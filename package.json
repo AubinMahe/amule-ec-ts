@@ -1,0 +1,50 @@
+{
+   "name"           : "amule-ec",
+   "version"        : "0.1.0",
+   "description"    : "TypeScript client library for aMule's binary External Connections (EC) protocol",
+   "keywords"       : ["aMule", "amuled", "EC", "External Connections"],
+   "license"        : "GPL-3.0-or-later",
+   "author"         : "Aubin MAHÉ",
+   "type"           : "module",
+   "allowScripts"   : {
+      "esbuild@0.28.1": true
+   },
+   "main"           : "./dist/index.js",
+   "types"          : "./dist/index.d.ts",
+   "exports"        : {
+      ".": {
+         "types" : "./dist/index.d.ts",
+         "import": "./dist/index.js"
+      }
+   },
+   "files"          : ["dist"],
+   "engines"        : {
+      "node": ">=18"
+   },
+   "dependencies"   : {},
+   "devDependencies": {
+      "@eslint/js"               : "^10.0.1",
+      "@types/chai"              : "^5.2.3",
+      "@types/mocha"             : "^10.0.10",
+      "@types/node"              : "^22.10.5",
+      "chai"                     : "^6.2.2",
+      "eslint-plugin-sonarjs"    : "^4.0.3",
+      "globals"                  : "^17.7.0",
+      "mocha"                    : "^11.3.0",
+      "monocart-coverage-reports": "^2.12.11",
+      "prettier"                 : "^3.9.6",
+      "tsx"                      : "^4.22.3",
+      "typescript"               : "^5.7.2",
+      "typescript-eslint"        : "^8.59.4"
+   },
+   "scripts"        : {
+      "build"                   : "tsc -p tsconfig.json",
+      "format"                  : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
+      "lint"                    : "tsc --noEmit -p tsconfig.tests.json && eslint src tests --ext .ts",
+      "prepack"                 : "npm run build",
+      "prepare"                 : "npm run build",
+      "repl"                    : "node --import tsx ./tests/repl/main.ts",
+      "tests-unitaires"         : "mocha",
+      "tests-unitaires:coverage": "mcr mocha"
+   }
+}

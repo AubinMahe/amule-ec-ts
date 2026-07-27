@@ -1,0 +1,19 @@
+{
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "name": "repl",
+         "type": "node",
+         "request": "launch",
+         "args": [
+            "${workspaceFolder}/tests/repl/main.ts",
+            "show dl"
+         ],
+         "runtimeArgs": [
+            "--import", "tsx",
+         ],
+         "cwd": "${workspaceRoot}",
+         "internalConsoleOptions": "openOnSessionStart"
+      }
+   ]
+}

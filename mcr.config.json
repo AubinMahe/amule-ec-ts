@@ -1,0 +1,10 @@
+{
+   "name": "amule-ec - couverture des tests unitaires",
+   "outputDir": "./coverage/unitaires",
+   "reports": ["v8", "console-details", "text-summary"],
+   "filter": {
+      "**/src/**": true,
+      "**/**": false
+   },
+   "cleanCache": true
+}
