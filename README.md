@@ -17,7 +17,8 @@ on non-trivial points.
 
 Early extraction (`0.1.0`) - the API surface still mirrors its origin
 project closely and hasn't yet been reviewed for a standalone library's
-needs (versioning, changelog, semver commitments).
+needs (versioning, changelog, semver commitments). See [TODO.md](TODO.md)
+for planned work.
 
 ## Usage
 
