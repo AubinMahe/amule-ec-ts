@@ -1,6 +1,7 @@
 # amule-ec
 
 [![CI](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/AubinMahe/amule-ec-ts/graph/badge.svg)](https://codecov.io/gh/AubinMahe/amule-ec-ts)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
