@@ -21,4 +21,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npm run tests-unitaires
+      - run: npm run tests-unitaires:coverage
+      - if: matrix.node-version == '20.x'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/unitaires/codecov.json

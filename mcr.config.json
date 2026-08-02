@@ -1,7 +1,7 @@
 {
    "name": "amule-ec - couverture des tests unitaires",
    "outputDir": "./coverage/unitaires",
-   "reports": ["v8", "console-details", "text-summary"],
+   "reports": ["v8", "console-details", "text-summary", "codecov"],
    "filter": {
       "**/node_modules/**": false,
       "**/src/**": true,
