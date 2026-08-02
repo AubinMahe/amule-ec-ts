@@ -1,6 +1,6 @@
 {
    "name"           : "amule-ec",
-   "version"        : "1.0.0",
+   "version"        : "1.0.1",
    "description"    : "TypeScript client library for aMule's binary External Connections (EC) protocol",
    "keywords"       : ["aMule", "amuled", "EC", "External Connections"],
    "homepage"       : "https://github.com/AubinMahe/amule-ec-ts#readme",
