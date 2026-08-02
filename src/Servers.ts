@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
@@ -6,10 +7,13 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECIPv4Tag, ECStringTag } from "./ECTags.js";
 
+const debug = debuglog("amule-ec:servers");
+
 /**
  * One EC_TAG_SERVER entry from an EC_OP_SERVER_LIST reply.
  *
- * Confirmed against amule/src/ECSpecialCoreTags.cpp:48-113
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L48-L113
  * (CEC_Server_Tag's status-report constructor, the one Get_EC_Response
  * uses for EC_OP_GET_SERVER_LIST): the tag's own data is an EC_IPv4_t
  * (IP + port), not a wrapper. Which children are present depends on the
@@ -110,6 +114,7 @@ export class Servers implements ECFetchable {
          })
          .map((tag) => ServerInfo.fromTag(tag))
          .filter((server): server is ServerInfo => server !== undefined);
+      debug("fetch: %d server(s)", this.servers.length);
    }
 
    /**
@@ -117,7 +122,7 @@ export class Servers implements ECFetchable {
     * ServerInfo.ipPort formats one - EC_OP_SERVER_CONNECT.
     *
     * Confirmed against Get_EC_Response_Server
-    * (amule/src/ExternalConn.cpp:1508-1548): the
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1508-L1548): the
     * request's EC_TAG_SERVER tag carries the target as its own EC_IPv4_t
     * data (IP + port) - the same shape ServerInfo.fromTag() decodes, not
     * a coincidence, since the daemon looks the server up by that exact
@@ -146,5 +151,6 @@ export class Servers implements ECFetchable {
             `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("connect: %s", ipPort);
    }
 }

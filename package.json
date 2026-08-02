@@ -1,10 +1,16 @@
 {
    "name"           : "amule-ec",
-   "version"        : "0.1.0",
+   "version"        : "1.0.0",
    "description"    : "TypeScript client library for aMule's binary External Connections (EC) protocol",
    "keywords"       : ["aMule", "amuled", "EC", "External Connections"],
+   "homepage"       : "https://github.com/AubinMahe/amule-ec-ts#readme",
+   "bugs"           : "https://github.com/AubinMahe/amule-ec-ts/issues",
+   "repository"     : {
+      "type": "git",
+      "url" : "git+https://github.com/AubinMahe/amule-ec-ts.git"
+   },
    "license"        : "GPL-3.0-or-later",
-   "author"         : "Aubin MAHÉ",
+   "author"         : "Aubin MAHÉ <aubin.mahe@wanadoo.fr>",
    "type"           : "module",
    "allowScripts"   : {
       "esbuild@0.28.1": true

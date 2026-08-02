@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 function searchResultTag(fields: { ecid: number; hash: string; name: string; sources?: bigint }): ec.ECTag {

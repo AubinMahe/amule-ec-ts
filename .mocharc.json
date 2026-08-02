@@ -1,6 +1,6 @@
 {
    "reporter": "spec",
    "extension": ["ts"],
-   "spec": "tests/unitaires/**/*.test.ts",
+   "spec": "tests/**/*.test.ts",
    "node-option": ["import=tsx"]
 }

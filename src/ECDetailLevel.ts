@@ -4,7 +4,8 @@
  * reply. One enum shared by every such request (stats, connstate, download
  * queue, shared files, ...), per aMule's ExternalConn.cpp.
  *
- * Confirmed against /home/aubin/Dev/git/amule/src/libs/ec/cpp/ECCodes.h:550-557.
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECCodes.h#L550-L557.
  */
 export enum ECDetailLevel {
    /** Lightest level, intended for periodic command-line polling. */

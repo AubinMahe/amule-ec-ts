@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
@@ -6,10 +7,13 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag } from "./ECTags.js";
 
+const debug = debuglog("amule-ec:uploads");
+
 /**
  * One EC_TAG_CLIENT entry from an EC_OP_ULOAD_QUEUE reply.
  *
- * Confirmed against /home/aubin/Dev/git/amule/src/ECSpecialCoreTags.cpp:327-397
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L327-L397
  * (CEC_UpDownClient_Tag): EC_TAG_CLIENT's own data is the client's internal
  * ECID (`CECTag(EC_TAG_CLIENT, client->ECID())`), not its user hash - the
  * hash and the other properties used below are children, added
@@ -78,5 +82,6 @@ export class Uploads implements ECFetchable {
             return name === ECTagNames.EC_TAG_CLIENT;
          })
          .map((tag) => new UploadClient(tag));
+      debug("fetch: %d client(s)", this.clients.length);
    }
 }

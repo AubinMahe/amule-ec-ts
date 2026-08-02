@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
@@ -6,11 +7,14 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag } from "./ECTags.js";
 
+const debug = debuglog("amule-ec:sharedfiles");
+
 /**
  * One EC_TAG_KNOWNFILE entry from an EC_OP_SHARED_FILES reply or
  * notification.
  *
- * Confirmed against /home/aubin/Dev/git/amule/src/ECSpecialCoreTags.cpp:223-300
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L223-L300
  * (CEC_SharedFile_Tag - the base class CEC_PartFile_Tag also builds on, see
  * DownloadFile's class doc for the parallel): own data is the file's
  * internal ECID, not its hash; name/hash/size are only added when
@@ -116,7 +120,7 @@ export class SharedFiles implements ECFetchable {
     * undefined if this packet isn't about the shared file list.
     *
     * Confirmed against ECKnownFileMsgSource::GetNextPacket
-    * (/home/aubin/Dev/git/amule/src/ExternalConn.cpp:3233-3258): checks for
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3233-L3258): checks for
     * either EC_TAG_KNOWNFILE (add/update) or EC_TAG_PARTFILE (removal - see
     * class doc) as the top-level tag name.
     *
@@ -128,7 +132,10 @@ export class SharedFiles implements ECFetchable {
       const tag =
          packet.find(ECTagNames.EC_TAG_KNOWNFILE) ??
          packet.find(ECTagNames.EC_TAG_PARTFILE);
-      return tag ? SharedFile.fromTag(tag) : undefined;
+      if (!tag) return undefined;
+      const file = SharedFile.fromTag(tag);
+      debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
+      return file;
    }
 
    public async fetch(): Promise<void> {
@@ -152,6 +159,7 @@ export class SharedFiles implements ECFetchable {
             return name === ECTagNames.EC_TAG_KNOWNFILE;
          })
          .map((tag) => SharedFile.fromTag(tag));
+      debug("fetch: %d file(s)", this.files.length);
    }
 
    /**
@@ -171,6 +179,7 @@ export class SharedFiles implements ECFetchable {
             `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("reload: shared file list reloaded");
    }
 }
 

@@ -1,5 +1,9 @@
 # amule-ec
 
+[![CI](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
+
 A from-scratch TypeScript client for aMule's binary "External Connections" (EC)
 protocol - the protocol `amuled` exposes for remote control (the same one
 `amulecmd`, `amuleweb` and the aMule GUI use).
@@ -7,18 +11,10 @@ protocol - the protocol `amuled` exposes for remote control (the same one
 Zero runtime dependencies - only Node built-ins (`node:net`, `node:crypto`,
 `node:zlib`, `node:events`, `node:util`, `node:timers/promises`).
 
-Extracted from [aMuleNodeJS](https://github.com/AubinMahe/aMuleNodeJS), a
-personal home-server project, where protocol assumptions (opcodes, tag
-layouts, enum values) were verified against aMule's own C++ source rather
-than its EC protocol PDF doc, which has repeatedly proven incomplete or wrong
-on non-trivial points.
-
 ## Status
 
-Early extraction (`0.1.0`) - the API surface still mirrors its origin
-project closely and hasn't yet been reviewed for a standalone library's
-needs (versioning, changelog, semver commitments). See [TODO.md](TODO.md)
-for planned work.
+`1.0.0` - see [CHANGELOG.md](CHANGELOG.md) for released changes and
+[TODO.md](TODO.md) for planned work.
 
 ## Usage
 
@@ -37,6 +33,21 @@ console.log(downloads.files);
 `ECEngine` has no filesystem access of its own and no opinion on where
 `port`/`passwordHash` come from - reading `amule.conf` is the caller's
 responsibility.
+
+## Debugging
+
+Connection loss and failed reconnect attempts are always logged to stderr
+via `console.error`/`console.log` - no opt-in needed. Everything else (wire
+framing, opcode dispatch, per-request results) is silent by default and
+opt-in per topic via Node's built-in `NODE_DEBUG` env var, one topic per
+class: `connection`, `packet`, `tags`, `engine`, `downloads`, `uploads`,
+`servers`, `sharedfiles`, `status`, `log`, `search` - all under the
+`amule-ec:` prefix.
+
+```bash
+NODE_DEBUG=amule-ec:downloads node app.js   # trace only Downloads
+NODE_DEBUG=amule-ec:*         node app.js   # trace everything
+```
 
 ## Development
 
@@ -67,8 +78,13 @@ npm install /path/to/amule-ec-<version>.tgz
 ```
 
 This installs exactly what a real consumer would get from the npm registry
-(respecting `files`/`package.json`), unlike `npm link` or a `file:` dependency
-which expose the raw source tree instead.
+(respecting `files`/`package.json`).
+
+## Contributing
+
+Bug reports and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md)
+for the development workflow and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for
+the project's expectations of contributors.
 
 ## License
 

@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 
 describe("TransmissionHeader", () => {
    it("round-trips flags and bodyLength through encode()/decode()", () => {

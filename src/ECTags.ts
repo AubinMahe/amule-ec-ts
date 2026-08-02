@@ -44,8 +44,10 @@ export abstract class ECTag {
     * child TAGCOUNT + children, then the tag's own data.
     *
     * TAGLEN itself does NOT count the child-TAGCOUNT field's own bytes -
-    * confirmed against CECTag::GetTagLen()/WriteTag()
-    * (/home/aubin/Dev/git/amule/src/libs/ec/cpp/ECTag.cpp:469-498,625-648):
+    * confirmed against CECTag::GetTagLen()
+    * (https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECTag.cpp#L469-L498)
+    * /WriteTag()
+    * (https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECTag.cpp#L625-L648):
     * GetTagLen() sums `m_dataLen` (own data) plus, per child, that child's
     * own GetTagLen() *and* the child's TAGNAME/TAGTYPE/TAGLEN header size -
     * never this tag's own TAGCOUNT field, even though WriteTag() physically

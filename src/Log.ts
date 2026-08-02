@@ -1,9 +1,12 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECStringTag } from "./ECTags.js";
+
+const debug = debuglog("amule-ec:log");
 
 /** The daemon's accumulated log, as returned by EC_OP_GET_LOG / EC_OP_LOG. */
 export class Log implements ECFetchable {
@@ -13,7 +16,8 @@ export class Log implements ECFetchable {
    public constructor(public readonly connection: ECConnection) {}
 
    /**
-    * Confirmed against /home/aubin/Dev/git/amule/src/ExternalConn.cpp:2888-2890:
+    * Confirmed against
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2888-L2890:
     * unlike the list-style replies elsewhere in this client, the whole log
     * is carried as a *single* EC_TAG_STRING (`theApp->GetLog(false)`),
     * newline-separated - not one tag per line. No request tag is needed
@@ -34,6 +38,7 @@ export class Log implements ECFetchable {
          .split(/\r?\n/)
          .map((line) => line.trim())
          .filter((line) => line.length > 0);
+      debug("fetch: %d line(s)", this.lines.length);
    }
 
    /**
@@ -52,5 +57,6 @@ export class Log implements ECFetchable {
             `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("reset: log cleared");
    }
 }

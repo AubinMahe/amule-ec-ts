@@ -14,9 +14,6 @@ export class TransmissionHeader {
       this.bodyLength = bodyLength >>> 0;
    }
 
-   /**
-    * Sérialise l'en-tête.
-    */
    public encode(): Buffer {
       const buffer = Buffer.allocUnsafe(TransmissionHeader.SIZE);
       buffer.writeUInt32BE(this.flags, 0);
@@ -24,9 +21,6 @@ export class TransmissionHeader {
       return buffer;
    }
 
-   /**
-    * Désérialise un en-tête.
-    */
    public static decode(buffer: Uint8Array): TransmissionHeader {
       if (buffer.byteLength < TransmissionHeader.SIZE) {
          throw new RangeError(
@@ -41,30 +35,18 @@ export class TransmissionHeader {
       return new TransmissionHeader(view.readUInt32BE(0), view.readUInt32BE(4));
    }
 
-   /**
-    * Taille totale du paquet (en-tête + corps).
-    */
    public get packetLength(): number {
       return TransmissionHeader.SIZE + this.bodyLength;
    }
 
-   /**
-    * Indique si le corps est compressé.
-    */
    public get compressed(): boolean {
       return ECFlags.isCompressed(this.flags);
    }
 
-   /**
-    * Indique si les nombres sont codés en UTF-8.
-    */
    public get utf8Numbers(): boolean {
       return ECFlags.usesUtf8Numbers(this.flags);
    }
 
-   /**
-    * Indique si le codage étendu des TAGCOUNT est utilisé.
-    */
    public get largeTagCount(): boolean {
       return ECFlags.usesLargeTagCount(this.flags);
    }

@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
@@ -6,7 +7,9 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECIPv4Tag } from "./ECTags.js";
 
-/** IDs at/above this threshold are eD2k "High ID" (reachable directly); below it, "Low ID" (behind a firewall/NAT). Confirmed against /home/aubin/Dev/git/amule/src/NetworkFunctions.h:122. */
+const debug = debuglog("amule-ec:status");
+
+/** IDs at/above this threshold are eD2k "High ID" (reachable directly); below it, "Low ID" (behind a firewall/NAT). Confirmed against https://github.com/amule-org/amule/blob/master/src/NetworkFunctions.h#L122. */
 const HIGHEST_LOWID_ED2K_KAD = 16_777_216n;
 
 /**
@@ -14,7 +17,7 @@ const HIGHEST_LOWID_ED2K_KAD = 16_777_216n;
  * exchanges:
  *  - EC_OP_STAT_REQ / EC_OP_STATS: transfer rates and network-wide counts.
  *    Confirmed against Get_EC_Response_StatRequest
- *    (/home/aubin/Dev/git/amule/src/ExternalConn.cpp:839, EC_DETAIL_CMD
+ *    (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L839, EC_DETAIL_CMD
  *    case at line 871): the EC_TAG_STATS_* tags sit directly at the
  *    packet's top level (no wrapper tag, unlike EC_TAG_PARTFILE).
  *  - EC_OP_GET_CONNSTATE / EC_OP_MISC_DATA: connection state, current
@@ -67,7 +70,8 @@ export class Status implements ECFetchable {
     * (see class doc). EC_TAG_SERVER's own data is an EC_IPv4_t (IP +
     * port), not a wrapper around EC_TAG_SERVER_IP/EC_TAG_SERVER_PORT
     * children - confirmed against CEC_Server_Tag's status-report
-    * constructor, /home/aubin/Dev/git/amule/src/ECSpecialCoreTags.cpp:50
+    * constructor,
+    * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L50
     * (`CECTag(EC_TAG_SERVER, EC_IPv4_t(server->GetIP(), server->GetPort()))`);
     * the separate IP/PORT child tags are only used by the other
     * CEC_Server_Tag constructor (preferences editing), not this one.
@@ -112,6 +116,12 @@ export class Status implements ECFetchable {
          statsReply,
          connStateReply.find(ECTagNames.EC_TAG_CONNSTATE),
       );
+      debug(
+         "fetch: ed2kConnected=%s, kadConnected=%s, downloadSpeed=%s",
+         this.ed2kConnected,
+         this.kadConnected,
+         this.downloadSpeed,
+      );
    }
 
    /**
@@ -125,6 +135,11 @@ export class Status implements ECFetchable {
       const connStateTag = packet.find(ECTagNames.EC_TAG_CONNSTATE);
       if (!connStateTag) return false;
       this.applySnapshot(undefined, connStateTag);
+      debug(
+         "applyNotification: ed2kConnected=%s, kadConnected=%s",
+         this.ed2kConnected,
+         this.kadConnected,
+      );
       return true;
    }
 

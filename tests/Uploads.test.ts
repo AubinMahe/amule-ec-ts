@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 /** Builds a synthetic EC_TAG_CLIENT tag, as UploadClient's constructor reads it. */

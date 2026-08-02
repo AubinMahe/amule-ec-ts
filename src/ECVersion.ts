@@ -6,7 +6,7 @@ export const ECVersion = {
     * (see ECConnection.authenticateWithHash) so the daemon's own log
     * ("Connecting client: ...") identifies this client instead of
     * "Unknown Unknown version" - confirmed against
-    * /home/aubin/Dev/git/amule/src/ExternalConn.cpp:602-608.
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L602-L608.
     */
    CLIENT_NAME: "TS-Client",
    CLIENT_VERSION: "1.0.0",

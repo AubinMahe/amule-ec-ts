@@ -3,6 +3,7 @@
    "outputDir": "./coverage/unitaires",
    "reports": ["v8", "console-details", "text-summary"],
    "filter": {
+      "**/node_modules/**": false,
       "**/src/**": true,
       "**/**": false
    },

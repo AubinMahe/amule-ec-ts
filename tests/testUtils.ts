@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 
 /**
  * A minimal stand-in for ECConnection, structurally compatible with what

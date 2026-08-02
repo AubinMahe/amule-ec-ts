@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 import { startFakeEcServer, computeSaltedHash, type FakeEcServer, type FakeEcPeer } from "./fakeEcServer.js";
 import { hexHash } from "./testUtils.js";
 

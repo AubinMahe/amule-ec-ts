@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
@@ -6,9 +7,12 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 
+const debug = debuglog("amule-ec:downloads");
+
 /**
  * A partfile's `EC_TAG_PARTFILE_STATUS` value - confirmed against
- * /home/aubin/Dev/git/amule/src/Constants.h:94-104 (the `PS_*` #defines
+ * https://github.com/amule-org/amule/blob/master/src/Constants.h#L94-L104
+ * (the `PS_*` #defines
  * `CPartFile::GetStatus()` returns, transmitted as-is by
  * `CEC_PartFile_Tag`, ECSpecialCoreTags.cpp:174).
  */
@@ -28,7 +32,8 @@ export enum ECPartFileStatus {
 
 /**
  * The base (non-auto) priority a partfile's `EC_TAG_PARTFILE_PRIO` value
- * encodes - confirmed against /home/aubin/Dev/git/amule/src/Constants.h:107-118
+ * encodes - confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/Constants.h#L107-L118
  * (the `PR_*` #defines). The wire value itself is
  * `file->IsAutoDownPriority() ? file->GetDownPriority() + 10 : file->GetDownPriority()`
  * (ECSpecialCoreTags.cpp:189-191) - i.e. add 10 to flag "auto" - see
@@ -47,7 +52,8 @@ export enum ECDownloadPriority {
 /**
  * One EC_TAG_PARTFILE entry from an EC_OP_DLOAD_QUEUE reply or notification.
  *
- * Confirmed against /home/aubin/Dev/git/amule/src/ECSpecialCoreTags.cpp:
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp:
  * EC_TAG_PARTFILE's own data is the file's internal ECID
  * (`CEC_SharedFile_Tag : CECTag(name, file->ECID())`, line 225), not its
  * hash - the hash and the other properties used below (name, sizes, speed,
@@ -91,7 +97,9 @@ export class DownloadFile {
    public readonly partMetId: bigint | undefined;
    /** `EC_TAG_PARTFILE_STOPPED` (`file->IsStopped()`, ECSpecialCoreTags.cpp:175). */
    public readonly stopped: boolean;
-   /** Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER` (ECSpecialCoreTags.cpp:179), used by statusText to tell "Downloading" from "Waiting". */
+   /** Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER` (ECSpecialCoreTags.cpp:179),
+    * used by statusText to tell "Downloading" from "Waiting".
+    */
    public readonly sourcesXfer: bigint | undefined;
 
    private constructor(fields: {
@@ -174,7 +182,7 @@ export class DownloadFile {
 
    /**
     * Human-readable priority, mirroring DataToText.cpp's `PriorityToStr()`
-    * (/home/aubin/Dev/git/amule/src/DataToText.cpp:31-62) - see `prio`'s
+    * (https://github.com/amule-org/amule/blob/master/src/DataToText.cpp#L31-L62) - see `prio`'s
     * class doc for the "+10 means auto" wire encoding this decodes.
     */
    public get priorityText(): string {
@@ -212,7 +220,7 @@ export class DownloadFile {
 
    /**
     * Human-readable status, mirroring `CPartFile::getPartfileStatus()`
-    * (/home/aubin/Dev/git/amule/src/PartFile.cpp:4353-4389): hashing/allocating
+    * (https://github.com/amule-org/amule/blob/master/src/PartFile.cpp#L4353-L4389): hashing/allocating
     * take priority over the status switch, "Downloading" vs "Waiting" is
     * decided by whether any source is currently transferring (not merely
     * connected), and a stopped file reads "Stopped" unless already complete.
@@ -269,7 +277,7 @@ export class Downloads implements ECFetchable {
     * undefined if this packet isn't about the download queue.
     *
     * Confirmed against ECPartFileMsgSource::GetNextPacket
-    * (/home/aubin/Dev/git/amule/src/ExternalConn.cpp:3165-3189): a download
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3165-L3189): a download
     * notification is an EC_OP_DLOAD_QUEUE packet carrying exactly one
     * EC_TAG_PARTFILE tag - same opcode/tag name as Downloads.fetch()'s
     * reply, just unsolicited and for a single file. See DownloadFile's
@@ -282,7 +290,10 @@ export class Downloads implements ECFetchable {
    public static parseNotification(packet: ECPacket): DownloadFile | undefined {
       if (packet.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) return undefined;
       const tag = packet.find(ECTagNames.EC_TAG_PARTFILE);
-      return tag ? DownloadFile.fromTag(tag) : undefined;
+      if (!tag) return undefined;
+      const file = DownloadFile.fromTag(tag);
+      debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
+      return file;
    }
 
    public async fetch(): Promise<void> {
@@ -306,6 +317,7 @@ export class Downloads implements ECFetchable {
             return name === ECTagNames.EC_TAG_PARTFILE;
          })
          .map((tag) => DownloadFile.fromTag(tag));
+      debug("fetch: %d file(s)", this.files.length);
    }
 
    /**
@@ -313,7 +325,7 @@ export class Downloads implements ECFetchable {
     * EC_OP_PARTFILE_DELETE.
     *
     * Confirmed against Get_EC_Response_PartFile_Cmd
-    * (/home/aubin/Dev/git/amule/src/ExternalConn.cpp:1405-1477, dispatched
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1405-L1477, dispatched
     * for EC_OP_PARTFILE_DELETE at ExternalConn.cpp:2456-2466): the request
     * carries the target as an EC_TAG_PARTFILE tag whose own data is the
     * file's MD4 hash - same tag name/shape TextClient.cpp's own "cancel"
@@ -344,6 +356,7 @@ export class Downloads implements ECFetchable {
             `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("cancel: hash=%s", hash);
    }
 
    /**
@@ -351,7 +364,7 @@ export class Downloads implements ECFetchable {
     *
     * Confirmed against the EC_OP_RENAME_FILE case in
     * ExternalConn::ProcessRequest2
-    * (/home/aubin/Dev/git/amule/src/ExternalConn.cpp:2481-2506): the request
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2481-L2506): the request
     * carries the target file as an EC_TAG_KNOWNFILE tag (own data: MD4
     * hash) and the new name as an EC_TAG_PARTFILE_NAME string tag - same
     * shape TextClient.cpp's own "rename" command builds
@@ -385,6 +398,7 @@ export class Downloads implements ECFetchable {
             `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("rename: hash=%s, newName=%s", hash, newName);
    }
 }
 

@@ -1,7 +1,7 @@
 import * as net from "node:net";
 import * as zlib from "node:zlib";
 import * as crypto from "node:crypto";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 
 /**
  * Buffers a socket's incoming bytes and lets callers await an exact byte

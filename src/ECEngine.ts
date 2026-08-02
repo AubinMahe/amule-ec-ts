@@ -1,6 +1,9 @@
 import { setTimeout } from "node:timers/promises";
+import { debuglog } from "node:util";
 
 import { ECConnection } from "./ECConnection.js";
+
+const debug = debuglog("amule-ec:engine");
 
 const DEFAULT_HOST = "localhost";
 
@@ -11,11 +14,20 @@ const RECONNECT_MAX_DELAY_MS = 30_000;
 let instance: ECConnection | undefined;
 
 export interface ECEngineStartOptions {
-   /** Defaults to "localhost" - the daemon and this client are expected to run on the same machine. */
+   /**
+    * Defaults to "localhost" - the daemon and this client are expected to run
+    * on the same machine.
+    */
    host?: string;
-   /** The daemon's EC port, e.g. read from its own config's [ExternalConnect] section (ECPort). */
+   /**
+    * The daemon's EC port, e.g. read from its own config's [ExternalConnect]
+    * section (ECPort).
+    */
    port: number;
-   /** MD5(plaintext) hex, e.g. read as-is from the daemon's own config (ECPassword is already stored in this form). */
+   /**
+    * MD5(plaintext) hex, e.g. read as-is from the daemon's own config
+    * (ECPassword is already stored in this form).
+    */
    passwordHash: string;
    /**
     * Sets connection.localCapabilities.notify before authenticating -
@@ -47,7 +59,7 @@ export function armReconnect(
    notify: boolean,
 ): void {
    connection.once("disconnected", () => {
-      console.error("EC: connexion à amuled perdue, tentative de reconnexion...");
+      console.error("amule-ec: connection to amuled lost, reconnecting...");
       void reconnectLoop(connection, host, port, passwordHash, notify);
    });
 }
@@ -60,18 +72,19 @@ async function reconnectLoop(
    notify: boolean,
 ): Promise<void> {
    let delayMs = RECONNECT_INITIAL_DELAY_MS;
-   for (;;) {
+   for (let attempt = 1; ; attempt++) {
       await setTimeout(delayMs);
+      debug("reconnectLoop: attempt %d, after %dms backoff", attempt, delayMs);
       try {
          await connection.reconnect(host, port);
          connection.localCapabilities.notify = notify;
          await connection.authenticateWithHash(passwordHash);
-         console.log("EC: reconnecté à amuled.");
+         console.log("amule-ec: reconnected to amuled.");
          armReconnect(connection, host, port, passwordHash, notify);
          return;
       }
       catch (error) {
-         console.error("EC: échec de la tentative de reconnexion, nouvel essai...", error);
+         console.error("amule-ec: reconnect attempt failed, retrying...", error);
          delayMs = Math.min(delayMs * 2, RECONNECT_MAX_DELAY_MS);
       }
    }

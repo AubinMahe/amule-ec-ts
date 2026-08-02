@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ec from "../../src/index.js";
+import * as ec from "../src/index.js";
 
 describe("ECFlags.create", () => {
    it("with no arguments, sets only the protocol marker", () => {

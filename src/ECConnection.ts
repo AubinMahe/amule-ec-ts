@@ -91,7 +91,10 @@ export class ECConnection extends events.EventEmitter {
       this.wireSocket();
    }
 
-   /** Attaches the data/error/close listeners to `this.socket` - called from the constructor and again from reconnect() once a fresh socket is in place. */
+   /**
+    * Attaches the data/error/close listeners to `this.socket` - called from
+    * the constructor and again from reconnect() once a fresh socket is in place.
+    */
    private wireSocket(): void {
       this.socket.on("data", (chunk: Buffer) => {
          this.onData(chunk);
@@ -194,7 +197,7 @@ export class ECConnection extends events.EventEmitter {
     * "notification" events) once authenticated. Unlike largeTagCount/
     * partialUpdate, the server doesn't echo this capability back in
     * EC_OP_AUTH_OK - confirmed against
-    * /home/aubin/Dev/git/amule/src/ExternalConn.cpp:701, which reads
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L701, which reads
     * EC_TAG_CAN_NOTIFY off our own EC_OP_AUTH_REQ and registers the socket
     * with ECNotifier unconditionally if present, with no acknowledgement.
     */

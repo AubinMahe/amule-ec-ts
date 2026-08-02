@@ -1,3 +1,4 @@
+import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
@@ -10,9 +11,11 @@ import {
    ECHash16Tag,
 } from "./ECTags.js";
 
+const debug = debuglog("amule-ec:search");
+
 /**
  * EC_SEARCH_TYPE values a search request selects - confirmed against
- * /home/aubin/Dev/git/amule/src/libs/ec/cpp/ECCodes.h:561-566.
+ * https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECCodes.h#L561-L566.
  */
 export enum ECSearchType {
    LOCAL = 0x00,
@@ -23,7 +26,7 @@ export enum ECSearchType {
 
 /**
  * CSearchList::SearchLifecycleState - confirmed against
- * /home/aubin/Dev/git/amule/src/SearchList.h:139-144.
+ * https://github.com/amule-org/amule/blob/master/src/SearchList.h#L139-L144.
  */
 export enum ECSearchLifecycleState {
    IDLE = 0,
@@ -50,7 +53,8 @@ export interface ECSearchProgress {
 /**
  * One EC_TAG_SEARCHFILE entry from an EC_OP_SEARCH_RESULTS reply.
  *
- * Confirmed against /home/aubin/Dev/git/amule/src/libs/ec/cpp/ECSpecialTags.h:538-576
+ * Confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECSpecialTags.h#L538-L576
  * and ECSpecialCoreTags.cpp:443-497 (CEC_SearchFile_Tag): own data is the
  * result's internal ECID; hash/name/size are children present at
  * EC_DETAIL_FULL, the level Search.fetch() requests (by omission - see its doc).
@@ -165,6 +169,7 @@ export class Search {
             `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("start: keywords=%s, fileType=%s", params.keywords, params.fileType);
    }
 
    /**
@@ -184,6 +189,7 @@ export class Search {
             `Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("stop: search stopped");
    }
 
    /**
@@ -210,11 +216,18 @@ export class Search {
          ECTagNames.EC_TAG_SEARCH_LIFECYCLE_PERCENT,
       );
       const countTag = reply.find(ECTagNames.EC_TAG_SEARCH_RESULT_COUNT);
-      return {
+      const progress: ECSearchProgress = {
          state: Number(stateTag?.intValue ?? 0n),
          percent: Number(percentTag?.intValue ?? 0n),
          resultCount: Number(countTag?.intValue ?? 0n),
       };
+      debug(
+         "progress: state=%s, percent=%d, resultCount=%d",
+         ECSearchLifecycleState[progress.state],
+         progress.percent,
+         progress.resultCount,
+      );
+      return progress;
    }
 
    /**
@@ -241,6 +254,7 @@ export class Search {
             return name === ECTagNames.EC_TAG_SEARCHFILE;
          })
          .map((tag) => new SearchResult(tag));
+      debug("fetch: %d result(s)", this.results.length);
    }
 
    /**
@@ -250,8 +264,7 @@ export class Search {
     * Confirmed against Get_EC_Response_Search_Results_Download
     * (ExternalConn.cpp:1905-1929) and amulecmd's own "download" command
     * (TextClient.cpp:727-744): one EC_TAG_PARTFILE tag per result (own data:
-    * MD4 hash), with an EC_TAG_PARTFILE_CAT child (category, always 0 here -
-    * aMuleNodeJS has no category feature). Always replies EC_OP_STRINGS
+    * MD4 hash), with an EC_TAG_PARTFILE_CAT child. Always replies EC_OP_STRINGS
     * unconditionally, with no tags - there is no failure case to check.
     */
    public async download(hashes: readonly string[]): Promise<void> {
@@ -272,5 +285,6 @@ export class Search {
             `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
          );
       }
+      debug("download: %d hash(es) requested", hashes.length);
    }
 }
