@@ -9,14 +9,6 @@ import * as ec from "../../src/index.js";
 
 const HOST = "localhost";
 
-const HELP =
-   'Commands: "help", "info", "show dl", "show ul", "show shared", ' +
-   '"show servers", "connect <ip:port>", "search <keywords>", "search stop", ' +
-   '"download <hash>...", "cancel <hash>", "pause <hash>", "resume <hash>", ' +
-   '"stop <hash>", "priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>", ' +
-   '"addlink <ed2k-link>", "clear completed", ' +
-   '"show log", "reset log", "status", "quit"/"exit"/Ctrl-D.\n';
-
 const SEARCH_POLL_INTERVAL_MS = 250;
 
 const PRIORITY_NAMES: Record<string, ec.ECDownloadPriority> = {
@@ -28,6 +20,49 @@ const PRIORITY_NAMES: Record<string, ec.ECDownloadPriority> = {
    auto: ec.ECDownloadPriority.PR_AUTO,
    powershare: ec.ECDownloadPriority.PR_POWERSHARE,
 };
+
+/** One row per command: keyword(s)/arguments, then a short description - see HELP below. */
+const HELP_ENTRIES: readonly (readonly [command: string, description: string])[] = [
+   ["help", "show this help"],
+   ["info", "negotiated capabilities"],
+   ["status", "connection state and transfer stats"],
+   ["show dl", "download queue"],
+   ["show ul", "upload queue"],
+   ["show shared", "shared files"],
+   ["show servers", "known server list"],
+   ["show log", "daemon log"],
+   ["reset log", "clear the daemon log"],
+   ["connect <ip:port>", "connect to a specific server"],
+   ["connect", "connect to ed2k/Kad per the daemon's preferences"],
+   ["disconnect", "disconnect from ed2k/Kad"],
+   ["search <keywords>", "start a search"],
+   ["search stop", "stop the running search"],
+   ["download <hash>...", "download one or more search results"],
+   ["cancel <hash>", "cancel a download"],
+   ["pause <hash>", "pause a download"],
+   ["resume <hash>", "resume a paused download"],
+   ["stop <hash>", "stop a download"],
+   [
+      `priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+      "set a download's priority",
+   ],
+   ["addlink <ed2k-link>", "start a download from a link"],
+   ["clear completed", "clear completed downloads"],
+   ["kad start", "start the Kademlia network"],
+   ["kad stop", "stop the Kademlia network"],
+   ["kad bootstrap <ip> <port>", "bootstrap Kad from a known node"],
+   ["kad update <url>", "update Kad's nodes.dat from a URL"],
+   ["quit / exit / Ctrl-D", "leave the REPL"],
+];
+
+const HELP_COMMAND_WIDTH = Math.max(...HELP_ENTRIES.map(([command]) => command.length));
+
+const HELP =
+   "Commands:\n" +
+   HELP_ENTRIES.map(
+      ([command, description]) => `  ${command.padEnd(HELP_COMMAND_WIDTH)}  ${description}`,
+   ).join("\n") +
+   "\n";
 
 interface ExternalConnectSettings {
    port: number;
@@ -333,6 +368,7 @@ class Repl {
    private readonly servers     : ec.Servers;
    private readonly search      : ec.Search;
    private readonly log         : ec.Log;
+   private readonly kad         : ec.Kad;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
@@ -342,6 +378,7 @@ class Repl {
       this.servers     = new ec.Servers(this.connection);
       this.search      = new ec.Search(this.connection);
       this.log         = new ec.Log(this.connection);
+      this.kad         = new ec.Kad(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -391,14 +428,62 @@ class Repl {
       printSearchResults(this.search.results);
    }
 
+   /** Bare "connect" is Kad.connect() (ed2k/Kad per daemon prefs); "connect <ip:port>" is Servers.connect(). */
    private async runConnect(args: string[]): Promise<void> {
       const ipPort = args[0];
       if (!ipPort) {
-         console.error("Usage: connect <ip:port>");
+         const messages = await this.kad.connect();
+         console.log(messages.length > 0 ? messages.join("\n") : "Nothing to connect to.");
          return;
       }
       await this.servers.connect(ipPort);
       console.log(`Connect requested: ${ipPort}.`);
+   }
+
+   private async runDisconnect(): Promise<void> {
+      const messages = await this.kad.disconnect();
+      console.log(messages.length > 0 ? messages.join("\n") : "Nothing was connected.");
+   }
+
+   private async runKad(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      switch (sub) {
+         case "start":
+            await this.kad.start();
+            console.log("Kad started.");
+            return;
+
+         case "stop":
+            await this.kad.stop();
+            console.log("Kad stopped.");
+            return;
+
+         case "update": {
+            const url = args[1];
+            if (!url) {
+               console.error("Usage: kad update <url>");
+               return;
+            }
+            await this.kad.updateNodesFromUrl(url);
+            console.log(`nodes.dat update requested: ${url}.`);
+            return;
+         }
+
+         case "bootstrap": {
+            const ip = args[1];
+            const port = Number(args[2]);
+            if (!ip || !args[2] || Number.isNaN(port)) {
+               console.error("Usage: kad bootstrap <ip> <port>");
+               return;
+            }
+            await this.kad.bootstrapFromIp(ip, port);
+            console.log(`Bootstrap requested: ${ip}:${port}.`);
+            return;
+         }
+
+         default:
+            console.error("Usage: kad <start|stop|update <url>|bootstrap <ip> <port>>");
+      }
    }
 
    /** Downloads one or more of the last search's results, identified by hash - see Search.download()'s doc. */
@@ -522,6 +607,14 @@ class Repl {
       }
       if (verb === "addlink") {
          await this.runAddLink(command.slice(1));
+         return;
+      }
+      if (verb === "disconnect") {
+         await this.runDisconnect();
+         return;
+      }
+      if (verb === "kad") {
+         await this.runKad(command.slice(1));
          return;
       }
 
