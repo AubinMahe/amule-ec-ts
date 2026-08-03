@@ -34,12 +34,30 @@ function downloadRemovalTag(hash: string): ec.ECTag {
    );
 }
 
+/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+function commentsTag(
+   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
+): ec.ECTag {
+   const children: ec.ECTag[] = [];
+   for (const entry of entries) {
+      children.push(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.userName),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.fileName),
+         new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, BigInt(entry.rating)),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.comment),
+      );
+   }
+   return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
+}
+
 /** Builds a synthetic EC_TAG_PARTFILE tag - only the fields statusText/priorityText read. */
 function partFileTag(fields: {
    status?: number;
    prio?: number;
    stopped?: boolean;
    sourcesXfer?: number;
+   comments?: ec.ECTag;
+   kadCommentSearching?: boolean;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.status !== undefined) {
@@ -56,6 +74,15 @@ function partFileTag(fields: {
    if (fields.sourcesXfer !== undefined) {
       children.push(
          new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER, fields.sourcesXfer),
+      );
+   }
+   if (fields.comments) children.push(fields.comments);
+   if (fields.kadCommentSearching !== undefined) {
+      children.push(
+         new ec.ECUInt64Tag(
+            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
+            fields.kadCommentSearching ? 1n : 0n,
+         ),
       );
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, children);
@@ -121,6 +148,34 @@ describe("DownloadFile.priorityText", () => {
    it("reports 'Unknown' when the prio field is absent", () => {
       const file = ec.DownloadFile.fromTag(partFileTag({}));
       expect(file.priorityText).to.equal("Unknown");
+   });
+});
+
+describe("DownloadFile comments/kadCommentSearching", () => {
+   it("decodes comments and kadCommentSearching when present", () => {
+      const file = ec.DownloadFile.fromTag(
+         partFileTag({
+            comments: commentsTag([
+               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
+            ]),
+            kadCommentSearching: true,
+         }),
+      );
+
+      expect(file.kadCommentSearching).to.equal(true);
+      expect(file.comments).to.have.lengthOf(1);
+      expect(file.comments?.[0]).to.deep.equal(
+         new ec.FileComment("Alice", "one.avi", ec.FileRating.GOOD, "Nice"),
+      );
+   });
+
+   it("leaves both undefined when absent", () => {
+      const file = ec.DownloadFile.fromTag(partFileTag({}));
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(file.comments).to.be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(file.kadCommentSearching).to.be.undefined;
    });
 });
 
@@ -423,6 +478,34 @@ describe("DownloadTracker", () => {
       tracker.apply(removal);
 
       expect(tracker.files).to.have.lengthOf(0);
+   });
+
+   it("apply() keeps previously known comments/kadCommentSearching when a later push omits them", () => {
+      const tracker = new ec.DownloadTracker();
+      const withComments = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      withComments.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            new ec.ECHash16Tag(
+               ec.ECTagNames.EC_TAG_PARTFILE_HASH,
+               new Uint8Array(Buffer.from(hexHash("a"), "hex")),
+            ),
+            new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, "one.avi"),
+            commentsTag([{ userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" }]),
+            new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, 1n),
+         ]),
+      );
+      tracker.apply(withComments);
+
+      const dirtyPush = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      dirtyPush.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n),
+         ]),
+      );
+      tracker.apply(dirtyPush);
+
+      expect(tracker.files[0]?.kadCommentSearching).to.equal(true);
+      expect(tracker.files[0]?.comments).to.have.lengthOf(1);
    });
 
    it("apply() returns undefined for a packet that isn't about the download queue", () => {

@@ -6,6 +6,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
+import { FileComment, parseFileComments, parseKadCommentSearching } from "./SharedFiles.js";
 
 const debug = debuglog("amule-ec:downloads");
 
@@ -101,6 +102,10 @@ export class DownloadFile {
     * used by statusText to tell "Downloading" from "Waiting".
     */
    public readonly sourcesXfer: bigint | undefined;
+   /** Community ratings/comments (own source comments + Kad NOTES) - see FileComment/parseFileComments' doc. */
+   public readonly comments: readonly FileComment[] | undefined;
+   /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   public readonly kadCommentSearching: boolean | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -116,6 +121,8 @@ export class DownloadFile {
       partMetId: bigint | undefined;
       stopped: boolean;
       sourcesXfer: bigint | undefined;
+      comments: readonly FileComment[] | undefined;
+      kadCommentSearching: boolean | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -130,6 +137,8 @@ export class DownloadFile {
       this.partMetId = fields.partMetId;
       this.stopped = fields.stopped;
       this.sourcesXfer = fields.sourcesXfer;
+      this.comments = fields.comments;
+      this.kadCommentSearching = fields.kadCommentSearching;
    }
 
    public static fromTag(tag: ECTag): DownloadFile {
@@ -152,6 +161,8 @@ export class DownloadFile {
          partMetId: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PARTMETID),
          stopped: (tag.childInt(ECTagNames.EC_TAG_PARTFILE_STOPPED) ?? 0n) !== 0n,
          sourcesXfer: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER),
+         comments: parseFileComments(tag),
+         kadCommentSearching: parseKadCommentSearching(tag),
       });
    }
 
@@ -171,6 +182,9 @@ export class DownloadFile {
          partMetId: update.partMetId ?? this.partMetId,
          stopped: update.stopped,
          sourcesXfer: update.sourcesXfer ?? this.sourcesXfer,
+         comments: update.comments ?? this.comments,
+         kadCommentSearching:
+            update.kadCommentSearching ?? this.kadCommentSearching,
       });
    }
 

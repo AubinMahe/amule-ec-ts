@@ -2,15 +2,47 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
+/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+function commentsTag(
+   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
+): ec.ECTag {
+   const children: ec.ECTag[] = [];
+   for (const entry of entries) {
+      children.push(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.userName),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.fileName),
+         new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, BigInt(entry.rating)),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.comment),
+      );
+   }
+   return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
+}
+
 /** Builds a synthetic EC_TAG_KNOWNFILE tag, as SharedFile.fromTag() reads it. */
-function sharedFileTag(fields: { ecid: number; hash: string; name: string }): ec.ECTag {
-   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, fields.ecid, [
+function sharedFileTag(fields: {
+   ecid: number;
+   hash: string;
+   name: string;
+   comments?: ec.ECTag;
+   kadCommentSearching?: boolean;
+}): ec.ECTag {
+   const children: ec.ECTag[] = [
       new ec.ECHash16Tag(
          ec.ECTagNames.EC_TAG_PARTFILE_HASH,
          new Uint8Array(Buffer.from(fields.hash, "hex")),
       ),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
-   ]);
+   ];
+   if (fields.comments) children.push(fields.comments);
+   if (fields.kadCommentSearching !== undefined) {
+      children.push(
+         new ec.ECUInt64Tag(
+            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
+            fields.kadCommentSearching ? 1n : 0n,
+         ),
+      );
+   }
+   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, fields.ecid, children);
 }
 
 /** A removal push notification's shape: own data IS the hash, tag name is EC_TAG_PARTFILE (see SharedFile's class doc). */
@@ -20,6 +52,60 @@ function sharedFileRemovalTag(hash: string): ec.ECTag {
       new Uint8Array(Buffer.from(hash, "hex")),
    );
 }
+
+describe("parseFileComments", () => {
+   it("decodes each 4-tag entry (userName/fileName/rating/comment) by index", () => {
+      const tag = sharedFileTag({
+         ecid: 1,
+         hash: hexHash("a"),
+         name: "one.avi",
+         comments: commentsTag([
+            { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.EXCELLENT, comment: "Great!" },
+            { userName: "Bob", fileName: "one (copy).avi", rating: ec.FileRating.POOR, comment: "Meh." },
+         ]),
+      });
+
+      const comments = ec.parseFileComments(tag);
+
+      expect(comments).to.have.lengthOf(2);
+      expect(comments?.[0]).to.deep.equal(
+         new ec.FileComment("Alice", "one.avi", ec.FileRating.EXCELLENT, "Great!"),
+      );
+      expect(comments?.[1]).to.deep.equal(
+         new ec.FileComment("Bob", "one (copy).avi", ec.FileRating.POOR, "Meh."),
+      );
+   });
+
+   it("returns undefined when the file tag carries no EC_TAG_PARTFILE_COMMENTS container", () => {
+      const tag = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi" });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(ec.parseFileComments(tag)).to.be.undefined;
+   });
+
+   it("returns an empty array for a present-but-empty container", () => {
+      const tag = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi", comments: commentsTag([]) });
+
+      expect(ec.parseFileComments(tag)).to.deep.equal([]);
+   });
+});
+
+describe("parseKadCommentSearching", () => {
+   it("decodes true/false when present", () => {
+      const running = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi", kadCommentSearching: true });
+      const idle = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi", kadCommentSearching: false });
+
+      expect(ec.parseKadCommentSearching(running)).to.equal(true);
+      expect(ec.parseKadCommentSearching(idle)).to.equal(false);
+   });
+
+   it("returns undefined when absent", () => {
+      const tag = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi" });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(ec.parseKadCommentSearching(tag)).to.be.undefined;
+   });
+});
 
 describe("SharedFiles.fetch", () => {
    it("requests EC_DETAIL_CMD and parses each EC_TAG_KNOWNFILE reply tag", async () => {
@@ -42,6 +128,30 @@ describe("SharedFiles.fetch", () => {
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
       await expectRejection(sharedFiles.fetch(), /EC_OP_SHARED_FILES/);
+   });
+
+   it("decodes comments/kadCommentSearching onto each file", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      reply.add(
+         sharedFileTag({
+            ecid: 1,
+            hash: hexHash("a"),
+            name: "one.avi",
+            comments: commentsTag([
+               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
+            ]),
+            kadCommentSearching: true,
+         }),
+      );
+      fake.queueReply(reply);
+
+      await sharedFiles.fetch();
+
+      expect(sharedFiles.files[0]?.kadCommentSearching).to.equal(true);
+      expect(sharedFiles.files[0]?.comments).to.have.lengthOf(1);
+      expect(sharedFiles.files[0]?.comments?.[0]?.userName).to.equal("Alice");
    });
 });
 
@@ -168,5 +278,29 @@ describe("SharedFileTracker", () => {
 
       expect(tracker.files).to.have.lengthOf(1);
       expect(tracker.files[0]?.name).to.equal("one.avi");
+   });
+
+   it("apply() keeps previously known comments/kadCommentSearching when a later push omits them", () => {
+      const tracker = new ec.SharedFileTracker();
+      const withComments = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      withComments.add(
+         sharedFileTag({
+            ecid: 1,
+            hash: hexHash("a"),
+            name: "one.avi",
+            comments: commentsTag([
+               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
+            ]),
+            kadCommentSearching: true,
+         }),
+      );
+      tracker.apply(withComments);
+
+      const dirtyPush = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      dirtyPush.add(sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi" }));
+      tracker.apply(dirtyPush);
+
+      expect(tracker.files[0]?.kadCommentSearching).to.equal(true);
+      expect(tracker.files[0]?.comments).to.have.lengthOf(1);
    });
 });
