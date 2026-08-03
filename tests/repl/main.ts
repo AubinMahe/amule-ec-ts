@@ -1,4 +1,5 @@
 import * as readline from "node:readline/promises";
+import { setTimeout } from "node:timers/promises";
 import { stdin, stdout } from "node:process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -9,7 +10,24 @@ import * as ec from "../../src/index.js";
 const HOST = "localhost";
 
 const HELP =
-   'Type a command ("help", "info", "show dl", "show ul", "show shared", "status"), "quit", "exit" or Ctrl-D to exit.\n';
+   'Commands: "help", "info", "show dl", "show ul", "show shared", ' +
+   '"show servers", "connect <ip:port>", "search <keywords>", "search stop", ' +
+   '"download <hash>...", "cancel <hash>", "pause <hash>", "resume <hash>", ' +
+   '"stop <hash>", "priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>", ' +
+   '"addlink <ed2k-link>", "clear completed", ' +
+   '"show log", "reset log", "status", "quit"/"exit"/Ctrl-D.\n';
+
+const SEARCH_POLL_INTERVAL_MS = 250;
+
+const PRIORITY_NAMES: Record<string, ec.ECDownloadPriority> = {
+   low: ec.ECDownloadPriority.PR_LOW,
+   normal: ec.ECDownloadPriority.PR_NORMAL,
+   high: ec.ECDownloadPriority.PR_HIGH,
+   veryhigh: ec.ECDownloadPriority.PR_VERYHIGH,
+   verylow: ec.ECDownloadPriority.PR_VERY_LOW,
+   auto: ec.ECDownloadPriority.PR_AUTO,
+   powershare: ec.ECDownloadPriority.PR_POWERSHARE,
+};
 
 interface ExternalConnectSettings {
    port: number;
@@ -161,6 +179,57 @@ function printSharedFiles(files: readonly ec.SharedFile[]): void {
    }
 }
 
+function printServer(server: ec.ServerInfo): void {
+   console.log(`${server.name ?? "(unknown name)"}  [${server.ipPort}]`);
+   console.log(
+      `  ping: ${server.ping ?? "?"}ms  users: ${server.users ?? "?"}/${server.usersMax ?? "?"}  files: ${server.files ?? "?"}`,
+   );
+}
+
+function printServers(servers: readonly ec.ServerInfo[]): void {
+   if (servers.length === 0) {
+      console.log("No known servers.");
+      return;
+   }
+
+   console.log(`${servers.length} server(s):\n`);
+
+   for (const server of servers) {
+      printServer(server);
+   }
+}
+
+function printSearchResult(result: ec.SearchResult): void {
+   console.log(`${result.name}  [${result.hash}]`);
+   console.log(
+      `  size: ${formatSize(result.sizeFull)}  sources: ${result.sources}`,
+   );
+}
+
+function printSearchResults(results: readonly ec.SearchResult[]): void {
+   if (results.length === 0) {
+      console.log("No results.");
+      return;
+   }
+
+   console.log(`${results.length} result(s):\n`);
+
+   for (const result of results) {
+      printSearchResult(result);
+   }
+}
+
+function printLog(lines: readonly string[]): void {
+   if (lines.length === 0) {
+      console.log("Log is empty.");
+      return;
+   }
+
+   for (const line of lines) {
+      console.log(line);
+   }
+}
+
 function formatIdLabel(status: ec.Status): string {
    if (status.hasLowId === undefined) return "";
    return status.hasLowId ? " (Low ID)" : " (High ID)";
@@ -261,12 +330,18 @@ class Repl {
    private readonly downloads   : ec.Downloads;
    private readonly uploads     : ec.Uploads;
    private readonly sharedFiles : ec.SharedFiles;
+   private readonly servers     : ec.Servers;
+   private readonly search      : ec.Search;
+   private readonly log         : ec.Log;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
       this.uploads     = new ec.Uploads(this.connection);
       this.sharedFiles = new ec.SharedFiles(this.connection);
       this.status      = new ec.Status(this.connection);
+      this.servers     = new ec.Servers(this.connection);
+      this.search      = new ec.Search(this.connection);
+      this.log         = new ec.Log(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -294,7 +369,162 @@ class Repl {
       }
    }
 
+   /** Starts a search, polls it to completion, then prints the results - mirrors amulecmd's own search/progress/results/download command sequence. */
+   private async runSearch(args: string[]): Promise<void> {
+      if (args.length === 1 && args[0]?.toLowerCase() === "stop") {
+         await this.search.stop();
+         console.log("Search stopped.");
+         return;
+      }
+      if (args.length === 0) {
+         console.error("Usage: search <keywords>  |  search stop");
+         return;
+      }
+      const keywords = args.join(" ");
+      await this.search.start({ keywords });
+      let progress: ec.ECSearchProgress;
+      do {
+         await setTimeout(SEARCH_POLL_INTERVAL_MS);
+         progress = await this.search.progress();
+      } while (progress.state === ec.ECSearchLifecycleState.RUNNING);
+      await this.search.fetch();
+      printSearchResults(this.search.results);
+   }
+
+   private async runConnect(args: string[]): Promise<void> {
+      const ipPort = args[0];
+      if (!ipPort) {
+         console.error("Usage: connect <ip:port>");
+         return;
+      }
+      await this.servers.connect(ipPort);
+      console.log(`Connect requested: ${ipPort}.`);
+   }
+
+   /** Downloads one or more of the last search's results, identified by hash - see Search.download()'s doc. */
+   private async runDownload(hashes: string[]): Promise<void> {
+      if (hashes.length === 0) {
+         console.error("Usage: download <hash> [<hash> ...]");
+         return;
+      }
+      await this.search.download(hashes);
+      console.log(`Download requested: ${hashes.length} file(s).`);
+   }
+
+   private async runCancel(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: cancel <hash>");
+         return;
+      }
+      await this.downloads.cancel(hash);
+      console.log(`Cancelled: ${hash}.`);
+   }
+
+   private async runPause(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: pause <hash>");
+         return;
+      }
+      await this.downloads.pause(hash);
+      console.log(`Paused: ${hash}.`);
+   }
+
+   private async runResume(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: resume <hash>");
+         return;
+      }
+      await this.downloads.resume(hash);
+      console.log(`Resumed: ${hash}.`);
+   }
+
+   private async runStop(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: stop <hash>");
+         return;
+      }
+      await this.downloads.stop(hash);
+      console.log(`Stopped: ${hash}.`);
+   }
+
+   private async runPriority(args: string[]): Promise<void> {
+      const hash = args[0];
+      const name = args[1]?.toLowerCase();
+      const priority = name ? PRIORITY_NAMES[name] : undefined;
+      if (!hash || priority === undefined) {
+         console.error(
+            `Usage: priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+         );
+         return;
+      }
+      await this.downloads.prioritySet(hash, priority);
+      console.log(`Priority set: ${hash} -> ${name}.`);
+   }
+
+   private async runAddLink(args: string[]): Promise<void> {
+      const link = args[0];
+      if (!link) {
+         console.error("Usage: addlink <ed2k-link>");
+         return;
+      }
+      await this.downloads.addLink(link);
+      console.log(`Link added: ${link}.`);
+   }
+
+   /** Fetches the download queue, clears every completed entry, and reports how many. */
+   private async runClearCompleted(): Promise<void> {
+      await this.downloads.fetch();
+      const ecids = this.downloads.files
+         .filter((file) => file.status === BigInt(ec.ECPartFileStatus.PS_COMPLETE))
+         .map((file) => file.ecid)
+         .filter((ecid): ecid is bigint => ecid !== undefined);
+      await this.downloads.clearCompleted(ecids);
+      console.log(`Cleared: ${ecids.length} completed download(s).`);
+   }
+
    private async runCommand(command: string[]): Promise<void> {
+      const verb = command[0]?.toLowerCase();
+      if (verb === "search") {
+         await this.runSearch(command.slice(1));
+         return;
+      }
+      if (verb === "connect") {
+         await this.runConnect(command.slice(1));
+         return;
+      }
+      if (verb === "download") {
+         await this.runDownload(command.slice(1));
+         return;
+      }
+      if (verb === "cancel") {
+         await this.runCancel(command.slice(1));
+         return;
+      }
+      if (verb === "pause") {
+         await this.runPause(command.slice(1));
+         return;
+      }
+      if (verb === "resume") {
+         await this.runResume(command.slice(1));
+         return;
+      }
+      if (verb === "stop") {
+         await this.runStop(command.slice(1));
+         return;
+      }
+      if (verb === "priority") {
+         await this.runPriority(command.slice(1));
+         return;
+      }
+      if (verb === "addlink") {
+         await this.runAddLink(command.slice(1));
+         return;
+      }
+
       const joined = command.join(" ").toLowerCase();
 
       switch (joined) {
@@ -331,6 +561,27 @@ class Repl {
             printSharedFiles(this.sharedFiles.files);
             break;
          }
+
+         case "clear completed":
+            await this.runClearCompleted();
+            break;
+
+         case "show servers": {
+            await this.servers.fetch();
+            printServers(this.servers.servers);
+            break;
+         }
+
+         case "show log": {
+            await this.log.fetch();
+            printLog(this.log.lines);
+            break;
+         }
+
+         case "reset log":
+            await this.log.reset();
+            console.log("Log cleared.");
+            break;
 
          case "status":
             await this.status.fetch();
