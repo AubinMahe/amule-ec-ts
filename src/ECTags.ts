@@ -815,3 +815,35 @@ export class ECTagDecoder {
       return tag;
    }
 }
+
+/**
+ * Packs a dotted-quad IPv4 address into the wire integer a handful of
+ * plain-UINT32 "IP" tags use - EC_TAG_BOOTSTRAP_IP (Kad.ts's
+ * bootstrapFromIp()) and EC_TAG_FRIEND_IP (Friends.ts's addByHash()) so
+ * far.
+ *
+ * Confirmed against webapi/Api.cpp's own comment on its /kad/bootstrap
+ * handler ("Dotted-quad string... matches the EC tag's wire shape
+ * directly", https://github.com/amule-org/amule/blob/master/src/webapi/Api.cpp#L6459-L6476)
+ * and amule-remote-gui.cpp's BootstrapKad()/AddFriend(): octet `a` goes in
+ * the *low* byte (`a | b<<8 | c<<16 | d<<24`) - the raw inet_addr()
+ * convention, NOT the same convention ECIPv4Tag uses (a distinct wire tag
+ * *type* carrying the four octets as bytes in address order, see
+ * Servers.connect()). These "IP" tags are plain UINT32 tags; this is the
+ * only place that integer's meaning is decided, so a future
+ * "simplification" toward ECIPv4Tag's byte order would silently target
+ * the wrong address. Shared rather than reimplemented per call site -
+ * hand-copying this bit-twiddling risks only one copy getting fixed if it
+ * ever needs to change.
+ */
+export function packIPv4ToUint32(ip: string): number {
+   const octets = ip.split(".").map(Number);
+   if (
+      octets.length !== 4 ||
+      octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+   ) {
+      throw new RangeError(`Invalid IPv4 address: "${ip}".`);
+   }
+   const [a, b, c, d] = octets as [number, number, number, number];
+   return (a | (b << 8) | (c << 16) | (d << 24)) >>> 0;
+}

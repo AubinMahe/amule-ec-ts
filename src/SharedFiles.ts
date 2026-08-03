@@ -5,9 +5,24 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
-import { ECTag, ECUInt8Tag, ECHash16Tag } from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:sharedfiles");
+
+/**
+ * A shared file's EC_TAG_KNOWNFILE_RATING scale - confirmed against the
+ * GUI's own rating dropdown
+ * (https://github.com/amule-org/amule/blob/master/src/muuli_wdr.cpp#L790-L798):
+ * "Not rated", "Invalid / Corrupt / Fake", "Poor", "Fair", "Good", "Excellent".
+ */
+export enum FileRating {
+   NOT_RATED = 0,
+   INVALID = 1,
+   POOR = 2,
+   FAIR = 3,
+   GOOD = 4,
+   EXCELLENT = 5,
+}
 
 /**
  * One EC_TAG_KNOWNFILE entry from an EC_OP_SHARED_FILES reply or
@@ -180,6 +195,78 @@ export class SharedFiles implements ECFetchable {
          );
       }
       debug("reload: shared file list reloaded");
+   }
+
+   /**
+    * Sets a comment/rating on one of *this daemon's own* shared files, by
+    * hash - EC_OP_SHARED_FILE_SET_COMMENT.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_SHARED_FILE_SET_COMMENT
+    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3335-L3345)
+    * and amule-remote-gui.cpp's SetFileCommentRating()
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1786-L1793):
+    * the request carries EC_TAG_KNOWNFILE (hash), EC_TAG_KNOWNFILE_COMMENT
+    * (string) and EC_TAG_KNOWNFILE_RATING (uint8, see FileRating). Unlike
+    * rename()/searchKadNotes(), the daemon looks this hash up in
+    * `sharedfiles` only - no downloadqueue/searchlist fallback. Always
+    * replies EC_OP_NOOP, silently no-op if the hash isn't a known shared
+    * file.
+    */
+   public async setComment(
+      hash: string,
+      comment: string,
+      rating: FileRating,
+   ): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SET_COMMENT);
+      request.add(
+         new ECHash16Tag(
+            ECTagNames.EC_TAG_KNOWNFILE,
+            new Uint8Array(Buffer.from(hash, "hex")),
+         ),
+      );
+      request.add(new ECStringTag(ECTagNames.EC_TAG_KNOWNFILE_COMMENT, comment));
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_KNOWNFILE_RATING, rating));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("setComment: hash=%s, rating=%s", hash, FileRating[rating]);
+   }
+
+   /**
+    * Kicks off an async Kad lookup for a file's community notes/comments,
+    * by hash - EC_OP_SHARED_FILE_SEARCH_KAD_NOTES.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_SHARED_FILE_SEARCH_KAD_NOTES
+    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3356-L3385):
+    * the request carries a single EC_TAG_KNOWNFILE (hash) tag; the daemon
+    * resolves it against the download queue, then the shared file list,
+    * then the current search results (`downloadqueue` → `sharedfiles` →
+    * `searchlist`) - unlike setComment(), not shared-files-only. Always
+    * replies EC_OP_NOOP - this is fire-and-forget, the retrieved notes
+    * aren't carried back over this request; they'd surface through fields
+    * this library doesn't currently decode on SharedFile/DownloadFile/
+    * SearchResult.
+    */
+   public async searchKadNotes(hash: string): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SEARCH_KAD_NOTES);
+      request.add(
+         new ECHash16Tag(
+            ECTagNames.EC_TAG_KNOWNFILE,
+            new Uint8Array(Buffer.from(hash, "hex")),
+         ),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("searchKadNotes: hash=%s", hash);
    }
 }
 

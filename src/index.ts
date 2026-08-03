@@ -18,6 +18,7 @@
  * (alias on collision, e.g. `import { Status as ECStatus } from "amule-ec"` -
  * normal, not a sign of a design problem.)
  */
+export * from "./Chat.js";
 export * from "./Daemon.js";
 export * from "./Downloads.js";
 export * from "./ECCapabilities.js";
@@ -32,6 +33,7 @@ export * from "./ECTagNames.js";
 export * from "./ECTags.js";
 export * from "./ECTagType.js";
 export * from "./ECVersion.js";
+export * from "./Friends.js";
 export * from "./Kad.js";
 export * from "./Log.js";
 export * from "./Search.js";

@@ -66,6 +66,57 @@ describe("SharedFiles.reload", () => {
    });
 });
 
+describe("SharedFiles.setComment", () => {
+   it("sends hash/comment/rating as EC_TAG_KNOWNFILE/_COMMENT/_RATING and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await sharedFiles.setComment(hexHash("a"), "Great file", ec.FileRating.EXCELLENT);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SHARED_FILE_SET_COMMENT);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      const commentTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE_COMMENT);
+      expect((commentTag as ec.ECStringTag).value).to.equal("Great file");
+      const ratingTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE_RATING);
+      expect(ratingTag?.intValue).to.equal(BigInt(ec.FileRating.EXCELLENT));
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         sharedFiles.setComment(hexHash("a"), "x", ec.FileRating.NOT_RATED),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+describe("SharedFiles.searchKadNotes", () => {
+   it("sends the hash as a single EC_TAG_KNOWNFILE tag and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await sharedFiles.searchKadNotes(hexHash("a"));
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SHARED_FILE_SEARCH_KAD_NOTES);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(sharedFiles.searchKadNotes(hexHash("a")), /EC_OP_NOOP/);
+   });
+});
+
 describe("SharedFiles.parseNotification", () => {
    it("parses an EC_OP_SHARED_FILES packet carrying one EC_TAG_KNOWNFILE tag", () => {
       const packet = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);

@@ -3,35 +3,9 @@ import { ECConnection } from "./ECConnection.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
-import { ECStringTag, ECUInt16Tag, ECUInt32Tag } from "./ECTags.js";
+import { ECStringTag, ECUInt16Tag, ECUInt32Tag, packIPv4ToUint32 } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:kad");
-
-/**
- * Packs a dotted-quad IPv4 address into EC_TAG_BOOTSTRAP_IP's wire integer.
- *
- * Confirmed against webapi/Api.cpp's own comment on its /kad/bootstrap
- * handler ("Dotted-quad string... matches the EC tag's wire shape
- * directly", https://github.com/amule-org/amule/blob/master/src/webapi/Api.cpp#L6459-L6476)
- * and amule-remote-gui.cpp's BootstrapKad(): octet `a` goes in the *low*
- * byte (`a | b<<8 | c<<16 | d<<24`) - the raw inet_addr() convention, NOT
- * the same convention ECIPv4Tag uses (a distinct wire tag *type* carrying
- * the four octets as bytes in address order, see Servers.connect()).
- * EC_TAG_BOOTSTRAP_IP is a plain UINT32 tag; this is the only place that
- * integer's meaning is decided, so a future "simplification" toward
- * ECIPv4Tag's byte order would silently bootstrap against the wrong node.
- */
-function packBootstrapIp(ip: string): number {
-   const octets = ip.split(".").map(Number);
-   if (
-      octets.length !== 4 ||
-      octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
-   ) {
-      throw new RangeError(`Invalid IPv4 address: "${ip}".`);
-   }
-   const [a, b, c, d] = octets as [number, number, number, number];
-   return (a | (b << 8) | (c << 16) | (d << 24)) >>> 0;
-}
 
 /** Every EC_TAG_STRING tag's value from a reply, in order - CONNECT/DISCONNECT's per-network status messages. */
 function stringTagValues(reply: ECPacket): readonly string[] {
@@ -137,14 +111,15 @@ export class Kad {
     * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3795-L3806),
     * amule-remote-gui.cpp's BootstrapKad() and webapi/Api.cpp's
     * /kad/bootstrap handler: the request carries EC_TAG_BOOTSTRAP_IP
-    * (uint32 - see packBootstrapIp()'s doc for its wire packing, NOT the
-    * same convention as ECIPv4Tag) and EC_TAG_BOOTSTRAP_PORT (uint16).
-    * Replies EC_OP_FAILED (same "Kad is disabled in preferences." reason
-    * as start()) if Kad is disabled in preferences, EC_OP_NOOP otherwise.
+    * (uint32 - see ECTags.ts's packIPv4ToUint32() doc for its wire
+    * packing, NOT the same convention as ECIPv4Tag) and
+    * EC_TAG_BOOTSTRAP_PORT (uint16). Replies EC_OP_FAILED (same "Kad is
+    * disabled in preferences." reason as start()) if Kad is disabled in
+    * preferences, EC_OP_NOOP otherwise.
     */
    public async bootstrapFromIp(ip: string, port: number): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_KAD_BOOTSTRAP_FROM_IP);
-      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_BOOTSTRAP_IP, packBootstrapIp(ip)));
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_BOOTSTRAP_IP, packIPv4ToUint32(ip)));
       request.add(new ECUInt16Tag(ECTagNames.EC_TAG_BOOTSTRAP_PORT, port));
       await this.connection.send(request);
       const reply = await this.connection.receive();

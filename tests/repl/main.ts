@@ -71,6 +71,13 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["show server log", "daemon's ed2k-connection log"],
    ["reset server log", "clear the ed2k-connection log"],
    ["shutdown", "tell the daemon to terminate"],
+   ["friend add <ecid>", "add a connected client as a friend"],
+   ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
+   ["friend remove <ecid>", "remove a friend"],
+   ["friend slot <ecid> <on|off>", "reserve/clear a friend's upload slot"],
+   ["comment <hash> <rating 0-5> <text>", "set a shared file's comment/rating"],
+   ["kadnotes <hash>", "search Kad for a file's community notes"],
+   ["show chat", "drain buffered incoming chat messages"],
    ["quit / exit / Ctrl-D", "leave the REPL"],
 ];
 
@@ -284,6 +291,17 @@ function printLog(lines: readonly string[]): void {
    }
 }
 
+function printChatMessages(messages: readonly ec.ChatMessage[]): void {
+   if (messages.length === 0) {
+      console.log("No new chat messages.");
+      return;
+   }
+
+   for (const message of messages) {
+      console.log(`[${message.senderId}] ${message.text}`);
+   }
+}
+
 function formatIdLabel(status: ec.Status): string {
    if (status.hasLowId === undefined) return "";
    return status.hasLowId ? " (Low ID)" : " (High ID)";
@@ -391,6 +409,8 @@ class Repl {
    private readonly serverLog   : ec.ServerLog;
    private readonly daemon      : ec.Daemon;
    private readonly debugLog    : ec.DebugLog;
+   private readonly friends     : ec.Friends;
+   private readonly chat        : ec.Chat;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
@@ -404,6 +424,8 @@ class Repl {
       this.serverLog   = new ec.ServerLog(this.connection);
       this.daemon      = new ec.Daemon(this.connection);
       this.debugLog    = new ec.DebugLog(this.connection);
+      this.friends     = new ec.Friends(this.connection);
+      this.chat        = new ec.Chat(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -655,6 +677,75 @@ class Repl {
       console.log("Debug log line added.");
    }
 
+   private async runFriendAdd(args: string[]): Promise<void> {
+      if (args.length === 1) {
+         const [ecid] = args as [string];
+         await this.friends.addByEcid(BigInt(ecid));
+         console.log(`Friend added: ecid=${ecid}.`);
+         return;
+      }
+      if (args.length === 4) {
+         const [hash, ip, portText, name] = args as [string, string, string, string];
+         await this.friends.addByHash(hash, ip, Number(portText), name);
+         console.log(`Friend added: ${name}.`);
+         return;
+      }
+      console.error("Usage: friend add <ecid>  |  friend add <hash> <ip> <port> <name>");
+   }
+
+   private async runFriend(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      if (sub === "add") {
+         await this.runFriendAdd(args.slice(1));
+         return;
+      }
+      if (sub === "remove") {
+         const ecid = args[1];
+         if (!ecid) {
+            console.error("Usage: friend remove <ecid>");
+            return;
+         }
+         await this.friends.remove(BigInt(ecid));
+         console.log(`Friend removed: ecid=${ecid}.`);
+         return;
+      }
+      if (sub === "slot") {
+         const ecid = args[1];
+         const state = args[2]?.toLowerCase();
+         if (!ecid || (state !== "on" && state !== "off")) {
+            console.error("Usage: friend slot <ecid> <on|off>");
+            return;
+         }
+         await this.friends.setFriendSlot(BigInt(ecid), state === "on");
+         console.log(`Friend slot ${state}: ecid=${ecid}.`);
+         return;
+      }
+      console.error("Usage: friend <add ...|remove <ecid>|slot <ecid> <on|off>>");
+   }
+
+   private async runComment(args: string[]): Promise<void> {
+      const hash = args[0];
+      const ratingText = args[1];
+      const text = args.slice(2).join(" ");
+      const rating = ratingText ? Number(ratingText) : NaN;
+      if (!hash || !text || !Number.isInteger(rating) || rating < 0 || rating > 5) {
+         console.error("Usage: comment <hash> <rating 0-5> <text>");
+         return;
+      }
+      await this.sharedFiles.setComment(hash, text, rating);
+      console.log(`Comment set: ${hash}.`);
+   }
+
+   private async runKadNotes(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: kadnotes <hash>");
+         return;
+      }
+      await this.sharedFiles.searchKadNotes(hash);
+      console.log(`Kad notes search requested: ${hash}.`);
+   }
+
    /** Verbs that take a variable argument list, dispatched by lookup rather than a long if-chain (keeps runCommand()'s complexity down). */
    private readonly verbHandlers: Record<string, (args: string[]) => Promise<void>> = {
       search: (args) => this.runSearch(args),
@@ -672,6 +763,9 @@ class Repl {
       shutdown: () => this.runShutdown(),
       addlog: (args) => this.runAddLog(args),
       adddebuglog: (args) => this.runAddDebugLog(args),
+      friend: (args) => this.runFriend(args),
+      comment: (args) => this.runComment(args),
+      kadnotes: (args) => this.runKadNotes(args),
    };
 
    private async runCommand(command: string[]): Promise<void> {
@@ -756,6 +850,12 @@ class Repl {
             await this.debugLog.reset();
             console.log("Debug log cleared.");
             break;
+
+         case "show chat": {
+            await this.chat.fetch();
+            printChatMessages(this.chat.messages);
+            break;
+         }
 
          case "show server log": {
             await this.serverLog.fetch();
