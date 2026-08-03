@@ -31,6 +31,7 @@ export * from "./ECTagNames.js";
 export * from "./ECTags.js";
 export * from "./ECTagType.js";
 export * from "./ECVersion.js";
+export * from "./Kad.js";
 export * from "./Log.js";
 export * from "./Search.js";
 export * from "./Servers.js";

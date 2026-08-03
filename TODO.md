@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 86 opcodes. The library wraps 38 of them; all 38 are
+`ECOpcode.ts` declares 86 opcodes. The library wraps 44 of them; all 44 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 34 opcodes
+(queued replies, no real socket). The REPL column reflects the 40 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -80,12 +80,12 @@ blank cell, which just means "not done yet, but could be".
 |0x45|`STATSGRAPHS`|Stats graph data reply| | | | |
 |0x46|`GET_STATSTREE`|Requests the client-tree stats (STATTREE)| | | | |
 |0x47|`STATSTREE`|Client-tree stats reply| | | | |
-|0x48|`KAD_START`|Starts the Kademlia network| | | | |
-|0x49|`KAD_STOP`|Stops the Kademlia network| | | | |
-|0x4a|`CONNECT`|Connects to the ed2k/Kad networks| | | | |
-|0x4b|`DISCONNECT`|Disconnects from the ed2k/Kad networks| | | | |
-|0x4d|`KAD_UPDATE_FROM_URL`|Updates Kad nodes.dat from a URL| | | | |
-|0x4e|`KAD_BOOTSTRAP_FROM_IP`|Bootstraps Kad from a given IP| | | | |
+|0x48|`KAD_START`|Starts the Kademlia network|✓|✓| |✓|
+|0x49|`KAD_STOP`|Stops the Kademlia network|✓|✓| |✓|
+|0x4a|`CONNECT`|Connects to the ed2k/Kad networks|✓|✓| |✓|
+|0x4b|`DISCONNECT`|Disconnects from the ed2k/Kad networks|✓|✓| |✓|
+|0x4d|`KAD_UPDATE_FROM_URL`|Updates Kad nodes.dat from a URL|✓|✓| |✓|
+|0x4e|`KAD_BOOTSTRAP_FROM_IP`|Bootstraps Kad from a given IP|✓|✓| |✓|
 |0x4f|`AUTH_SALT`|Server's random salt for the password hash|✓|✓|✓|✓|
 |0x50|`AUTH_PASSWD`|Client's salted password hash|✓|✓|✓|✓|
 |0x51|`IPFILTER_UPDATE`|Updates the IP filter from its configured URL| | | | |
@@ -105,10 +105,12 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 7 feature classes: `Downloads`, `Uploads`,
-`SharedFiles`, `Status`, `Servers`, `Search` and `Log` - commands `show dl`,
-`show ul`, `show shared`, `show servers`, `connect <ip:port>`,
+`tests/repl/main.ts` drives all 8 feature classes: `Downloads`, `Uploads`,
+`SharedFiles`, `Status`, `Servers`, `Search`, `Log` and `Kad` - commands
+`show dl`, `show ul`, `show shared`, `show servers`, `show log`,
+`reset log`, `status`, `connect <ip:port>`, `connect`, `disconnect`,
 `search <keywords>`, `search stop`, `download <hash>...`, `cancel <hash>`,
 `pause <hash>`, `resume <hash>`, `stop <hash>`,
 `priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`,
-`addlink <ed2k-link>`, `clear completed`, `show log`, `reset log`, `status`.
+`addlink <ed2k-link>`, `clear completed`, `kad start`, `kad stop`,
+`kad bootstrap <ip> <port>`, `kad update <url>`.
