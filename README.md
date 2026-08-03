@@ -56,8 +56,8 @@ NODE_DEBUG=amule-ec:*         node app.js   # trace everything
 npm install
 npm run lint                     # tsc --noEmit + eslint
 npm run build                    # emits dist/ (JS + .d.ts)
-npm run tests-unitaires          # mocha
-npm run tests-unitaires:coverage # mocha + v8 coverage report
+npm run test          # mocha
+npm run test:coverage # mocha + v8 coverage report
 
 # Interactive REPL against a real local amuled (reads ~/.aMule/amule.conf directly -
 # the library itself never touches the filesystem, see ECEngine's doc)

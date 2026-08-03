@@ -16,8 +16,8 @@ npm install
 ```bash
 npm run lint                     # tsc --noEmit + eslint, must pass before opening a PR
 npm run build                    # emits dist/ (JS + .d.ts)
-npm run tests-unitaires          # mocha
-npm run tests-unitaires:coverage # mocha + v8 coverage report
+npm run test          # mocha
+npm run test:coverage # mocha + v8 coverage report
 npm run format                   # prettier --write on src/ and tests/
 ```
 
@@ -36,7 +36,7 @@ checked.
 
 ## Before opening a pull request
 
-- `npm run lint` and `npm run tests-unitaires` both pass.
+- `npm run lint` and `npm run test` both pass.
 - New behavior has unit tests (see `tests/*.test.ts` and `tests/fakeEcServer.ts`
   for the mocking pattern already in use).
 - Public API changes are reflected in `README.md`'s usage example if relevant.

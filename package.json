@@ -1,31 +1,18 @@
 {
-   "name"           : "amule-ec",
-   "version"        : "1.0.1",
-   "description"    : "TypeScript client library for aMule's binary External Connections (EC) protocol",
-   "keywords"       : ["aMule", "amuled", "EC", "External Connections"],
-   "homepage"       : "https://github.com/AubinMahe/amule-ec-ts#readme",
-   "bugs"           : "https://github.com/AubinMahe/amule-ec-ts/issues",
-   "repository"     : {
-      "type": "git",
-      "url" : "git+https://github.com/AubinMahe/amule-ec-ts.git"
-   },
-   "license"        : "GPL-3.0-or-later",
    "author"         : "Aubin MAHÉ <aubin.mahe@wanadoo.fr>",
+   "bugs"           : "https://github.com/AubinMahe/amule-ec-ts/issues",
+   "description"    : "TypeScript client library for aMule's binary External Connections (EC) protocol",
+   "files"          : ["dist"],
+   "homepage"       : "https://github.com/AubinMahe/amule-ec-ts#readme",
+   "keywords"       : ["aMule", "amuled", "EC", "External Connections"],
+   "license"        : "GPL-3.0-or-later",
+   "main"           : "./dist/index.js",
+   "name"           : "amule-ec",
    "type"           : "module",
+   "types"          : "./dist/index.d.ts",
+   "version"        : "1.0.1",
    "allowScripts"   : {
       "esbuild@0.28.1": true
-   },
-   "main"           : "./dist/index.js",
-   "types"          : "./dist/index.d.ts",
-   "exports"        : {
-      ".": {
-         "types" : "./dist/index.d.ts",
-         "import": "./dist/index.js"
-      }
-   },
-   "files"          : ["dist"],
-   "engines"        : {
-      "node": ">=18"
    },
    "dependencies"   : {},
    "devDependencies": {
@@ -43,15 +30,29 @@
       "typescript"               : "^5.7.2",
       "typescript-eslint"        : "^8.59.4"
    },
+   "engines"        : {
+      "node": ">=18"
+   },
+   "exports"        : {
+      ".": {
+         "import": "./dist/index.js",
+         "types" : "./dist/index.d.ts"
+      }
+   },
+   "repository"     : {
+      "type": "git",
+      "url" : "git+https://github.com/AubinMahe/amule-ec-ts.git"
+   },
    "scripts"        : {
-      "build"                   : "tsc -p tsconfig.json",
-      "format"                  : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
-      "lint"                    : "tsc --noEmit -p tsconfig.tests.json && eslint src tests --ext .ts",
-      "pack-release"            : "npm pack",
-      "prepack"                 : "npm run build",
-      "prepare"                 : "npm run build",
-      "repl"                    : "node --import tsx ./tests/repl/main.ts",
-      "tests-unitaires"         : "mocha",
-      "tests-unitaires:coverage": "mcr mocha"
+      "build"         : "tsc -p tsconfig.json",
+      "format"        : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
+      "format:package": "node scripts/format-package.mjs --in-place package.json",
+      "lint"          : "tsc --noEmit -p tsconfig.tests.json && eslint src tests --ext .ts",
+      "pack-release"  : "npm pack",
+      "prepack"       : "npm run build",
+      "prepare"       : "npm run build",
+      "repl"          : "node --import tsx ./tests/repl/main.ts",
+      "test"          : "mocha",
+      "test:coverage" : "mcr mocha"
    }
 }

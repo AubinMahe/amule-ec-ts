@@ -18,7 +18,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npm run tests-unitaires
+      - run: npm run test
       - name: Check tag matches package.json version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
