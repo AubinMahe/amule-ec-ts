@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 86 opcodes. The library wraps 50 of them; all 50 are
+`ECOpcode.ts` declares 86 opcodes. The library wraps 56 of them; all 56 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 46 opcodes
+(queued replies, no real socket). The REPL column reflects the 52 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -59,18 +59,18 @@ blank cell, which just means "not done yet, but could be".
 |0x30|`SERVER_REMOVE`|Removes a server from the known list|||||
 |0x31|`SERVER_ADD`|Adds a server to the known list|||||
 |0x32|`SERVER_UPDATE_FROM_URL`|Updates the server list from a server.met URL|||||
-|0x33|`ADDLOGLINE`|Pushes one new log line (notification)|||||
-|0x34|`ADDDEBUGLOGLINE`|Pushes one new debug log line (notification)|||||
+|0x33|`ADDLOGLINE`|Appends a line to the daemon's log (client request, not a push notification)|✓|✓||✓|
+|0x34|`ADDDEBUGLOGLINE`|Appends a line to the daemon's debug log (client request, not a push notification)|✓|✓||✓|
 |0x35|`GET_LOG`|Requests the accumulated log|✓|✓||✓|
-|0x36|`GET_DEBUGLOG`|Requests the accumulated debug log|||||
+|0x36|`GET_DEBUGLOG`|Requests the accumulated debug log|✓|✓||✓|
 |0x37|`GET_SERVERINFO`|Requests the daemon's cumulative ed2k-connection log (not per-server detail, despite the name)|✓|✓||✓|
 |0x38|`LOG`|Log reply|✓|✓||✓|
-|0x39|`DEBUGLOG`|Debug log reply|||||
+|0x39|`DEBUGLOG`|Debug log reply|✓|✓||✓|
 |0x3a|`SERVERINFO`|Reply carrying the ed2k-connection log|✓|✓||✓|
 |0x3b|`RESET_LOG`|Clears the log|✓|✓||✓|
-|0x3c|`RESET_DEBUGLOG`|Clears the debug log|||||
+|0x3c|`RESET_DEBUGLOG`|Clears the debug log|✓|✓||✓|
 |0x3d|`CLEAR_SERVERINFO`|Clears the ed2k-connection log|✓|✓||✓|
-|0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|||||
+|0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|✓|✓||✓|
 |0x3f|`GET_PREFERENCES`|Requests daemon preferences|||||
 |0x40|`SET_PREFERENCES`|Sets daemon preferences|||||
 |0x41|`CREATE_CATEGORY`|Creates a download category|||||
@@ -105,11 +105,13 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 10 feature classes: `Downloads`, `Uploads`,
-`SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog` and
-`Daemon` - commands `show dl`, `show ul`, `show shared`, `show servers`,
-`show log`, `reset log`, `show server log`, `reset server log`, `status`,
-`connect <ip:port>`, `connect`, `disconnect`, `server disconnect`,
+`tests/repl/main.ts` drives all 11 feature classes: `Downloads`, `Uploads`,
+`SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`,
+`Daemon` and `DebugLog` - commands `show dl`, `show ul`, `show shared`,
+`show servers`, `show log`, `reset log`, `show log last`, `addlog <text>`,
+`show debug log`, `reset debug log`, `adddebuglog <text>`,
+`show server log`, `reset server log`, `status`, `connect <ip:port>`,
+`connect`, `disconnect`, `server disconnect`,
 `server priority <ecid> [static|nostatic] [normal|high|low]`,
 `search <keywords>`, `search stop`, `download <hash>...`, `cancel <hash>`,
 `pause <hash>`, `resume <hash>`, `stop <hash>`,

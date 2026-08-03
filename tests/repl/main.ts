@@ -38,6 +38,11 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["show servers", "known server list"],
    ["show log", "daemon log"],
    ["reset log", "clear the daemon log"],
+   ["show log last", "the daemon log's single latest line"],
+   ["addlog <text>", "append a line to the daemon log"],
+   ["show debug log", "daemon debug log"],
+   ["reset debug log", "clear the daemon debug log"],
+   ["adddebuglog <text>", "append a line to the daemon debug log"],
    ["connect <ip:port>", "connect to a specific server"],
    ["connect", "connect to ed2k/Kad per the daemon's preferences"],
    ["disconnect", "disconnect from ed2k/Kad"],
@@ -385,6 +390,7 @@ class Repl {
    private readonly kad         : ec.Kad;
    private readonly serverLog   : ec.ServerLog;
    private readonly daemon      : ec.Daemon;
+   private readonly debugLog    : ec.DebugLog;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
@@ -397,6 +403,7 @@ class Repl {
       this.kad         = new ec.Kad(this.connection);
       this.serverLog   = new ec.ServerLog(this.connection);
       this.daemon      = new ec.Daemon(this.connection);
+      this.debugLog    = new ec.DebugLog(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -627,58 +634,51 @@ class Repl {
       console.log("Shutdown requested.");
    }
 
+   private async runAddLog(args: string[]): Promise<void> {
+      const text = args.join(" ");
+      if (!text) {
+         console.error("Usage: addlog <text>");
+         return;
+      }
+      await this.log.addLine(text);
+      console.log("Log line added.");
+   }
+
+   /** Always passes toStatus: true - see DebugLog.addLine()'s doc: without it, a non-debug-build daemon silently drops the line. */
+   private async runAddDebugLog(args: string[]): Promise<void> {
+      const text = args.join(" ");
+      if (!text) {
+         console.error("Usage: adddebuglog <text>");
+         return;
+      }
+      await this.debugLog.addLine(text, true);
+      console.log("Debug log line added.");
+   }
+
+   /** Verbs that take a variable argument list, dispatched by lookup rather than a long if-chain (keeps runCommand()'s complexity down). */
+   private readonly verbHandlers: Record<string, (args: string[]) => Promise<void>> = {
+      search: (args) => this.runSearch(args),
+      connect: (args) => this.runConnect(args),
+      download: (args) => this.runDownload(args),
+      cancel: (args) => this.runCancel(args),
+      pause: (args) => this.runPause(args),
+      resume: (args) => this.runResume(args),
+      stop: (args) => this.runStop(args),
+      priority: (args) => this.runPriority(args),
+      addlink: (args) => this.runAddLink(args),
+      disconnect: () => this.runDisconnect(),
+      kad: (args) => this.runKad(args),
+      server: (args) => this.runServer(args),
+      shutdown: () => this.runShutdown(),
+      addlog: (args) => this.runAddLog(args),
+      adddebuglog: (args) => this.runAddDebugLog(args),
+   };
+
    private async runCommand(command: string[]): Promise<void> {
       const verb = command[0]?.toLowerCase();
-      if (verb === "search") {
-         await this.runSearch(command.slice(1));
-         return;
-      }
-      if (verb === "connect") {
-         await this.runConnect(command.slice(1));
-         return;
-      }
-      if (verb === "download") {
-         await this.runDownload(command.slice(1));
-         return;
-      }
-      if (verb === "cancel") {
-         await this.runCancel(command.slice(1));
-         return;
-      }
-      if (verb === "pause") {
-         await this.runPause(command.slice(1));
-         return;
-      }
-      if (verb === "resume") {
-         await this.runResume(command.slice(1));
-         return;
-      }
-      if (verb === "stop") {
-         await this.runStop(command.slice(1));
-         return;
-      }
-      if (verb === "priority") {
-         await this.runPriority(command.slice(1));
-         return;
-      }
-      if (verb === "addlink") {
-         await this.runAddLink(command.slice(1));
-         return;
-      }
-      if (verb === "disconnect") {
-         await this.runDisconnect();
-         return;
-      }
-      if (verb === "kad") {
-         await this.runKad(command.slice(1));
-         return;
-      }
-      if (verb === "server") {
-         await this.runServer(command.slice(1));
-         return;
-      }
-      if (verb === "shutdown") {
-         await this.runShutdown();
+      const handler = verb ? this.verbHandlers[verb] : undefined;
+      if (handler) {
+         await handler(command.slice(1));
          return;
       }
 
@@ -738,6 +738,23 @@ class Repl {
          case "reset log":
             await this.log.reset();
             console.log("Log cleared.");
+            break;
+
+         case "show log last": {
+            const last = await this.log.fetchLast();
+            console.log(last ?? "Log is empty.");
+            break;
+         }
+
+         case "show debug log": {
+            await this.debugLog.fetch();
+            printLog(this.debugLog.lines);
+            break;
+         }
+
+         case "reset debug log":
+            await this.debugLog.reset();
+            console.log("Debug log cleared.");
             break;
 
          case "show server log": {
