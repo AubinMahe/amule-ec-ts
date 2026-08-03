@@ -5,9 +5,22 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
-import { ECTag, ECUInt8Tag, ECIPv4Tag, ECStringTag } from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECUInt32Tag, ECIPv4Tag, ECStringTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:servers");
+
+/**
+ * A server's EC_TAG_SERVER_PRIO value - confirmed against
+ * https://github.com/amule-org/amule/blob/master/src/Server.h#L39-L41
+ * (the SRV_PR_* #defines): non-monotonic - HIGH sits between NORMAL and
+ * LOW numerically - unlike ECDownloadPriority's ordering, so this is its
+ * own enum rather than reusing that one.
+ */
+export enum ServerPriority {
+   SRV_PR_NORMAL = 0,
+   SRV_PR_HIGH = 1,
+   SRV_PR_LOW = 2,
+}
 
 /**
  * One EC_TAG_SERVER entry from an EC_OP_SERVER_LIST reply.
@@ -152,5 +165,140 @@ export class Servers implements ECFetchable {
          );
       }
       debug("connect: %s", ipPort);
+   }
+
+   /**
+    * Disconnects from the current ed2k server - EC_OP_SERVER_DISCONNECT.
+    *
+    * Confirmed against Get_EC_Response_Server's EC_OP_SERVER_DISCONNECT
+    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1995-L2044,
+    * the same function connect() dispatches EC_OP_SERVER_CONNECT into) and
+    * TextClient.cpp's "disconnect ed2k" command (CMD_ID_DISCONNECT_ED2K,
+    * TextClient.cpp:340-341): no request tags - this case never reads the
+    * function's optional EC_TAG_SERVER lookup. Always replies EC_OP_NOOP.
+    */
+   public async disconnect(): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_DISCONNECT);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("disconnect");
+   }
+
+   /**
+    * Sets a known server's static-priority flag and/or priority, by ECID -
+    * EC_OP_SERVER_SET_STATIC_PRIO.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_SERVER_SET_STATIC_PRIO case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3420-L3434)
+    * and amule-remote-gui.cpp's SetStaticServer()/SetServerPrio()
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1619-L1642,
+    * called separately there, one child tag each - the daemon applies
+    * whichever child(ren) are present, so a single call setting both is
+    * equally valid): the request's EC_TAG_SERVER tag carries the target's
+    * ECID as a **plain uint32** here - unlike connect()'s EC_TAG_SERVER,
+    * which carries an IP:port (ECIPv4Tag). Same tag name, different wire
+    * type depending on the opcode - see Kad.ts's packBootstrapIp() doc for
+    * the same class of gotcha. Optional EC_TAG_SERVER_STATIC (nonzero =
+    * static) and/or EC_TAG_SERVER_PRIO (uint8, ServerPriority) children.
+    * Always replies EC_OP_NOOP, even if the ECID doesn't resolve to a
+    * known server - no failure case exists.
+    */
+   public async setStaticPrio(
+      ecid: bigint,
+      options: { static?: boolean; prio?: ServerPriority },
+   ): Promise<void> {
+      const children: ECTag[] = [];
+      if (options.static !== undefined) {
+         children.push(
+            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, options.static ? 1 : 0),
+         );
+      }
+      if (options.prio !== undefined) {
+         children.push(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, options.prio));
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), children));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug(
+         "setStaticPrio: ecid=%s, static=%s, prio=%s",
+         ecid,
+         options.static,
+         options.prio !== undefined ? ServerPriority[options.prio] : undefined,
+      );
+   }
+}
+
+/**
+ * The daemon's cumulative ed2k-connection log, as returned by
+ * EC_OP_GET_SERVERINFO / EC_OP_SERVERINFO - not per-server detail (see
+ * Servers.fetch() for that), despite the name.
+ */
+export class ServerLog implements ECFetchable {
+
+   public lines: readonly string[] = [];
+
+   public constructor(public readonly connection: ECConnection) {}
+
+   /**
+    * Confirmed against ExternalConn.cpp's EC_OP_GET_SERVERINFO case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3719-L3721,
+    * `response->AddTag(CECTag(EC_TAG_STRING, theApp->GetServerLog(false)));`)
+    * and amule-remote-gui.cpp's own comment on the reply
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1088,
+    * "amuled answers EC_OP_GET_SERVERINFO with one EC_TAG_STRING carrying
+    * the full cumulative server_msg buffer") - same shape as Log.fetch():
+    * one EC_TAG_STRING, newline-separated, not one tag per line. No
+    * amulecmd equivalent exists (GUI/API-only, like CLEAR_COMPLETED). No
+    * request tag is needed.
+    */
+   public async fetch(): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_GET_SERVERINFO);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_SERVERINFO) {
+         throw new Error(
+            `Expected EC_OP_SERVERINFO, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      const textTag = reply.find(ECTagNames.EC_TAG_STRING);
+      const text = textTag instanceof ECStringTag ? textTag.value : "";
+      this.lines = text
+         .split(/\r?\n/)
+         .map((line) => line.trim())
+         .filter((line) => line.length > 0);
+      debug("fetch: %d line(s)", this.lines.length);
+   }
+
+   /**
+    * Clears the server log - EC_OP_CLEAR_SERVERINFO.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_CLEAR_SERVERINFO case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3730-L3733)
+    * and amule-remote-gui.cpp's GetServerLog(reset=true)
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1063-L1073,
+    * "Mirror the GetLog reset path"): no request tag needed, no amulecmd
+    * equivalent. Always replies EC_OP_NOOP - exact mirror of Log.reset().
+    */
+   public async reset(): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_CLEAR_SERVERINFO);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("reset: server log cleared");
    }
 }

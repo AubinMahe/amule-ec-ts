@@ -21,6 +21,12 @@ const PRIORITY_NAMES: Record<string, ec.ECDownloadPriority> = {
    powershare: ec.ECDownloadPriority.PR_POWERSHARE,
 };
 
+const SERVER_PRIORITY_NAMES: Record<string, ec.ServerPriority> = {
+   normal: ec.ServerPriority.SRV_PR_NORMAL,
+   high: ec.ServerPriority.SRV_PR_HIGH,
+   low: ec.ServerPriority.SRV_PR_LOW,
+};
+
 /** One row per command: keyword(s)/arguments, then a short description - see HELP below. */
 const HELP_ENTRIES: readonly (readonly [command: string, description: string])[] = [
    ["help", "show this help"],
@@ -52,6 +58,14 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["kad stop", "stop the Kademlia network"],
    ["kad bootstrap <ip> <port>", "bootstrap Kad from a known node"],
    ["kad update <url>", "update Kad's nodes.dat from a URL"],
+   ["server disconnect", "disconnect from the current ed2k server"],
+   [
+      `server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`,
+      "set a known server's static flag and/or priority",
+   ],
+   ["show server log", "daemon's ed2k-connection log"],
+   ["reset server log", "clear the ed2k-connection log"],
+   ["shutdown", "tell the daemon to terminate"],
    ["quit / exit / Ctrl-D", "leave the REPL"],
 ];
 
@@ -369,6 +383,8 @@ class Repl {
    private readonly search      : ec.Search;
    private readonly log         : ec.Log;
    private readonly kad         : ec.Kad;
+   private readonly serverLog   : ec.ServerLog;
+   private readonly daemon      : ec.Daemon;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
@@ -379,6 +395,8 @@ class Repl {
       this.search      = new ec.Search(this.connection);
       this.log         = new ec.Log(this.connection);
       this.kad         = new ec.Kad(this.connection);
+      this.serverLog   = new ec.ServerLog(this.connection);
+      this.daemon      = new ec.Daemon(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -571,6 +589,44 @@ class Repl {
       console.log(`Cleared: ${ecids.length} completed download(s).`);
    }
 
+   private async runServerPriority(args: string[]): Promise<void> {
+      const ecidText = args[0];
+      const options: { static?: boolean; prio?: ec.ServerPriority } = {};
+      for (const token of args.slice(1)) {
+         const lower = token.toLowerCase();
+         if (lower === "static") options.static = true;
+         else if (lower === "nostatic") options.static = false;
+         else if (lower in SERVER_PRIORITY_NAMES) options.prio = SERVER_PRIORITY_NAMES[lower];
+      }
+      if (!ecidText || (options.static === undefined && options.prio === undefined)) {
+         console.error(
+            `Usage: server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`,
+         );
+         return;
+      }
+      await this.servers.setStaticPrio(BigInt(ecidText), options);
+      console.log(`Server priority updated: ecid=${ecidText}.`);
+   }
+
+   private async runServer(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      if (sub === "disconnect") {
+         await this.servers.disconnect();
+         console.log("Disconnected from the current server.");
+         return;
+      }
+      if (sub === "priority") {
+         await this.runServerPriority(args.slice(1));
+         return;
+      }
+      console.error("Usage: server <disconnect|priority <ecid> [static|nostatic] [low|normal|high]>");
+   }
+
+   private async runShutdown(): Promise<void> {
+      await this.daemon.shutdown();
+      console.log("Shutdown requested.");
+   }
+
    private async runCommand(command: string[]): Promise<void> {
       const verb = command[0]?.toLowerCase();
       if (verb === "search") {
@@ -615,6 +671,14 @@ class Repl {
       }
       if (verb === "kad") {
          await this.runKad(command.slice(1));
+         return;
+      }
+      if (verb === "server") {
+         await this.runServer(command.slice(1));
+         return;
+      }
+      if (verb === "shutdown") {
+         await this.runShutdown();
          return;
       }
 
@@ -674,6 +738,17 @@ class Repl {
          case "reset log":
             await this.log.reset();
             console.log("Log cleared.");
+            break;
+
+         case "show server log": {
+            await this.serverLog.fetch();
+            printLog(this.serverLog.lines);
+            break;
+         }
+
+         case "reset server log":
+            await this.serverLog.reset();
+            console.log("Server log cleared.");
             break;
 
          case "status":
