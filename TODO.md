@@ -2,7 +2,7 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 86 opcodes. The library wraps 61 of them; all 61 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 61 of them; all 61 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
@@ -102,6 +102,8 @@ blank cell, which just means "not done yet, but could be".
 |0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES, draining buffered incoming chat|✓|✓||✓|
 |0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|||||
 |0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|||||
+|0x5f|`SEARCH_REQUEST_MORE`|Kad-only: re-asks already-queried peers for more results on a multi-search-addressed search|||||
+|0x60|`SEARCH_LIST`|Multi-search only: lists the connection's known search IDs|||||
 
 ## REPL coverage
 
