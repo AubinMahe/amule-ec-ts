@@ -37,6 +37,13 @@ export interface ECEngineStartOptions {
     * has returned) is too late to have any effect.
     */
    notify?: boolean;
+   /**
+    * Sets connection.localCapabilities.multiSearch before authenticating -
+    * same timing constraint as `notify`: ECConnection.authenticateWithHash()
+    * negotiates EC_TAG_CAN_MULTI_SEARCH as part of the AUTH_REQ packet
+    * itself. See Search.ts's SearchSession doc for what this unlocks.
+    */
+   multiSearch?: boolean;
 }
 
 /**
@@ -57,10 +64,11 @@ export function armReconnect(
    port: number,
    passwordHash: string,
    notify: boolean,
+   multiSearch: boolean,
 ): void {
    connection.once("disconnected", () => {
       console.error("amule-ec: connection to amuled lost, reconnecting...");
-      void reconnectLoop(connection, host, port, passwordHash, notify);
+      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch);
    });
 }
 
@@ -70,6 +78,7 @@ async function reconnectLoop(
    port: number,
    passwordHash: string,
    notify: boolean,
+   multiSearch: boolean,
 ): Promise<void> {
    let delayMs = RECONNECT_INITIAL_DELAY_MS;
    for (let attempt = 1; ; attempt++) {
@@ -78,9 +87,10 @@ async function reconnectLoop(
       try {
          await connection.reconnect(host, port);
          connection.localCapabilities.notify = notify;
+         connection.localCapabilities.multiSearch = multiSearch;
          await connection.authenticateWithHash(passwordHash);
          console.log("amule-ec: reconnected to amuled.");
-         armReconnect(connection, host, port, passwordHash, notify);
+         armReconnect(connection, host, port, passwordHash, notify, multiSearch);
          return;
       }
       catch (error) {
@@ -103,11 +113,13 @@ export const ECEngine = {
    async start(options: ECEngineStartOptions): Promise<void> {
       const host = options.host ?? DEFAULT_HOST;
       const notify = options.notify ?? false;
+      const multiSearch = options.multiSearch ?? false;
       const connection = await ECConnection.connect(host, options.port);
       connection.localCapabilities.notify = notify;
+      connection.localCapabilities.multiSearch = multiSearch;
       await connection.authenticateWithHash(options.passwordHash);
       instance = connection;
-      armReconnect(connection, host, options.port, options.passwordHash, notify);
+      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch);
    },
 
    get connection(): ECConnection {

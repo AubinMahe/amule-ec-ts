@@ -411,6 +411,7 @@ class Repl {
    private readonly debugLog    : ec.DebugLog;
    private readonly friends     : ec.Friends;
    private readonly chat        : ec.Chat;
+   private currentSearch?: ec.SearchSession;
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
@@ -456,7 +457,11 @@ class Repl {
    /** Starts a search, polls it to completion, then prints the results - mirrors amulecmd's own search/progress/results/download command sequence. */
    private async runSearch(args: string[]): Promise<void> {
       if (args.length === 1 && args[0]?.toLowerCase() === "stop") {
-         await this.search.stop();
+         if (!this.currentSearch) {
+            console.log("No active search.");
+            return;
+         }
+         await this.currentSearch.stop();
          console.log("Search stopped.");
          return;
       }
@@ -465,14 +470,15 @@ class Repl {
          return;
       }
       const keywords = args.join(" ");
-      await this.search.start({ keywords });
+      const session = await this.search.start({ keywords });
+      this.currentSearch = session;
       let progress: ec.ECSearchProgress;
       do {
          await setTimeout(SEARCH_POLL_INTERVAL_MS);
-         progress = await this.search.progress();
+         progress = await session.progress();
       } while (progress.state === ec.ECSearchLifecycleState.RUNNING);
-      await this.search.fetch();
-      printSearchResults(this.search.results);
+      await session.fetch();
+      printSearchResults(session.results);
    }
 
    /** Bare "connect" is Kad.connect() (ed2k/Kad per daemon prefs); "connect <ip:port>" is Servers.connect(). */
@@ -927,7 +933,7 @@ function parseArgs(argv: string[]): CliOptions {
 async function main(): Promise<void> {
    const options = parseArgs(process.argv.slice(2));
    const { port, passwordHash } = readExternalConnectSettings();
-   await ec.ECEngine.start({ host: HOST, port, passwordHash, notify: options.notify });
+   await ec.ECEngine.start({ host: HOST, port, passwordHash, notify: options.notify, multiSearch: true });
    const repl = new Repl(ec.ECEngine.connection);
    try {
       await repl.run();
