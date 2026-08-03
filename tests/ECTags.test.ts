@@ -96,3 +96,17 @@ describe("ECTag encode/decode round-trip", () => {
       },
    );
 });
+
+describe("packIPv4ToUint32", () => {
+   it("packs a dotted-quad address low-byte-first (octet a in the low byte)", () => {
+      expect(ec.packIPv4ToUint32("192.0.2.1")).to.equal(0x010200c0);
+   });
+
+   it("rejects an address with the wrong number of octets", () => {
+      expect(() => ec.packIPv4ToUint32("1.2.3")).to.throw(RangeError, /Invalid IPv4 address/);
+   });
+
+   it("rejects an out-of-range octet", () => {
+      expect(() => ec.packIPv4ToUint32("1.2.3.256")).to.throw(RangeError, /Invalid IPv4 address/);
+   });
+});

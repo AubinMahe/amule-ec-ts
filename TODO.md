@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 86 opcodes. The library wraps 56 of them; all 56 are
+`ECOpcode.ts` declares 86 opcodes. The library wraps 61 of them; all 61 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 52 opcodes
+(queued replies, no real socket). The REPL column reflects the 57 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -92,29 +92,33 @@ blank cell, which just means "not done yet, but could be".
 |0x52|`GET_UPDATE`|Checks for a daemon update|||||
 |0x53|`CLEAR_COMPLETED`|Clears completed downloads from the list|✓|✓||✓|
 |0x54|`CLIENT_SWAP_TO_ANOTHER_FILE`|Moves an uploading client to another file|||||
-|0x55|`SHARED_FILE_SET_COMMENT`|Sets a shared file's comment/rating|||||
+|0x55|`SHARED_FILE_SET_COMMENT`|Sets a shared file's comment/rating|✓|✓||✓|
 |0x56|`SERVER_SET_STATIC_PRIO`|Sets a server's static priority|✓|✓||✓|
-|0x57|`FRIEND`|Adds/manages a friend|||||
+|0x57|`FRIEND`|Adds/removes a friend, sets friend-slot (browse "View Files" not wrapped - needs multi-search)|✓|✓||✓|
 |0x58|`VERSION_CHECK`|Checks the daemon's version|||||
-|0x59|`SHARED_FILE_SEARCH_KAD_NOTES`|Searches Kad notes for a shared file|||||
+|0x59|`SHARED_FILE_SEARCH_KAD_NOTES`|Searches Kad notes for a shared file|✓|✓||✓|
 |0x5a|`VERIFY_LOCAL_DATA`|Verifies a partial file's local data (hash check)|||||
-|0x5b|`GET_CHAT_MESSAGES`|Requests buffered chat messages|||||
-|0x5c|`CHAT_MESSAGES`|Chat messages reply / push notification|||||
+|0x5b|`GET_CHAT_MESSAGES`|Requests buffered chat messages|✓|✓||✓|
+|0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES, draining buffered incoming chat|✓|✓||✓|
 |0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|||||
 |0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|||||
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 11 feature classes: `Downloads`, `Uploads`,
+`tests/repl/main.ts` drives all 13 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`,
-`Daemon` and `DebugLog` - commands `show dl`, `show ul`, `show shared`,
-`show servers`, `show log`, `reset log`, `show log last`, `addlog <text>`,
-`show debug log`, `reset debug log`, `adddebuglog <text>`,
-`show server log`, `reset server log`, `status`, `connect <ip:port>`,
-`connect`, `disconnect`, `server disconnect`,
+`Daemon`, `DebugLog`, `Friends` and `Chat` - commands `show dl`, `show ul`,
+`show shared`, `show servers`, `show log`, `reset log`, `show log last`,
+`addlog <text>`, `show debug log`, `reset debug log`,
+`adddebuglog <text>`, `show server log`, `reset server log`, `show chat`,
+`status`, `connect <ip:port>`, `connect`, `disconnect`,
+`server disconnect`,
 `server priority <ecid> [static|nostatic] [normal|high|low]`,
 `search <keywords>`, `search stop`, `download <hash>...`, `cancel <hash>`,
 `pause <hash>`, `resume <hash>`, `stop <hash>`,
 `priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`,
 `addlink <ed2k-link>`, `clear completed`, `kad start`, `kad stop`,
-`kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`.
+`kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`,
+`friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
+`friend remove <ecid>`, `friend slot <ecid> <on|off>`,
+`comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`.
