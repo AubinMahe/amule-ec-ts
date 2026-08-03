@@ -5,7 +5,7 @@
 ## Checklist
 
 - [ ] `npm run lint` passes
-- [ ] `npm run tests-unitaires` passes
+- [ ] `npm run test` passes
 - [ ] Added/updated unit tests for the change
 - [ ] If this touches wire format or opcode handling: verified against
       aMule's C++ source (link the file(s) checked), not just the EC
