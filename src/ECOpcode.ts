@@ -88,4 +88,6 @@ export enum ECOpcode {
    EC_OP_CHAT_MESSAGES = 0x5c,
    EC_OP_GET_SHARED_DIRS = 0x5d,
    EC_OP_SET_SHARED_DIRS = 0x5e,
+   EC_OP_SEARCH_REQUEST_MORE = 0x5f,
+   EC_OP_SEARCH_LIST = 0x60,
 }
