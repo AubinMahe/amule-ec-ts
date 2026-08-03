@@ -213,6 +213,152 @@ describe("Downloads.rename", () => {
    });
 });
 
+describe("Downloads.pause/resume/stop", () => {
+   const cases: {
+      method: "pause" | "resume" | "stop";
+      opcode: ec.ECOpcode;
+   }[] = [
+      { method: "pause", opcode: ec.ECOpcode.EC_OP_PARTFILE_PAUSE },
+      { method: "resume", opcode: ec.ECOpcode.EC_OP_PARTFILE_RESUME },
+      { method: "stop", opcode: ec.ECOpcode.EC_OP_PARTFILE_STOP },
+   ];
+
+   for (const { method, opcode } of cases) {
+      describe(`Downloads.${method}`, () => {
+         it("sends the hash as an EC_TAG_PARTFILE tag and succeeds on EC_OP_NOOP", async () => {
+            const fake = createFakeConnection();
+            const downloads = new ec.Downloads(fake.connection);
+            fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+            await downloads[method](hexHash("a"));
+
+            expect(fake.sent[0]?.opcode).to.equal(opcode);
+            const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+            expect(hashTag).to.be.instanceOf(ec.ECHash16Tag);
+            expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(
+               hexHash("a"),
+            );
+         });
+
+         it("throws the daemon's reason on EC_OP_FAILED", async () => {
+            const fake = createFakeConnection();
+            const downloads = new ec.Downloads(fake.connection);
+            const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+            failure.add(
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"),
+            );
+            fake.queueReply(failure);
+
+            await expectRejection(downloads[method](hexHash("a")), /FileHash not found/);
+         });
+      });
+   }
+});
+
+describe("Downloads.prioritySet", () => {
+   it("sends the hash as EC_TAG_PARTFILE with an EC_TAG_PARTFILE_PRIO child", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_HIGH);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_PARTFILE_PRIO_SET);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      const prioTag = hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_PRIO);
+      expect(prioTag?.intValue).to.equal(BigInt(ec.ECDownloadPriority.PR_HIGH));
+   });
+
+   it("sends PR_AUTO as-is (5), not the +10 read-side encoding", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_AUTO);
+
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      const prioTag = hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_PRIO);
+      expect(prioTag?.intValue).to.equal(BigInt(ec.ECDownloadPriority.PR_AUTO));
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"));
+      fake.queueReply(failure);
+
+      await expectRejection(
+         downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_HIGH),
+         /FileHash not found/,
+      );
+   });
+});
+
+describe("Downloads.addLink", () => {
+   it("sends the link as a single EC_TAG_STRING tag and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.addLink("ed2k://|file|foo.avi|123|" + hexHash("a") + "|/");
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_ADD_LINK);
+      const linkTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING);
+      expect((linkTag as ec.ECStringTag).value).to.equal(
+         "ed2k://|file|foo.avi|123|" + hexHash("a") + "|/",
+      );
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid link or already on list."),
+      );
+      fake.queueReply(failure);
+
+      await expectRejection(downloads.addLink("not-a-link"), /Invalid link/);
+   });
+});
+
+describe("Downloads.clearCompleted", () => {
+   it("sends one EC_TAG_ECID tag per ecid and always succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.clearCompleted([1n, 2n, 3n]);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CLEAR_COMPLETED);
+      const ecidTags = fake.sent[0]?.tags.filter((tag) => {
+         const name: ec.ECTagNames = tag.name;
+         return name === ec.ECTagNames.EC_TAG_ECID;
+      });
+      expect(ecidTags?.map((tag) => tag.intValue)).to.deep.equal([1n, 2n, 3n]);
+   });
+
+   it("sends no tags at all for an empty list", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.clearCompleted([]);
+
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(downloads.clearCompleted([1n]), /EC_OP_NOOP/);
+   });
+});
+
 describe("Downloads.parseNotification", () => {
    it("parses an EC_OP_DLOAD_QUEUE packet carrying one EC_TAG_PARTFILE tag", () => {
       const packet = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);

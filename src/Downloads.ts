@@ -5,7 +5,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
-import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:downloads");
 
@@ -360,17 +360,25 @@ export class Downloads implements ECFetchable {
    }
 
    /**
-    * Renames a partial download, identified by its MD4 hash - EC_OP_RENAME_FILE.
+    * Renames a file identified by its MD4 hash - EC_OP_RENAME_FILE. Despite
+    * living on Downloads, this isn't partfile-specific: it's one unified
+    * rename shared with shared/complete files too.
     *
     * Confirmed against the EC_OP_RENAME_FILE case in
     * ExternalConn::ProcessRequest2
-    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2481-L2506): the request
-    * carries the target file as an EC_TAG_KNOWNFILE tag (own data: MD4
-    * hash) and the new name as an EC_TAG_PARTFILE_NAME string tag - same
-    * shape TextClient.cpp's own "rename" command builds
-    * (TextClient.cpp:274-276). Replies EC_OP_FAILED (with an EC_TAG_STRING
-    * reason: "File not found.", "Invalid file name.", or "Unable to rename
-    * file.") on error, EC_OP_NOOP on success.
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3285-L3311):
+    * the request carries the target as an EC_TAG_KNOWNFILE tag (own data:
+    * MD4 hash) and the new name as an EC_TAG_PARTFILE_NAME string tag -
+    * hence "KNOWNFILE" rather than "PARTFILE": the daemon looks the hash up
+    * in the download queue first and falls back to the known/shared files
+    * list ("search first in downloadqueue - it might be in known files as
+    * well"), then renames through CKnownFile - the common base class both
+    * a CPartFile and a shared file are, so the same request works on
+    * either without the caller needing to know which one it's hitting. No
+    * amulecmd equivalent exists (grep of TextClient.cpp found no "rename"
+    * command at all) - this one is GUI-only upstream. Replies EC_OP_FAILED
+    * (with an EC_TAG_STRING reason: "File not found.", "Invalid file
+    * name.", or "Unable to rename file.") on error, EC_OP_NOOP on success.
     */
    public async rename(hash: string, newName: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_RENAME_FILE);
@@ -399,6 +407,183 @@ export class Downloads implements ECFetchable {
          );
       }
       debug("rename: hash=%s, newName=%s", hash, newName);
+   }
+
+   /**
+    * Sends a single-hash partfile command (pause/resume/stop), identified
+    * by its MD4 hash - shared by pause()/resume()/stop(), which all wrap
+    * Get_EC_Response_PartFile_Cmd the same way cancel() does.
+    *
+    * Confirmed against Get_EC_Response_PartFile_Cmd
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1659-L1728,
+    * PAUSE/RESUME/STOP cases): the request carries a single EC_TAG_PARTFILE
+    * tag whose own data is the file's MD4 hash - same shape cancel()
+    * already builds, no child tag needed for any of these three opcodes.
+    * Replies EC_OP_FAILED (with an EC_TAG_STRING reason, e.g. "FileHash not
+    * found: ...") if the hash doesn't match a download in progress,
+    * EC_OP_NOOP otherwise.
+    */
+   private async sendPartFileCommand(
+      opcode: ECOpcode,
+      hash: string,
+      failureMessage: string,
+   ): Promise<void> {
+      const request = new ECPacket(opcode);
+      request.add(
+         new ECHash16Tag(
+            ECTagNames.EC_TAG_PARTFILE,
+            new Uint8Array(Buffer.from(hash, "hex")),
+         ),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag ? reasonTag.value : failureMessage;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+   }
+
+   /** Pauses a download, identified by its MD4 hash - EC_OP_PARTFILE_PAUSE. See sendPartFileCommand()'s doc. */
+   public async pause(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_PAUSE,
+         hash,
+         `Failed to pause ${hash}.`,
+      );
+      debug("pause: hash=%s", hash);
+   }
+
+   /** Resumes a paused download, identified by its MD4 hash - EC_OP_PARTFILE_RESUME. See sendPartFileCommand()'s doc. */
+   public async resume(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_RESUME,
+         hash,
+         `Failed to resume ${hash}.`,
+      );
+      debug("resume: hash=%s", hash);
+   }
+
+   /** Stops a download, identified by its MD4 hash - EC_OP_PARTFILE_STOP. See sendPartFileCommand()'s doc. */
+   public async stop(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_STOP,
+         hash,
+         `Failed to stop ${hash}.`,
+      );
+      debug("stop: hash=%s", hash);
+   }
+
+   /**
+    * Sets a download's priority, identified by its MD4 hash -
+    * EC_OP_PARTFILE_PRIO_SET.
+    *
+    * Confirmed against Get_EC_Response_PartFile_Cmd's EC_OP_PARTFILE_PRIO_SET
+    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1701-L1708)
+    * and TextClient.cpp's own priority commands
+    * (https://github.com/amule-org/amule/blob/master/src/TextClient.cpp#L511-L539): the request's
+    * EC_TAG_PARTFILE tag (own data: MD4 hash) carries one EC_TAG_PARTFILE_PRIO
+    * child (uint8). Unlike DownloadFile.prio (see its class doc: the daemon
+    * adds 10 to flag "auto" on the *read* side), this is the raw
+    * ECDownloadPriority value - PR_AUTO is sent as 5, not 15; the daemon
+    * itself special-cases PR_AUTO to call SetAutoDownPriority() rather than
+    * SetDownPriority(). Replies EC_OP_FAILED/EC_OP_NOOP exactly like
+    * pause()/resume()/stop().
+    */
+   public async prioritySet(
+      hash: string,
+      priority: ECDownloadPriority,
+   ): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_PRIO_SET);
+      request.add(
+         new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
+            new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_PRIO, priority),
+         ]),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to set priority for ${hash}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("prioritySet: hash=%s, priority=%s", hash, ECDownloadPriority[priority]);
+   }
+
+   /**
+    * Starts a download from an ed2k link - EC_OP_ADD_LINK.
+    *
+    * Confirmed against the EC_OP_ADD_LINK case in ExternalConn::ProcessRequest2
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2730-L2763) and
+    * TextClient.cpp's own "add" command (https://github.com/amule-org/amule/blob/master/src/TextClient.cpp#L578-L590):
+    * the request carries the link as a single EC_TAG_STRING tag. The daemon
+    * accepts a batch of links per request (aggregating results across them),
+    * but amulecmd itself only ever sends one per call - this wrapper does
+    * the same, matching cancel()/rename()'s singular style. Replies
+    * EC_OP_FAILED (with an EC_TAG_STRING reason, e.g. "Invalid link or
+    * already on list.") if the link was rejected, EC_OP_NOOP otherwise.
+    */
+   public async addLink(link: string): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_ADD_LINK);
+      request.add(new ECStringTag(ECTagNames.EC_TAG_STRING, link));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to add link ${link}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("addLink: link=%s", link);
+   }
+
+   /**
+    * Clears the given completed downloads from the daemon's completed list,
+    * by ECID - EC_OP_CLEAR_COMPLETED.
+    *
+    * Confirmed against the EC_OP_CLEAR_COMPLETED case in ExternalConn::ProcessRequest2
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2939-L2949) and
+    * CDownloadQueue::ClearCompleted (https://github.com/amule-org/amule/blob/master/src/DownloadQueue.cpp#L863-L878):
+    * the request carries zero or more EC_TAG_ECID tags (uint32); each ECID
+    * that matches a completed download is cleared, everything else is a
+    * no-op - an empty list clears nothing, it is NOT a "clear all"
+    * wildcard. No amulecmd equivalent exists (GUI-only upstream). Always
+    * replies EC_OP_NOOP - there is no failure case to check.
+    */
+   public async clearCompleted(ecids: readonly bigint[]): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_CLEAR_COMPLETED);
+      for (const ecid of ecids) {
+         request.add(new ECUInt32Tag(ECTagNames.EC_TAG_ECID, Number(ecid)));
+      }
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("clearCompleted: %d ecid(s)", ecids.length);
    }
 }
 
