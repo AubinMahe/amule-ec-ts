@@ -161,6 +161,21 @@ function formatPercent(
    return `${percent.toFixed(1).padStart(5, " ")}%`;
 }
 
+/** Shared by printDownloadFile/printSharedFile/printSearchResult - prints the Kad-notes-searching flag and each community comment, if any. */
+function printFileComments(
+   comments: readonly ec.FileComment[] | undefined,
+   kadCommentSearching: boolean | undefined,
+): void {
+   if (kadCommentSearching) {
+      console.log("  Kad notes search in progress...");
+   }
+   for (const comment of comments ?? []) {
+      console.log(
+         `  [${ec.FileRating[comment.rating]}] ${comment.userName}: ${comment.comment}`,
+      );
+   }
+}
+
 function printDownloadFile(file: ec.DownloadFile): void {
    if (file.removed) {
       console.log(`(removed)  [${file.hash ?? "unknown hash"}]`);
@@ -174,6 +189,7 @@ function printDownloadFile(file: ec.DownloadFile): void {
       `  ${formatPercent(file.sizeDone, file.sizeFull)}  ${formatSize(file.sizeDone)} / ${formatSize(file.sizeFull)}` +
          `  @ ${formatSpeed(file.speed)}  sources: ${file.sources ?? "?"}  prio: ${file.prio ?? "?"}  status: ${file.status ?? "?"}`,
    );
+   printFileComments(file.comments, file.kadCommentSearching);
 }
 
 function printDownloadFiles(files: readonly ec.DownloadFile[]): void {
@@ -225,6 +241,7 @@ function printSharedFile(file: ec.SharedFile): void {
          `  @ ${formatSpeed(file.uploadSpeed)}  uploading to: ${file.uploadingCount ?? "?"}` +
          `  requests: ${file.requestsTotal ?? "?"}  prio: ${file.prio ?? "?"}`,
    );
+   printFileComments(file.comments, file.kadCommentSearching);
 }
 
 function printSharedFiles(files: readonly ec.SharedFile[]): void {
@@ -265,6 +282,7 @@ function printSearchResult(result: ec.SearchResult): void {
    console.log(
       `  size: ${formatSize(result.sizeFull)}  sources: ${result.sources}`,
    );
+   printFileComments(result.comments, result.kadCommentSearching);
 }
 
 function printSearchResults(results: readonly ec.SearchResult[]): void {
@@ -887,16 +905,28 @@ class Repl {
 
    async run(): Promise<void> {
       const rl = readline.createInterface({ input: stdin, output: stdout });
-      const closed = new Promise<"closed">((resolve) =>
-         rl.once("close", () => { resolve("closed"); }),
-      );
+      /**
+       * Reused across every iteration - each .next() freshly checks the
+       * stream's current state (buffered line vs. genuinely ended), unlike
+       * a one-shot `rl.once("close", ...)` promise raced against
+       * `rl.question()`: that promise resolves once and stays resolved,
+       * so once stdin's EOF fires it wins every future race immediately -
+       * even while lines that arrived before EOF are still queued waiting
+       * to be processed (piped/scripted input hits this constantly: all
+       * lines and EOF land in the same event-loop tick, so the very first
+       * command after the stream closes gets silently dropped instead of
+       * run). Confirmed live: piping several REPL commands with no delay
+       * between them only ever ran the first one.
+       */
+      const lines = rl[Symbol.asyncIterator]();
       console.log(HELP);
       for (;;) {
          const indicator = this.activity.consume();
          if (indicator) console.log(indicator);
-         const answer = await Promise.race([rl.question("> "), closed]);
-         if (answer === "closed") break;
-         const command = answer.trim();
+         stdout.write("> ");
+         const next = await lines.next();
+         if (next.done) break;
+         const command = next.value.trim();
          if (command === "") continue;
          if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit")
             break;

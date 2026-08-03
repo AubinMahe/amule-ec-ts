@@ -2,15 +2,48 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
-function searchResultTag(fields: { ecid: number; hash: string; name: string; sources?: bigint }): ec.ECTag {
-   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCHFILE, fields.ecid, [
+/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+function commentsTag(
+   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
+): ec.ECTag {
+   const children: ec.ECTag[] = [];
+   for (const entry of entries) {
+      children.push(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.userName),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.fileName),
+         new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, BigInt(entry.rating)),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, entry.comment),
+      );
+   }
+   return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
+}
+
+function searchResultTag(fields: {
+   ecid: number;
+   hash: string;
+   name: string;
+   sources?: bigint;
+   comments?: ec.ECTag;
+   kadCommentSearching?: boolean;
+}): ec.ECTag {
+   const children: ec.ECTag[] = [
       new ec.ECHash16Tag(
          ec.ECTagNames.EC_TAG_PARTFILE_HASH,
          new Uint8Array(Buffer.from(fields.hash, "hex")),
       ),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT, fields.sources ?? 0n),
-   ]);
+   ];
+   if (fields.comments) children.push(fields.comments);
+   if (fields.kadCommentSearching !== undefined) {
+      children.push(
+         new ec.ECUInt64Tag(
+            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
+            fields.kadCommentSearching ? 1n : 0n,
+         ),
+      );
+   }
+   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCHFILE, fields.ecid, children);
 }
 
 describe("Search.start", () => {
@@ -238,6 +271,34 @@ describe("SearchSession.fetch", () => {
 
       const idTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SEARCH_ID);
       expect(idTag?.intValue).to.equal(7n);
+   });
+
+   it("decodes comments/kadCommentSearching when present, defaulting to []/false when absent", async () => {
+      const fake = createFakeConnection();
+      const session = new ec.SearchSession(fake.connection, undefined);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_RESULTS);
+      reply.add(
+         searchResultTag({
+            ecid: 1,
+            hash: hexHash("a"),
+            name: "Cars.avi",
+            comments: commentsTag([
+               { userName: "Alice", fileName: "Cars.avi", rating: ec.FileRating.EXCELLENT, comment: "Great" },
+            ]),
+            kadCommentSearching: true,
+         }),
+      );
+      reply.add(searchResultTag({ ecid: 2, hash: hexHash("b"), name: "Trucks.avi" }));
+      fake.queueReply(reply);
+
+      await session.fetch();
+
+      expect(session.results[0]?.kadCommentSearching).to.equal(true);
+      expect(session.results[0]?.comments).to.deep.equal([
+         new ec.FileComment("Alice", "Cars.avi", ec.FileRating.EXCELLENT, "Great"),
+      ]);
+      expect(session.results[1]?.kadCommentSearching).to.equal(false);
+      expect(session.results[1]?.comments).to.deep.equal([]);
    });
 
    it("throws when the reply carries EC_TAG_SEARCH_EXPIRED", async () => {

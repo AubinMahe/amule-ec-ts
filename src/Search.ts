@@ -11,6 +11,7 @@ import {
    ECHash16Tag,
    ECCustomTag,
 } from "./ECTags.js";
+import { FileComment, parseFileComments, parseKadCommentSearching } from "./SharedFiles.js";
 
 const debug = debuglog("amule-ec:search");
 
@@ -73,6 +74,10 @@ export class SearchResult {
    public readonly name: string;
    public readonly sizeFull: bigint;
    public readonly sources: bigint;
+   /** Community ratings/comments (Kad NOTES) - see FileComment/parseFileComments' doc. */
+   public readonly comments: readonly FileComment[];
+   /** Whether a searchKadNotes() lookup is currently in flight for this result - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   public readonly kadCommentSearching: boolean;
 
    public constructor(tag: ECTag) {
       this.ecid = tag.intValue ?? 0n;
@@ -85,6 +90,8 @@ export class SearchResult {
       this.sizeFull = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL) ?? 0n;
       this.sources =
          tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
+      this.comments = parseFileComments(tag) ?? [];
+      this.kadCommentSearching = parseKadCommentSearching(tag) ?? false;
    }
 }
 

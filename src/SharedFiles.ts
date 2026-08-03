@@ -25,6 +25,73 @@ export enum FileRating {
 }
 
 /**
+ * One community rating/comment entry - `SFileRating`
+ * (https://github.com/amule-org/amule/blob/master/src/KnownFile.h#L65-L77):
+ * sourced either from a connected ed2k source's own comment (downloads
+ * only) or from a Kad NOTES lookup kicked off by
+ * `SharedFiles.searchKadNotes()` (any file type).
+ */
+export class FileComment {
+
+   public constructor(
+      public readonly userName: string,
+      public readonly fileName: string,
+      public readonly rating: FileRating,
+      public readonly comment: string,
+   ) {}
+}
+
+/**
+ * Decodes an `EC_TAG_PARTFILE_COMMENTS` container child off `fileTag`
+ * (a `SharedFile`/`DownloadFile`/`SearchResult`'s own tag) into
+ * `FileComment` entries.
+ *
+ * Confirmed against `ECSpecialCoreTags.cpp`'s `CEC_SharedFile_Tag`/
+ * `CEC_SearchFile_Tag` constructors: the container's children are a flat,
+ * repeating group of 4 - userName/fileName/rating/comment - "evaluated by
+ * index, not by name" (there is no way to tell entries apart by tag name,
+ * all 4 children of one entry share the same `EC_TAG_PARTFILE_COMMENTS`
+ * name as the container itself). Returns undefined if `fileTag` carries
+ * no such container at all - see FileComment callers for what that means
+ * on each of the three file types.
+ */
+export function parseFileComments(
+   fileTag: ECTag,
+): readonly FileComment[] | undefined {
+   const container = fileTag.findChild(ECTagNames.EC_TAG_PARTFILE_COMMENTS);
+   if (!container) return undefined;
+   const comments: FileComment[] = [];
+   for (let i = 0; i + 3 < container.children.length; i += 4) {
+      const userName = container.children[i];
+      const fileName = container.children[i + 1];
+      const rating = container.children[i + 2];
+      const comment = container.children[i + 3];
+      comments.push(
+         new FileComment(
+            userName instanceof ECStringTag ? userName.value : "",
+            fileName instanceof ECStringTag ? fileName.value : "",
+            Number(rating?.intValue ?? 0n),
+            comment instanceof ECStringTag ? comment.value : "",
+         ),
+      );
+   }
+   return comments;
+}
+
+/**
+ * Decodes `EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING` off `fileTag` -
+ * undefined if absent (see parseFileComments' callers for what that
+ * means on each of the three file types), otherwise whether a
+ * `searchKadNotes()` lookup is currently in flight for this file.
+ */
+export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
+   const value = fileTag.childInt(
+      ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
+   );
+   return value === undefined ? undefined : value !== 0n;
+}
+
+/**
  * One EC_TAG_KNOWNFILE entry from an EC_OP_SHARED_FILES reply or
  * notification.
  *
@@ -58,6 +125,10 @@ export class SharedFile {
    public readonly removed: boolean;
    /** The file's internal ECID - present on every shape except a removal notification (see class doc). */
    public readonly ecid: bigint | undefined;
+   /** Community ratings/comments (own source comments + Kad NOTES) - see FileComment/parseFileComments' doc. */
+   public readonly comments: readonly FileComment[] | undefined;
+   /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   public readonly kadCommentSearching: boolean | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -70,6 +141,8 @@ export class SharedFile {
       prio: bigint | undefined;
       removed: boolean;
       ecid: bigint | undefined;
+      comments: readonly FileComment[] | undefined;
+      kadCommentSearching: boolean | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -81,6 +154,8 @@ export class SharedFile {
       this.prio = fields.prio;
       this.removed = fields.removed;
       this.ecid = fields.ecid;
+      this.comments = fields.comments;
+      this.kadCommentSearching = fields.kadCommentSearching;
    }
 
    public static fromTag(tag: ECTag): SharedFile {
@@ -102,6 +177,8 @@ export class SharedFile {
          prio: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_PRIO),
          removed,
          ecid: removed ? undefined : tag.intValue,
+         comments: parseFileComments(tag),
+         kadCommentSearching: parseKadCommentSearching(tag),
       });
    }
 
@@ -118,6 +195,9 @@ export class SharedFile {
          prio: update.prio ?? this.prio,
          removed: update.removed,
          ecid: update.ecid ?? this.ecid,
+         comments: update.comments ?? this.comments,
+         kadCommentSearching:
+            update.kadCommentSearching ?? this.kadCommentSearching,
       });
    }
 }
@@ -211,6 +291,13 @@ export class SharedFiles implements ECFetchable {
     * `sharedfiles` only - no downloadqueue/searchlist fallback. Always
     * replies EC_OP_NOOP, silently no-op if the hash isn't a known shared
     * file.
+    *
+    * Still write-only: confirmed against `CKnownFile::GetFileComment()`/
+    * `UserRating()` (`KnownFile.h:191-196`) that the value set here is
+    * never referenced anywhere in the EC layer - it doesn't appear in
+    * `SharedFile.comments` (that's Kad NOTES + connected-source comments
+    * only, see `FileComment`'s doc) or anywhere else. There is no way to
+    * read it back over EC, live-tested 2026-08-03.
     */
    public async setComment(
       hash: string,
@@ -247,9 +334,10 @@ export class SharedFiles implements ECFetchable {
     * then the current search results (`downloadqueue` → `sharedfiles` →
     * `searchlist`) - unlike setComment(), not shared-files-only. Always
     * replies EC_OP_NOOP - this is fire-and-forget, the retrieved notes
-    * aren't carried back over this request; they'd surface through fields
-    * this library doesn't currently decode on SharedFile/DownloadFile/
-    * SearchResult.
+    * aren't carried back over this request. `kadCommentSearching` on the
+    * relevant SharedFile/DownloadFile/SearchResult flips true while the
+    * lookup is in flight, then false once it settles, with any results
+    * appearing in that file's `comments` on the next fetch()/poll.
     */
    public async searchKadNotes(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SEARCH_KAD_NOTES);
