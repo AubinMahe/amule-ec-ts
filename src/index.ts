@@ -18,6 +18,7 @@
  * (alias on collision, e.g. `import { Status as ECStatus } from "amule-ec"` -
  * normal, not a sign of a design problem.)
  */
+export * from "./Daemon.js";
 export * from "./Downloads.js";
 export * from "./ECCapabilities.js";
 export * from "./ECConnection.js";

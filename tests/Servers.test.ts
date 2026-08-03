@@ -132,3 +132,110 @@ describe("Servers.connect", () => {
       await expectRejection(servers.connect("192.0.2.1:4712"), /server not found/);
    });
 });
+
+describe("Servers.disconnect", () => {
+   it("sends no request tags and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.disconnect();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_DISCONNECT);
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(servers.disconnect(), /EC_OP_NOOP/);
+   });
+});
+
+describe("Servers.setStaticPrio", () => {
+   it("sends the ECID as a plain EC_TAG_SERVER uint32 (not an IPv4 tag)", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.setStaticPrio(7n, { static: true, prio: ec.ServerPriority.SRV_PR_HIGH });
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
+      const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
+      expect(tag).to.be.instanceOf(ec.ECUInt32Tag);
+      expect(tag?.intValue).to.equal(7n);
+      const staticTag = tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC);
+      expect(staticTag?.intValue).to.equal(1n);
+      const prioTag = tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO);
+      expect(prioTag?.intValue).to.equal(BigInt(ec.ServerPriority.SRV_PR_HIGH));
+   });
+
+   it("omits whichever of static/prio isn't given", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.setStaticPrio(7n, { prio: ec.ServerPriority.SRV_PR_LOW });
+
+      const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC)).to.be.undefined;
+      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)?.intValue).to.equal(
+         BigInt(ec.ServerPriority.SRV_PR_LOW),
+      );
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(servers.setStaticPrio(7n, { static: false }), /EC_OP_NOOP/);
+   });
+});
+
+describe("ServerLog.fetch", () => {
+   it("splits the single newline-separated EC_TAG_STRING into trimmed, non-empty lines", async () => {
+      const fake = createFakeConnection();
+      const log = new ec.ServerLog(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SERVERINFO);
+      reply.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "line one\nline two\n\n"));
+      fake.queueReply(reply);
+
+      await log.fetch();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_SERVERINFO);
+      expect(log.lines).to.deep.equal(["line one", "line two"]);
+   });
+
+   it("throws when the daemon replies with an unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const log = new ec.ServerLog(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(log.fetch(), /EC_OP_SERVERINFO/);
+   });
+});
+
+describe("ServerLog.reset", () => {
+   it("sends EC_OP_CLEAR_SERVERINFO with no tags and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const log = new ec.ServerLog(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await log.reset();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CLEAR_SERVERINFO);
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+   });
+
+   it("throws when the daemon replies with anything other than EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const log = new ec.ServerLog(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(log.reset(), /EC_OP_NOOP/);
+   });
+});
