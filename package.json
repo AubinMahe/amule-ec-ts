@@ -47,6 +47,7 @@
       "build"                   : "tsc -p tsconfig.json",
       "format"                  : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
       "lint"                    : "tsc --noEmit -p tsconfig.tests.json && eslint src tests --ext .ts",
+      "pack-release"            : "npm pack",
       "prepack"                 : "npm run build",
       "prepare"                 : "npm run build",
       "repl"                    : "node --import tsx ./tests/repl/main.ts",
