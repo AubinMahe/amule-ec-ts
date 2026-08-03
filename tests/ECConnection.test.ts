@@ -61,6 +61,34 @@ describe("ECConnection.authenticateWithHash", () => {
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(true);
    });
 
+   it("adds EC_TAG_CAN_MULTI_SEARCH when localCapabilities.multiSearch is set beforehand", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.localCapabilities.multiSearch = true;
+
+      const [, authRequest] = await Promise.all([
+         connection.authenticateWithHash(PASSWORD_HASH),
+         acceptAuthentication(peer),
+      ]);
+
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(true);
+   });
+
+   it("sets remoteCapabilities.multiSearch only when both requested and echoed back", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.localCapabilities.multiSearch = true;
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH, new Uint8Array())),
+      );
+      await authPromise;
+
+      expect(connection.remoteCapabilities.multiSearch).to.equal(true);
+   });
+
    it("does not enable a remote capability the server echoed but we never requested", async () => {
       const { connection, peer } = await connectPeer(server);
 

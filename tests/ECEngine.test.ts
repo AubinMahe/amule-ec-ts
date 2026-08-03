@@ -39,7 +39,7 @@ describe("armReconnect", () => {
       ]);
       await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(firstPeer)]);
 
-      ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false);
+      ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false, false);
 
       const secondPeerPromise = server.nextPeer();
       firstPeer.socket.destroy();
@@ -60,5 +60,64 @@ describe("armReconnect", () => {
       // would be seen as yet another disconnect and spawn a real, unstoppable reconnect
       // loop with live timers, hanging the test process.
       connection.removeAllListeners("disconnected");
+   });
+});
+
+describe("ECEngine.start", () => {
+   const PASSWORD_HASH = hexHash("c");
+   const SALT = 0x0011_2233_4455_6677n;
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      // ECEngine.start() always arms a reconnect loop (see armReconnect's doc) -
+      // disarm it before closing the fake server, same reasoning as the
+      // armReconnect describe block above.
+      ec.ECEngine.connection.removeAllListeners("disconnected");
+      await server.close();
+   });
+
+   async function acceptAuthentication(peer: FakeEcPeer): Promise<ec.ECPacket> {
+      const authRequest = await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      const authPasswd = await peer.readPacket();
+      const hashTag = authPasswd.find(ec.ECTagNames.EC_TAG_PASSWD_HASH) as ec.ECHash16Tag;
+      expect(Buffer.from(hashTag.value)).to.deep.equal(Buffer.from(computeSaltedHash(PASSWORD_HASH, SALT)));
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK));
+      return authRequest;
+   }
+
+   it("connects, authenticates and exposes the connection via .connection - capabilities default to off", async () => {
+      const [, authRequest] = await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+
+      expect(ec.ECEngine.connection).to.be.instanceOf(ec.ECConnection);
+      expect(ec.ECEngine.connection.localCapabilities.notify).to.equal(false);
+      expect(ec.ECEngine.connection.localCapabilities.multiSearch).to.equal(false);
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(false);
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(false);
+   });
+
+   it("sets localCapabilities and sends EC_TAG_CAN_NOTIFY/EC_TAG_CAN_MULTI_SEARCH when requested", async () => {
+      const [, authRequest] = await Promise.all([
+         ec.ECEngine.start({
+            host: "127.0.0.1",
+            port: server.port,
+            passwordHash: PASSWORD_HASH,
+            notify: true,
+            multiSearch: true,
+         }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+
+      expect(ec.ECEngine.connection.localCapabilities.notify).to.equal(true);
+      expect(ec.ECEngine.connection.localCapabilities.multiSearch).to.equal(true);
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(true);
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(true);
    });
 });

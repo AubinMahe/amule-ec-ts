@@ -6,4 +6,5 @@ export class ECCapabilities {
    public largeTagCount = false;
    public partialUpdate = false;
    public preferNoZlib = false;
+   public multiSearch = false;
 }

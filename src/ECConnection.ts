@@ -260,6 +260,14 @@ export class ECConnection extends events.EventEmitter {
                new Uint8Array()),
          );
       }
+      if (this.localCapabilities.multiSearch) {
+         authRequest.add(
+            new ECCustomTag(
+               ECTagNames.EC_TAG_CAN_MULTI_SEARCH,
+               new Uint8Array(),
+            ),
+         );
+      }
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
@@ -306,6 +314,9 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.partialUpdate =
          this.localCapabilities.partialUpdate &&
          reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
+      this.remoteCapabilities.multiSearch =
+         this.localCapabilities.multiSearch &&
+         reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
    }
 
    public async send(packet: ECPacket): Promise<void> {
