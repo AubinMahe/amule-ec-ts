@@ -279,6 +279,13 @@ export class ECConnection extends events.EventEmitter {
             new Uint8Array(),
          ),
       );
+      // Unconditional too - see ECCapabilities.searchList's doc.
+      authRequest.add(
+         new ECCustomTag(
+            ECTagNames.EC_TAG_CAN_SEARCH_LIST,
+            new Uint8Array(),
+         ),
+      );
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
@@ -333,6 +340,8 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.sharedDirsConfig = reply.has(
          ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG,
       );
+      // Unconditional request above too - see ECCapabilities.searchList's doc.
+      this.remoteCapabilities.searchList = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_LIST);
    }
 
    public async send(packet: ECPacket): Promise<void> {

@@ -99,6 +99,32 @@ describe("ECConnection.authenticateWithHash", () => {
       expect(connection.remoteCapabilities.sharedDirsConfig).to.equal(true);
    });
 
+   it("always adds EC_TAG_CAN_SEARCH_LIST, unlike every other capability, with no local flag to set", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const [, authRequest] = await Promise.all([
+         connection.authenticateWithHash(PASSWORD_HASH),
+         acceptAuthentication(peer),
+      ]);
+
+      expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_SEARCH_LIST)).to.equal(true);
+   });
+
+   it("sets remoteCapabilities.searchList purely from the echo, with no local flag gating it", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_SEARCH_LIST, new Uint8Array())),
+      );
+      await authPromise;
+
+      expect(connection.remoteCapabilities.searchList).to.equal(true);
+   });
+
    it("sets remoteCapabilities.multiSearch only when both requested and echoed back", async () => {
       const { connection, peer } = await connectPeer(server);
       connection.localCapabilities.multiSearch = true;

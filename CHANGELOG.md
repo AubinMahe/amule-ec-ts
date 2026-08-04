@@ -12,6 +12,17 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-04
+
+### Added
+
+- `Search.requestMore` (`EC_OP_SEARCH_REQUEST_MORE`) and `Search.list`
+  (`EC_OP_SEARCH_LIST`, returning `KnownSearch[]`) - the two opcodes
+  deliberately deferred out of the original multi-search batch.
+  `Search.list` is guarded on a new negotiated capability,
+  `ECCapabilities.searchList`, following the same unconditionally-advertised
+  pattern as `sharedDirsConfig`.
+
 ## [2.5.0] - 2026-08-04
 
 ### Added

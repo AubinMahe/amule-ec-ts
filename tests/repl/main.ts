@@ -49,6 +49,8 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["disconnect", "disconnect from ed2k/Kad"],
    ["search <keywords>", "start a search"],
    ["search stop", "stop the running search"],
+   ["search more [id]", "re-ask Kad peers for more results (current search if id omitted)"],
+   ["show searches", "list every search the daemon currently holds"],
    ["download <hash>...", "download one or more search results"],
    ["cancel <hash>", "cancel a download"],
    ["pause <hash>", "pause a download"],
@@ -322,6 +324,19 @@ function printSearchResults(results: readonly ec.SearchResult[]): void {
    }
 }
 
+function printKnownSearches(searches: readonly ec.KnownSearch[]): void {
+   if (searches.length === 0) {
+      console.log("No searches known to the daemon.");
+      return;
+   }
+   for (const search of searches) {
+      console.log(
+         `${search.id}: "${search.name}"  kind: ${ec.ECSearchType[search.kind]}` +
+            `  state: ${ec.ECSearchLifecycleState[search.state]}`,
+      );
+   }
+}
+
 function printLog(lines: readonly string[]): void {
    if (lines.length === 0) {
       console.log("Log is empty.");
@@ -524,6 +539,14 @@ class Repl {
       }
    }
 
+   private async runSearchMore(args: string[]): Promise<void> {
+      const idText = args[0];
+      const id = idText ? BigInt(idText) : this.currentSearch?.id;
+      await this.search.requestMore(id);
+      const suffix = id !== undefined ? `: search ${id}` : "";
+      console.log(`More results requested${suffix}.`);
+   }
+
    /** Starts a search, polls it to completion, then prints the results - mirrors amulecmd's own search/progress/results/download command sequence. */
    private async runSearch(args: string[]): Promise<void> {
       if (args.length === 1 && args[0]?.toLowerCase() === "stop") {
@@ -535,8 +558,11 @@ class Repl {
          console.log("Search stopped.");
          return;
       }
+      if (args[0]?.toLowerCase() === "more") {
+         return this.runSearchMore(args.slice(1));
+      }
       if (args.length === 0) {
-         console.error("Usage: search <keywords>  |  search stop");
+         console.error("Usage: search <keywords>  |  search stop  |  search more [id]");
          return;
       }
       const keywords = args.join(" ");
@@ -1140,6 +1166,12 @@ class Repl {
          case "show servers": {
             await this.servers.fetch();
             printServers(this.servers.servers);
+            break;
+         }
+
+         case "show searches": {
+            const searches = await this.search.list();
+            printKnownSearches(searches);
             break;
          }
 

@@ -345,3 +345,90 @@ describe("Search.download", () => {
       await expectRejection(search.download([hexHash("a")]), /EC_OP_STRINGS/);
    });
 });
+
+describe("Search.requestMore", () => {
+   it("sends the search ID as EC_TAG_SEARCH_ID and succeeds on EC_OP_MISC_DATA", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_MISC_DATA));
+
+      await search.requestMore(7n);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SEARCH_REQUEST_MORE);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SEARCH_ID)?.intValue).to.equal(7n);
+   });
+
+   it("sends no request tags when the search ID is omitted", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_MISC_DATA));
+
+      await search.requestMore();
+
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(search.requestMore(7n), /EC_OP_MISC_DATA/);
+   });
+});
+
+describe("Search.list", () => {
+   it("throws when the daemon never confirmed EC_TAG_CAN_SEARCH_LIST, without sending anything", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+
+      await expectRejection(search.list(), /EC_TAG_CAN_SEARCH_LIST/);
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("sends no request tags and parses each EC_TAG_SEARCH_ID entry", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.searchList = true;
+      const search = new ec.Search(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_LIST);
+      reply.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCH_ID, 1, [
+            new ec.ECStringTag(ec.ECTagNames.EC_TAG_SEARCH_NAME, "Astérix"),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND, ec.ECSearchType.KAD),
+            new ec.ECUInt8Tag(
+               ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE,
+               ec.ECSearchLifecycleState.RUNNING,
+            ),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const searches = await search.list();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SEARCH_LIST);
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+      expect(searches).to.deep.equal([
+         new ec.KnownSearch(1n, "Astérix", ec.ECSearchType.KAD, ec.ECSearchLifecycleState.RUNNING),
+      ]);
+   });
+
+   it("resolves with an empty array when the daemon has nothing to list", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.searchList = true;
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_LIST));
+
+      const searches = await search.list();
+
+      expect(searches).to.have.lengthOf(0);
+   });
+
+   it("throws when the daemon replies with an unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.searchList = true;
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(search.list(), /EC_OP_SEARCH_LIST/);
+   });
+});
