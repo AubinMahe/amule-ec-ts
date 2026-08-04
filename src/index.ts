@@ -35,6 +35,7 @@ export * from "./ECTags.js";
 export * from "./ECTagType.js";
 export * from "./ECVersion.js";
 export * from "./Friends.js";
+export * from "./IPFilter.js";
 export * from "./Kad.js";
 export * from "./Log.js";
 export * from "./Search.js";

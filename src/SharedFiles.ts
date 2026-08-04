@@ -425,6 +425,37 @@ export class SharedFiles implements ECFetchable {
    }
 
    /**
+    * Verifies a shared file's local data against its known hash (a full
+    * re-hash/integrity check), by hash - EC_OP_VERIFY_LOCAL_DATA.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_VERIFY_LOCAL_DATA case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3347-L3354): the
+    * request carries a single EC_TAG_KNOWNFILE (hash) tag; the daemon
+    * resolves it against `sharedfiles` only - not the download queue like
+    * searchKadNotes(), same shared-files-only scope as setComment(). Fire
+    * and forget: the verification result isn't carried back over this
+    * request. Always replies EC_OP_NOOP, silently no-op if the hash isn't
+    * a known shared file.
+    */
+   public async verifyLocalData(hash: string): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_VERIFY_LOCAL_DATA);
+      request.add(
+         new ECHash16Tag(
+            ECTagNames.EC_TAG_KNOWNFILE,
+            new Uint8Array(Buffer.from(hash, "hex")),
+         ),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("verifyLocalData: hash=%s", hash);
+   }
+
+   /**
     * Requests the daemon's shared-directory configuration -
     * EC_OP_GET_SHARED_DIRS.
     *

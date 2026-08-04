@@ -5,7 +5,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
-import { ECTag, ECUInt8Tag, ECHash16Tag } from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:uploads");
 
@@ -83,5 +83,40 @@ export class Uploads implements ECFetchable {
          })
          .map((tag) => new UploadClient(tag));
       debug("fetch: %d client(s)", this.clients.length);
+   }
+
+   /**
+    * Moves an uploading client to another of the daemon's downloads -
+    * EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE
+    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3324-L3333): the
+    * request carries two top-level tags, EC_TAG_CLIENT (the client's ECID,
+    * plain uint32 - same tag name UploadClient.ecid reads, but as its own
+    * data here rather than a child) and EC_TAG_PARTFILE (the target
+    * download's MD4 hash, own data - same shape Downloads' PARTFILE_*
+    * commands use). Silently no-ops if either doesn't resolve; always
+    * replies EC_OP_NOOP.
+    */
+   public async swapClientToAnotherFile(
+      clientEcid: bigint,
+      fileHash: string,
+   ): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE);
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)));
+      request.add(
+         new ECHash16Tag(
+            ECTagNames.EC_TAG_PARTFILE,
+            new Uint8Array(Buffer.from(fileHash, "hex")),
+         ),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("swapClientToAnotherFile: clientEcid=%s, fileHash=%s", clientEcid, fileHash);
    }
 }
