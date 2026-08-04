@@ -97,6 +97,14 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["verify <hash>", "verify a shared file's local data against its hash"],
    ["ipfilter reload", "reload the IP filter from its local file"],
    ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
+   ["show prefs messagefilter", "message filter preferences"],
+   ["prefs messagefilter <on|off>", "enable/disable the message filter (preserves other fields)"],
+   ["show prefs coretweaks", "core tweaks preferences"],
+   [
+      "prefs coretweaks verbose <on|off>",
+      "toggle core verbose logging (preserves other fields)",
+   ],
+   ["show categories", "list download categories"],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
    ["friend remove <ecid>", "remove a friend"],
@@ -280,6 +288,48 @@ function printSharedFiles(files: readonly ec.SharedFile[]): void {
 
    for (const file of files) {
       printSharedFile(file);
+   }
+}
+
+function printMessageFilterPrefs(prefs: ec.MessageFilterPrefs): void {
+   console.log(`enabled: ${prefs.enabled}`);
+   console.log(
+      `  filterAll: ${prefs.filterAll}  friendsOnly: ${prefs.friendsOnly}  secureOnly: ${prefs.secureOnly}`,
+   );
+   console.log(`  byKeyword: ${prefs.byKeyword}  keywords: "${prefs.keywords}"`);
+   console.log(
+      `  showInLog: ${prefs.showInLog}  filterComments: ${prefs.filterComments}  commentKeywords: "${prefs.commentKeywords}"`,
+   );
+}
+
+function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
+   console.log(
+      `maxConnPerFive: ${prefs.maxConnPerFive}  verbose: ${prefs.verbose}`,
+   );
+   console.log(
+      `  fileBufferSize: ${prefs.fileBufferSize}B  uploadQueueSize: ${prefs.uploadQueueSize}`,
+   );
+   console.log(
+      `  serverKeepAliveTimeoutMs: ${prefs.serverKeepAliveTimeoutMs}  kadMaxSourceSearches: ${prefs.kadMaxSourceSearches}`,
+   );
+   console.log(
+      `  kadSourceReaskMs: ${prefs.kadSourceReaskMs}  sourceReaskMs: ${prefs.sourceReaskMs}`,
+   );
+}
+
+function printCategories(categories: readonly ec.Category[]): void {
+   if (categories.length === 0) {
+      console.log("No categories beyond the built-in default (\"All\").");
+      return;
+   }
+
+   console.log(`${categories.length} categor(y/ies):\n`);
+
+   for (const category of categories) {
+      console.log(`[${category.index}] ${category.title}  (${category.path})`);
+      console.log(
+         `  comment: "${category.comment}"  color: ${category.color}  prio: ${category.prio}`,
+      );
    }
 }
 
@@ -493,6 +543,7 @@ class Repl {
    private readonly friends     : ec.Friends;
    private readonly chat        : ec.Chat;
    private readonly ipFilter    : ec.IPFilter;
+   private readonly preferences : ec.Preferences;
    private currentSearch?: ec.SearchSession;
 
    constructor(private readonly connection: ec.ECConnection) {
@@ -512,6 +563,7 @@ class Repl {
       this.friends     = new ec.Friends(this.connection);
       this.chat        = new ec.Chat(this.connection);
       this.ipFilter    = new ec.IPFilter(this.connection);
+      this.preferences = new ec.Preferences(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -920,6 +972,42 @@ class Repl {
       console.error("Usage: ipfilter <reload|update [url]>");
    }
 
+   private async runPrefs(args: string[]): Promise<void> {
+      const section = args[0]?.toLowerCase();
+      if (section === "messagefilter") {
+         const onOff = args[1]?.toLowerCase();
+         if (onOff !== "on" && onOff !== "off") {
+            console.error("Usage: prefs messagefilter <on|off>");
+            return;
+         }
+         const current = await this.preferences.getMessageFilter();
+         await this.preferences.setMessageFilter({
+            ...current,
+            enabled: onOff === "on",
+         });
+         console.log(`Message filter ${onOff === "on" ? "enabled" : "disabled"}.`);
+         return;
+      }
+      if (section === "coretweaks") {
+         const field = args[1]?.toLowerCase();
+         const onOff = args[2]?.toLowerCase();
+         if (field !== "verbose" || (onOff !== "on" && onOff !== "off")) {
+            console.error("Usage: prefs coretweaks verbose <on|off>");
+            return;
+         }
+         const current = await this.preferences.getCoreTweaks();
+         await this.preferences.setCoreTweaks({
+            ...current,
+            verbose: onOff === "on",
+         });
+         console.log(
+            `Core verbose logging ${onOff === "on" ? "enabled" : "disabled"}.`,
+         );
+         return;
+      }
+      console.error("Usage: prefs <messagefilter|coretweaks> ...");
+   }
+
    private async runAddLog(args: string[]): Promise<void> {
       const text = args.join(" ");
       if (!text) {
@@ -1101,6 +1189,7 @@ class Repl {
       swapclient: (args) => this.runSwapClient(args),
       verify: (args) => this.runVerify(args),
       ipfilter: (args) => this.runIpfilter(args),
+      prefs: (args) => this.runPrefs(args),
       addlog: (args) => this.runAddLog(args),
       adddebuglog: (args) => this.runAddDebugLog(args),
       friend: (args) => this.runFriend(args),
@@ -1158,6 +1247,24 @@ class Repl {
          case "show shareddirs":
             await this.runShowSharedDirs();
             break;
+
+         case "show prefs messagefilter": {
+            const prefs = await this.preferences.getMessageFilter();
+            printMessageFilterPrefs(prefs);
+            break;
+         }
+
+         case "show prefs coretweaks": {
+            const prefs = await this.preferences.getCoreTweaks();
+            printCoreTweaksPrefs(prefs);
+            break;
+         }
+
+         case "show categories": {
+            const categories = await this.preferences.listCategories();
+            printCategories(categories);
+            break;
+         }
 
          case "clear completed":
             await this.runClearCompleted();

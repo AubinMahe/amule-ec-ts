@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 83 of them; all 83 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 85 of them; all 85 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 79 opcodes
+(queued replies, no real socket). The REPL column reflects the 81 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -71,8 +71,8 @@ blank cell, which just means "not done yet, but could be".
 |0x3c|`RESET_DEBUGLOG`|Clears the debug log|✓|✓||✓|
 |0x3d|`CLEAR_SERVERINFO`|Clears the ed2k-connection log|✓|✓||✓|
 |0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|✓|✓||✓|
-|0x3f|`GET_PREFERENCES`|Requests daemon preferences|||||
-|0x40|`SET_PREFERENCES`|Sets daemon preferences|||||
+|0x3f|`GET_PREFERENCES`|Requests daemon preferences (partial: MessageFilter, CoreTweaks, Categories sections so far)|✓|✓||✓|
+|0x40|`SET_PREFERENCES`|Sets daemon preferences (same partial section coverage)|✓|✓||✓|
 |0x41|`CREATE_CATEGORY`|Creates a download category|✓|✓||✓|
 |0x42|`UPDATE_CATEGORY`|Updates a download category|✓|✓||✓|
 |0x43|`DELETE_CATEGORY`|Deletes a download category|✓|✓||✓|
@@ -107,10 +107,10 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 16 feature classes: `Downloads`, `Uploads`,
+`tests/repl/main.ts` drives all 17 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `StatsGraphs`, `Servers`, `Search`, `Log`, `Kad`,
-`ServerLog`, `Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories` and
-`IPFilter` - commands
+`ServerLog`, `Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories`,
+`IPFilter` and `Preferences` - commands
 `show dl`, `show ul`,
 `show shared`, `show servers`, `show log`, `reset log`, `show log last`,
 `addlog <text>`, `show debug log`, `reset debug log`,
@@ -138,4 +138,7 @@ blank cell, which just means "not done yet, but could be".
 `ipfilter reload`, `ipfilter update [url]`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,
-`comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`.
+`comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`,
+`show prefs messagefilter`, `prefs messagefilter <on|off>`,
+`show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
+`show categories`.
