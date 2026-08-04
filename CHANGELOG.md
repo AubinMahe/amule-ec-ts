@@ -12,6 +12,21 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-04
+
+### Added
+
+- `Preferences` service (`EC_OP_GET_PREFERENCES`/`EC_OP_SET_PREFERENCES`),
+  first of five planned batches covering the protocol's 14 preference
+  sections: `getMessageFilter`/`setMessageFilter`,
+  `getCoreTweaks`/`setCoreTweaks`, and the read-only `listCategories`
+  bonus (the `EC_TAG_PREFS_CATEGORIES` section, out of `Categories`'s own
+  scope). New `ECPreferencesSelection` enum for the `EC_TAG_SELECT_PREFS`
+  bitmask. Documents two protocol quirks: a GET_PREFERENCES reply carries
+  opcode `EC_OP_SET_PREFERENCES` on the wire, and boolean fields are
+  presence-encoded (a set*() call always fully replaces its section, sent
+  at `EC_DETAIL_UPDATE`).
+
 ## [2.6.0] - 2026-08-04
 
 ### Added
