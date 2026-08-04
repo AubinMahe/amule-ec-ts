@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 79 of them; all 79 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 81 of them; all 81 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 75 opcodes
+(queued replies, no real socket). The REPL column reflects the 77 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -76,8 +76,8 @@ blank cell, which just means "not done yet, but could be".
 |0x41|`CREATE_CATEGORY`|Creates a download category|✓|✓||✓|
 |0x42|`UPDATE_CATEGORY`|Updates a download category|✓|✓||✓|
 |0x43|`DELETE_CATEGORY`|Deletes a download category|✓|✓||✓|
-|0x44|`GET_STATSGRAPHS`|Requests historical stats graph data|||||
-|0x45|`STATSGRAPHS`|Stats graph data reply|||||
+|0x44|`GET_STATSGRAPHS`|Requests historical stats graph data|✓|✓||✓|
+|0x45|`STATSGRAPHS`|Stats graph data reply|✓|✓||✓|
 |0x46|`GET_STATSTREE`|Requests the client-tree stats (STATTREE)|||||
 |0x47|`STATSTREE`|Client-tree stats reply|||||
 |0x48|`KAD_START`|Starts the Kademlia network|✓|✓||✓|
@@ -107,15 +107,15 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 15 feature classes: `Downloads`, `Uploads`,
-`SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`,
-`Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories` and `IPFilter` -
-commands
+`tests/repl/main.ts` drives all 16 feature classes: `Downloads`, `Uploads`,
+`SharedFiles`, `Status`, `StatsGraphs`, `Servers`, `Search`, `Log`, `Kad`,
+`ServerLog`, `Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories` and
+`IPFilter` - commands
 `show dl`, `show ul`,
 `show shared`, `show servers`, `show log`, `reset log`, `show log last`,
 `addlog <text>`, `show debug log`, `reset debug log`,
 `adddebuglog <text>`, `show server log`, `reset server log`, `show chat`,
-`status`, `connect <ip:port>`, `connect`, `disconnect`,
+`status`, `show statsgraphs`, `connect <ip:port>`, `connect`, `disconnect`,
 `server disconnect`,
 `server priority <ecid> [static|nostatic] [normal|high|low]`,
 `server remove <ip:port>`, `server add <ip:port> [name]`,

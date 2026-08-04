@@ -12,6 +12,28 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-08-04
+
+### Added
+
+- `StatsGraphs` service: `fetch` for the daemon's transfer-history graph
+  (`EC_OP_GET_STATSGRAPHS`/`EC_OP_STATSGRAPHS`), including incremental
+  polling via the echoed `last` timestamp.
+- `ECDoubleTag` is now exported, and `ECTag` gained `doubleValue`/
+  `childDouble` helpers (mirroring the existing integer ones) - the first
+  opcode in this library to carry a double-valued tag.
+
+### Fixed
+
+- `ECConnection.close()` no longer triggers `ECEngine`'s automatic
+  reconnect loop. Previously, any deliberate shutdown (e.g. the REPL
+  exiting) still fired the same "disconnected" event as an unexpected
+  drop, so it reconnected anyway and then never closed that new socket -
+  leaking a live connection that kept the process running forever. Found
+  live: 17 orphaned `tests/repl/main.ts` processes, one per live smoke
+  test performed earlier in the same development session, were still
+  running.
+
 ## [2.4.0] - 2026-08-04
 
 ### Added

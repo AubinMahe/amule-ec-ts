@@ -32,6 +32,7 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["help", "show this help"],
    ["info", "negotiated capabilities"],
    ["status", "connection state and transfer stats"],
+   ["show statsgraphs", "transfer-history graph points since the last call"],
    ["show dl", "download queue"],
    ["show ul", "upload queue"],
    ["show shared", "shared files"],
@@ -383,6 +384,28 @@ function printStatus(status: ec.Status): void {
    );
 }
 
+function printStatsGraphs(statsGraphs: ec.StatsGraphs): void {
+   if (statsGraphs.points.length === 0) {
+      console.log("No new graph points.");
+      return;
+   }
+   for (const point of statsGraphs.points) {
+      const clients =
+         point.uploadingClients !== undefined || point.downloadingClients !== undefined
+            ? `  clients up: ${point.uploadingClients ?? "?"} down: ${point.downloadingClients ?? "?"}`
+            : "";
+      console.log(
+         `down: ${formatSpeed(point.downloadSpeed)}  up: ${formatSpeed(point.uploadSpeed)}` +
+            `  connections: ${point.connections}  kad nodes: ${point.kadNodes}${clients}`,
+      );
+   }
+   console.log(
+      `session: down ${formatSize(statsGraphs.sessionDownloaded)} / up ${formatSize(statsGraphs.sessionUploaded)}` +
+         `  kad nodes: ${statsGraphs.sessionKadNodes ?? "?"}` +
+         `  timespan: ${statsGraphs.sessionTimespan?.toFixed(0) ?? "?"}s`,
+   );
+}
+
 /**
  * Presentation-side tally of what's changed via push notifications since
  * the REPL last showed it, so the prompt can point the user at a command
@@ -440,6 +463,7 @@ class Repl {
    private readonly sharedFileTracker = new ec.SharedFileTracker();
    private readonly activity          = new NotificationActivity();
    private readonly status      : ec.Status;
+   private readonly statsGraphs : ec.StatsGraphs;
    private readonly downloads   : ec.Downloads;
    private readonly categories  : ec.Categories;
    private readonly uploads     : ec.Uploads;
@@ -462,6 +486,7 @@ class Repl {
       this.uploads     = new ec.Uploads(this.connection);
       this.sharedFiles = new ec.SharedFiles(this.connection);
       this.status      = new ec.Status(this.connection);
+      this.statsGraphs = new ec.StatsGraphs(this.connection);
       this.servers     = new ec.Servers(this.connection);
       this.search      = new ec.Search(this.connection);
       this.log         = new ec.Log(this.connection);
@@ -1166,6 +1191,15 @@ class Repl {
          case "status":
             await this.status.fetch();
             printStatus(this.status);
+            break;
+
+         case "show statsgraphs":
+            // scale/width match amule-remote-gui.cpp/WebServer.cpp's own
+            // polling convention (see StatsGraphs.fetch()'s doc) - omitting
+            // them isn't "use the daemon's default", it's width=0, which
+            // always looks like "no new points".
+            await this.statsGraphs.fetch({ last: this.statsGraphs.last, scale: 1, width: 32 });
+            printStatsGraphs(this.statsGraphs);
             break;
 
          default:

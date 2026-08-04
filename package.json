@@ -10,7 +10,7 @@
    "name"           : "amule-ec",
    "type"           : "module",
    "types"          : "./dist/index.d.ts",
-   "version"        : "2.4.0",
+   "version"        : "2.5.0",
    "allowScripts"   : {
       "esbuild@0.28.1": true
    },
@@ -45,6 +45,7 @@
    },
    "scripts"        : {
       "build"         : "tsc --build tsconfig.src.json",
+      "check"         : "rm -rf dist *.tsbuildinfo coverage && npm run lint && npm run build && npm run test",
       "format"        : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
       "format:package": "node scripts/format-package.mjs --in-place package.json",
       "lint"          : "tsc --build tsconfig.json && eslint src tests --ext .ts",
@@ -52,7 +53,9 @@
       "prepack"       : "npm run build",
       "prepare"       : "npm run build",
       "repl"          : "node --import tsx ./tests/repl/main.ts",
+      "repl-run"      : "node scripts/repl-run.mjs",
       "test"          : "mocha",
-      "test:coverage" : "mcr mocha"
+      "test:coverage" : "mcr mocha",
+      "todo-coverage" : "node scripts/todo-coverage.mjs"
    }
 }
