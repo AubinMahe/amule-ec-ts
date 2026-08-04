@@ -12,6 +12,18 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-08-04
+
+### Added
+
+- `Preferences.getConnections`/`setConnections` (`EC_TAG_PREFS_CONNECTIONS`),
+  second of five planned `Preferences` batches. New `ECProxyType` enum and
+  `ProxyPrefs` interface for the section's nested proxy sub-group. Documents
+  a third protocol quirk on top of the two already noted for MessageFilter/
+  CoreTweaks: within this one section, `proxy.enabled`/`proxy.enablePassword`/
+  `upnpEnabled` are NOT presence-encoded like every other boolean here -
+  they're sent as explicit 0/1 int tags, unconditionally.
+
 ## [2.7.0] - 2026-08-04
 
 ### Added

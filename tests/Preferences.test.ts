@@ -136,6 +136,150 @@ describe("Preferences.setMessageFilter", () => {
    });
 });
 
+function connectionsPrefsFixture(): ec.ConnectionsPrefs {
+   return {
+      maxGraphUploadRate: 100,
+      maxGraphDownloadRate: 200,
+      maxUpload: 50,
+      maxDownload: 500,
+      slotAllocation: 10,
+      tcpPort: 4662,
+      udpPort: 4672,
+      udpDisabled: false,
+      maxSourcesPerFile: 300,
+      maxConnections: 500,
+      autoConnect: true,
+      reconnect: false,
+      networkEd2k: true,
+      networkKademlia: true,
+      bindAddress: "",
+      bindInterface: "",
+      proxy: {
+         enabled: false,
+         type: ec.ECProxyType.NONE,
+         host: "",
+         port: 0,
+         enablePassword: false,
+         userName: "",
+         password: "",
+      },
+      upnpEnabled: true,
+      upnpTcpPort: 43_690,
+   };
+}
+
+describe("Preferences.getConnections", () => {
+   it("requests EC_PREFS_CONNECTIONS and parses both boolean encodings correctly", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_CONNECTIONS,
+            new Uint8Array(),
+            [
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CONN_UL_CAP, 100),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CONN_DL_CAP, 200),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CONN_MAX_UL, 50),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CONN_MAX_DL, 500),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CONN_SLOT_ALLOCATION, 10),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CONN_TCP_PORT, 4662),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CONN_UDP_PORT, 4672),
+               // EC_TAG_CONN_UDP_DISABLE omitted: presence-encoded, false here
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CONN_MAX_FILE_SOURCES, 300),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CONN_MAX_CONN, 500),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_CONN_AUTOCONNECT,
+                  new Uint8Array(),
+               ),
+               // EC_TAG_CONN_RECONNECT omitted: presence-encoded, false here
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_NETWORK_ED2K,
+                  new Uint8Array(),
+               ),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_NETWORK_KADEMLIA,
+                  new Uint8Array(),
+               ),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_CONN_BIND_ADDRESS, ""),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_CONN_BIND_INTERFACE, ""),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PROXY_ENABLE, 0),
+               new ec.ECUInt32Tag(
+                  ec.ECTagNames.EC_TAG_PROXY_TYPE,
+                  ec.ECProxyType.NONE,
+               ),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_PROXY_HOST, ""),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_PROXY_PORT, 0),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PROXY_AUTH, 0),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_PROXY_USER, ""),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_PROXY_PASSWORD, ""),
+               // upnpEnabled is explicit int-valued, not presence-encoded - true here
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CONN_UPNP_ENABLED, 1),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CONN_UPNP_TCP_PORT, 43_690),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getConnections();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.CONNECTIONS),
+      );
+      expect(prefs).to.deep.equal(connectionsPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getConnections(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setConnections", () => {
+   it("presence-encodes AUTOCONNECT/RECONNECT/etc, but sends PROXY_ENABLE/PROXY_AUTH/UPNP_ENABLED as explicit ints", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setConnections(connectionsPrefsFixture());
+
+      const sent = fake.sent[0];
+      expect(sent?.opcode).to.equal(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      const section = sent?.find(ec.ECTagNames.EC_TAG_PREFS_CONNECTIONS);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(
+         section?.findChild(ec.ECTagNames.EC_TAG_CONN_AUTOCONNECT),
+      ).to.not.be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_CONN_RECONNECT)).to.be
+         .undefined;
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_PROXY_ENABLE),
+      ).to.equal(0n);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_CONN_UPNP_ENABLED),
+      ).to.equal(1n);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_PROXY_TYPE),
+      ).to.equal(BigInt(ec.ECProxyType.NONE));
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setConnections(connectionsPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
 describe("Preferences.getCoreTweaks", () => {
    it("requests EC_PREFS_CORETWEAKS and parses ints plus the presence-encoded VERBOSE flag", async () => {
       const fake = createFakeConnection();
