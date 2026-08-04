@@ -71,7 +71,7 @@ blank cell, which just means "not done yet, but could be".
 |0x3c|`RESET_DEBUGLOG`|Clears the debug log|✓|✓||✓|
 |0x3d|`CLEAR_SERVERINFO`|Clears the ed2k-connection log|✓|✓||✓|
 |0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|✓|✓||✓|
-|0x3f|`GET_PREFERENCES`|Requests daemon preferences (partial: MessageFilter, CoreTweaks, Categories sections so far)|✓|✓||✓|
+|0x3f|`GET_PREFERENCES`|Requests daemon preferences (partial: MessageFilter, Connections, CoreTweaks, Categories sections so far)|✓|✓||✓|
 |0x40|`SET_PREFERENCES`|Sets daemon preferences (same partial section coverage)|✓|✓||✓|
 |0x41|`CREATE_CATEGORY`|Creates a download category|✓|✓||✓|
 |0x42|`UPDATE_CATEGORY`|Updates a download category|✓|✓||✓|
@@ -140,5 +140,6 @@ blank cell, which just means "not done yet, but could be".
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,
 `comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`,
 `show prefs messagefilter`, `prefs messagefilter <on|off>`,
+`show prefs connections`, `prefs connections reconnect <on|off>`,
 `show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
 `show categories`.

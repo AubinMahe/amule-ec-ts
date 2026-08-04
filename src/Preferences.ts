@@ -54,6 +54,75 @@ export interface CoreTweaksPrefs {
    sourceReaskMs: number;
 }
 
+/**
+ * CProxyType values - confirmed against Proxy.h
+ * (https://github.com/amule-org/amule/blob/master/src/Proxy.h#L103-L109). `NONE` is declared as
+ * signed `-1` on the C++ side but transmitted `static_cast<uint32>(...)`
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L160) - i.e. as
+ * `0xffffffff` on the wire - so that's the value used here too, rather than
+ * a `-1` this library's UINT32 tag encoder would reject.
+ */
+export enum ECProxyType {
+   NONE = 0xffffffff,
+   SOCKS5 = 0,
+   SOCKS4 = 1,
+   HTTP = 2,
+   SOCKS4A = 3,
+}
+
+/**
+ * Proxy sub-group of the CONNECTIONS section - the daemon routes both P2P
+ * traffic and its own HTTP fetches (e.g. IPFilter/Kad-nodes updates)
+ * through this. `password` rides in plain text both ways (confirmed
+ * against the CONNECTIONS reply builder's own comment,
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L163-L166) - it is a
+ * proxy auth credential, not a password hash.
+ */
+export interface ProxyPrefs {
+   enabled: boolean;
+   type: ECProxyType;
+   host: string;
+   port: number;
+   enablePassword: boolean;
+   userName: string;
+   password: string;
+}
+
+/**
+ * CONNECTIONS section of the daemon preferences - EC_TAG_PREFS_CONNECTIONS.
+ *
+ * Unlike every other boolean in this class, `proxy.enabled`,
+ * `proxy.enablePassword` and `upnpEnabled` are NOT presence-encoded: the
+ * reply builder always sends them as an explicit int tag
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L160-L179), and
+ * `Apply()` reads them with a plain `GetInt() != 0` rather than going
+ * through `ApplyBoolean()`
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L648-L677) - so
+ * `setConnections()` sends them unconditionally too, same as any other
+ * value-carrying field.
+ */
+export interface ConnectionsPrefs {
+   maxGraphUploadRate: number;
+   maxGraphDownloadRate: number;
+   maxUpload: number;
+   maxDownload: number;
+   slotAllocation: number;
+   tcpPort: number;
+   udpPort: number;
+   udpDisabled: boolean;
+   maxSourcesPerFile: number;
+   maxConnections: number;
+   autoConnect: boolean;
+   reconnect: boolean;
+   networkEd2k: boolean;
+   networkKademlia: boolean;
+   bindAddress: string;
+   bindInterface: string;
+   proxy: ProxyPrefs;
+   upnpEnabled: boolean;
+   upnpTcpPort: number;
+}
+
 /** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
 export class Category {
 
@@ -77,7 +146,8 @@ export class Category {
  * and CEC_Prefs_Packet's constructor
  * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L89-L216)); this class
  * grows section-by-section across several batches. So far: MESSAGEFILTER,
- * CORETWEAKS, and the read-only CATEGORIES helper `listCategories()`.
+ * CONNECTIONS, CORETWEAKS, and the read-only CATEGORIES helper
+ * `listCategories()`.
  *
  * Two protocol quirks worth calling out:
  *  - A GET_PREFERENCES reply is a `CEC_Prefs_Packet`, whose base-class
@@ -202,6 +272,121 @@ export class Preferences {
       );
       await this.applySection(section);
       debug("setMessageFilter: applied");
+   }
+
+   /** Fetches the CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
+   public async getConnections(): Promise<ConnectionsPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.CONNECTIONS,
+         ECTagNames.EC_TAG_PREFS_CONNECTIONS,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the CONNECTIONS section.");
+      }
+      const has = (name: number): boolean =>
+         section.findChild(name) !== undefined;
+      const num = (name: number): number => Number(section.childInt(name) ?? 0n);
+      const str = (name: number): string => section.childString(name) ?? "";
+      const prefs: ConnectionsPrefs = {
+         maxGraphUploadRate: num(ECTagNames.EC_TAG_CONN_UL_CAP),
+         maxGraphDownloadRate: num(ECTagNames.EC_TAG_CONN_DL_CAP),
+         maxUpload: num(ECTagNames.EC_TAG_CONN_MAX_UL),
+         maxDownload: num(ECTagNames.EC_TAG_CONN_MAX_DL),
+         slotAllocation: num(ECTagNames.EC_TAG_CONN_SLOT_ALLOCATION),
+         tcpPort: num(ECTagNames.EC_TAG_CONN_TCP_PORT),
+         udpPort: num(ECTagNames.EC_TAG_CONN_UDP_PORT),
+         udpDisabled: has(ECTagNames.EC_TAG_CONN_UDP_DISABLE),
+         maxSourcesPerFile: num(ECTagNames.EC_TAG_CONN_MAX_FILE_SOURCES),
+         maxConnections: num(ECTagNames.EC_TAG_CONN_MAX_CONN),
+         autoConnect: has(ECTagNames.EC_TAG_CONN_AUTOCONNECT),
+         reconnect: has(ECTagNames.EC_TAG_CONN_RECONNECT),
+         networkEd2k: has(ECTagNames.EC_TAG_NETWORK_ED2K),
+         networkKademlia: has(ECTagNames.EC_TAG_NETWORK_KADEMLIA),
+         bindAddress: str(ECTagNames.EC_TAG_CONN_BIND_ADDRESS),
+         bindInterface: str(ECTagNames.EC_TAG_CONN_BIND_INTERFACE),
+         proxy: {
+            enabled: num(ECTagNames.EC_TAG_PROXY_ENABLE) !== 0,
+            type: num(ECTagNames.EC_TAG_PROXY_TYPE),
+            host: str(ECTagNames.EC_TAG_PROXY_HOST),
+            port: num(ECTagNames.EC_TAG_PROXY_PORT),
+            enablePassword: num(ECTagNames.EC_TAG_PROXY_AUTH) !== 0,
+            userName: str(ECTagNames.EC_TAG_PROXY_USER),
+            password: str(ECTagNames.EC_TAG_PROXY_PASSWORD),
+         },
+         upnpEnabled: num(ECTagNames.EC_TAG_CONN_UPNP_ENABLED) !== 0,
+         upnpTcpPort: num(ECTagNames.EC_TAG_CONN_UPNP_TCP_PORT),
+      };
+      debug("getConnections: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
+   public async setConnections(prefs: ConnectionsPrefs): Promise<void> {
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_CONNECTIONS,
+         new Uint8Array(),
+         [
+            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_UL_CAP, prefs.maxGraphUploadRate),
+            new ECUInt32Tag(
+               ECTagNames.EC_TAG_CONN_DL_CAP,
+               prefs.maxGraphDownloadRate,
+            ),
+            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_UL, prefs.maxUpload),
+            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_DL, prefs.maxDownload),
+            new ECUInt32Tag(
+               ECTagNames.EC_TAG_CONN_SLOT_ALLOCATION,
+               prefs.slotAllocation,
+            ),
+            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_TCP_PORT, prefs.tcpPort),
+            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_UDP_PORT, prefs.udpPort),
+            ...flag(ECTagNames.EC_TAG_CONN_UDP_DISABLE, prefs.udpDisabled),
+            new ECUInt16Tag(
+               ECTagNames.EC_TAG_CONN_MAX_FILE_SOURCES,
+               prefs.maxSourcesPerFile,
+            ),
+            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_MAX_CONN, prefs.maxConnections),
+            ...flag(ECTagNames.EC_TAG_CONN_AUTOCONNECT, prefs.autoConnect),
+            ...flag(ECTagNames.EC_TAG_CONN_RECONNECT, prefs.reconnect),
+            ...flag(ECTagNames.EC_TAG_NETWORK_ED2K, prefs.networkEd2k),
+            ...flag(ECTagNames.EC_TAG_NETWORK_KADEMLIA, prefs.networkKademlia),
+            new ECStringTag(
+               ECTagNames.EC_TAG_CONN_BIND_ADDRESS,
+               prefs.bindAddress,
+            ),
+            new ECStringTag(
+               ECTagNames.EC_TAG_CONN_BIND_INTERFACE,
+               prefs.bindInterface,
+            ),
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_PROXY_ENABLE,
+               prefs.proxy.enabled ? 1 : 0,
+            ),
+            new ECUInt32Tag(ECTagNames.EC_TAG_PROXY_TYPE, prefs.proxy.type),
+            new ECStringTag(ECTagNames.EC_TAG_PROXY_HOST, prefs.proxy.host),
+            new ECUInt16Tag(ECTagNames.EC_TAG_PROXY_PORT, prefs.proxy.port),
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_PROXY_AUTH,
+               prefs.proxy.enablePassword ? 1 : 0,
+            ),
+            new ECStringTag(ECTagNames.EC_TAG_PROXY_USER, prefs.proxy.userName),
+            new ECStringTag(
+               ECTagNames.EC_TAG_PROXY_PASSWORD,
+               prefs.proxy.password,
+            ),
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_CONN_UPNP_ENABLED,
+               prefs.upnpEnabled ? 1 : 0,
+            ),
+            new ECUInt16Tag(
+               ECTagNames.EC_TAG_CONN_UPNP_TCP_PORT,
+               prefs.upnpTcpPort,
+            ),
+         ],
+      );
+      await this.applySection(section);
+      debug("setConnections: applied");
    }
 
    /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */

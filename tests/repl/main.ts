@@ -99,6 +99,11 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
    ["show prefs messagefilter", "message filter preferences"],
    ["prefs messagefilter <on|off>", "enable/disable the message filter (preserves other fields)"],
+   ["show prefs connections", "connection preferences"],
+   [
+      "prefs connections reconnect <on|off>",
+      "toggle ed2k auto-reconnect (preserves other fields)",
+   ],
    ["show prefs coretweaks", "core tweaks preferences"],
    [
       "prefs coretweaks verbose <on|off>",
@@ -300,6 +305,28 @@ function printMessageFilterPrefs(prefs: ec.MessageFilterPrefs): void {
    console.log(
       `  showInLog: ${prefs.showInLog}  filterComments: ${prefs.filterComments}  commentKeywords: "${prefs.commentKeywords}"`,
    );
+}
+
+function printConnectionsPrefs(prefs: ec.ConnectionsPrefs): void {
+   console.log(
+      `graph caps: ul ${prefs.maxGraphUploadRate} / dl ${prefs.maxGraphDownloadRate}  actual caps: ul ${prefs.maxUpload} / dl ${prefs.maxDownload}`,
+   );
+   console.log(
+      `  slotAllocation: ${prefs.slotAllocation}  tcpPort: ${prefs.tcpPort}  udpPort: ${prefs.udpPort}  udpDisabled: ${prefs.udpDisabled}`,
+   );
+   console.log(
+      `  maxSourcesPerFile: ${prefs.maxSourcesPerFile}  maxConnections: ${prefs.maxConnections}`,
+   );
+   console.log(
+      `  autoConnect: ${prefs.autoConnect}  reconnect: ${prefs.reconnect}  networkEd2k: ${prefs.networkEd2k}  networkKademlia: ${prefs.networkKademlia}`,
+   );
+   console.log(
+      `  bindAddress: "${prefs.bindAddress}"  bindInterface: "${prefs.bindInterface}"`,
+   );
+   console.log(
+      `  proxy: enabled=${prefs.proxy.enabled} type=${ec.ECProxyType[prefs.proxy.type]} host=${prefs.proxy.host} port=${prefs.proxy.port}`,
+   );
+   console.log(`  upnpEnabled: ${prefs.upnpEnabled}  upnpTcpPort: ${prefs.upnpTcpPort}`);
 }
 
 function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
@@ -974,38 +1001,68 @@ class Repl {
 
    private async runPrefs(args: string[]): Promise<void> {
       const section = args[0]?.toLowerCase();
+      const rest = args.slice(1);
       if (section === "messagefilter") {
-         const onOff = args[1]?.toLowerCase();
-         if (onOff !== "on" && onOff !== "off") {
-            console.error("Usage: prefs messagefilter <on|off>");
-            return;
-         }
-         const current = await this.preferences.getMessageFilter();
-         await this.preferences.setMessageFilter({
-            ...current,
-            enabled: onOff === "on",
-         });
-         console.log(`Message filter ${onOff === "on" ? "enabled" : "disabled"}.`);
+         await this.runPrefsMessageFilter(rest);
+         return;
+      }
+      if (section === "connections") {
+         await this.runPrefsConnections(rest);
          return;
       }
       if (section === "coretweaks") {
-         const field = args[1]?.toLowerCase();
-         const onOff = args[2]?.toLowerCase();
-         if (field !== "verbose" || (onOff !== "on" && onOff !== "off")) {
-            console.error("Usage: prefs coretweaks verbose <on|off>");
-            return;
-         }
-         const current = await this.preferences.getCoreTweaks();
-         await this.preferences.setCoreTweaks({
-            ...current,
-            verbose: onOff === "on",
-         });
-         console.log(
-            `Core verbose logging ${onOff === "on" ? "enabled" : "disabled"}.`,
-         );
+         await this.runPrefsCoreTweaks(rest);
          return;
       }
-      console.error("Usage: prefs <messagefilter|coretweaks> ...");
+      console.error("Usage: prefs <messagefilter|connections|coretweaks> ...");
+   }
+
+   private async runPrefsMessageFilter(args: string[]): Promise<void> {
+      const onOff = args[0]?.toLowerCase();
+      if (onOff !== "on" && onOff !== "off") {
+         console.error("Usage: prefs messagefilter <on|off>");
+         return;
+      }
+      const current = await this.preferences.getMessageFilter();
+      await this.preferences.setMessageFilter({
+         ...current,
+         enabled: onOff === "on",
+      });
+      console.log(`Message filter ${onOff === "on" ? "enabled" : "disabled"}.`);
+   }
+
+   private async runPrefsConnections(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "reconnect" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs connections reconnect <on|off>");
+         return;
+      }
+      const current = await this.preferences.getConnections();
+      await this.preferences.setConnections({
+         ...current,
+         reconnect: onOff === "on",
+      });
+      console.log(
+         `ed2k auto-reconnect ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
+   }
+
+   private async runPrefsCoreTweaks(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "verbose" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs coretweaks verbose <on|off>");
+         return;
+      }
+      const current = await this.preferences.getCoreTweaks();
+      await this.preferences.setCoreTweaks({
+         ...current,
+         verbose: onOff === "on",
+      });
+      console.log(
+         `Core verbose logging ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
    }
 
    private async runAddLog(args: string[]): Promise<void> {
@@ -1251,6 +1308,12 @@ class Repl {
          case "show prefs messagefilter": {
             const prefs = await this.preferences.getMessageFilter();
             printMessageFilterPrefs(prefs);
+            break;
+         }
+
+         case "show prefs connections": {
+            const prefs = await this.preferences.getConnections();
+            printConnectionsPrefs(prefs);
             break;
          }
 
