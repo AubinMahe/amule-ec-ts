@@ -503,6 +503,353 @@ describe("Preferences.setDirectories", () => {
    });
 });
 
+function securityPrefsFixture(): ec.SecurityPrefs {
+   return {
+      canSeeShares: ec.ECVisibleShareAccess.FRIENDS,
+      ipFilterClients: true,
+      ipFilterServers: true,
+      ipFilterAutoUpdate: false,
+      ipFilterUpdateUrl: "http://example.com/ipfilter.dat",
+      ipFilterLevel: 127,
+      filterLanIps: false,
+      secureIdentEnabled: true,
+      obfuscationSupported: true,
+      obfuscationRequested: false,
+      obfuscationRequired: false,
+      ipFilterParanoid: false,
+      ipFilterSystem: false,
+   };
+}
+
+describe("Preferences.getSecurity", () => {
+   it("requests EC_PREFS_SECURITY and parses the explicit-int CAN_SEE_SHARES plus presence-encoded booleans", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_SECURITY,
+            new Uint8Array(),
+            [
+               new ec.ECUInt8Tag(
+                  ec.ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES,
+                  ec.ECVisibleShareAccess.FRIENDS,
+               ),
+               new ec.ECCustomTag(ec.ECTagNames.EC_TAG_IPFILTER_CLIENTS, new Uint8Array()),
+               new ec.ECCustomTag(ec.ECTagNames.EC_TAG_IPFILTER_SERVERS, new Uint8Array()),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_IPFILTER_UPDATE_URL,
+                  "http://example.com/ipfilter.dat",
+               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IPFILTER_LEVEL, 127),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_SECURITY_USE_SECIDENT,
+                  new Uint8Array(),
+               ),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_SECURITY_OBFUSCATION_SUPPORTED,
+                  new Uint8Array(),
+               ),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getSecurity();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.SECURITY),
+      );
+      expect(prefs).to.deep.equal(securityPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getSecurity(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setSecurity", () => {
+   it("sends CAN_SEE_SHARES as an explicit uint8 and presence-encodes the rest", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setSecurity(securityPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_SECURITY);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES),
+      ).to.equal(BigInt(ec.ECVisibleShareAccess.FRIENDS));
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_IPFILTER_CLIENTS)).to.not
+         .be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_IPFILTER_PARANOID)).to.be
+         .undefined;
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setSecurity(securityPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+function onlineSigPrefsFixture(): ec.OnlineSigPrefs {
+   return {
+      enabled: true,
+      directory: "/home/user/.aMule/OnlineSig",
+      updateIntervalSeconds: 5,
+   };
+}
+
+describe("Preferences.getOnlineSig", () => {
+   it("requests EC_PREFS_ONLINESIG and parses the presence-encoded ENABLED flag plus DIRECTORY/UPDATE", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_ONLINESIG,
+            new Uint8Array(),
+            [
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_ONLINESIG_ENABLED,
+                  new Uint8Array(),
+               ),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_ONLINESIG_DIRECTORY,
+                  "/home/user/.aMule/OnlineSig",
+               ),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_ONLINESIG_UPDATE, 5),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getOnlineSig();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.ONLINESIG),
+      );
+      expect(prefs).to.deep.equal(onlineSigPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getOnlineSig(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setOnlineSig", () => {
+   it("presence-encodes ENABLED and sends DIRECTORY/UPDATE as plain value tags", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setOnlineSig(onlineSigPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_ONLINESIG);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_ONLINESIG_ENABLED)).to.not
+         .be.undefined;
+      expect(
+         section?.childString(ec.ECTagNames.EC_TAG_ONLINESIG_DIRECTORY),
+      ).to.equal("/home/user/.aMule/OnlineSig");
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_ONLINESIG_UPDATE),
+      ).to.equal(5n);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setOnlineSig(onlineSigPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+function serversPrefsFixture(): ec.ServersPrefs {
+   return {
+      removeDeadServers: true,
+      deadServerRetries: 3,
+      autoUpdateServerList: true,
+      addServersFromServer: false,
+      addServersFromClient: false,
+      useScoreSystem: true,
+      smartIdCheck: true,
+      safeServerConnect: true,
+      autoConnectStaticOnly: false,
+      manualHighPriority: false,
+      updateUrl: "http://example.com/server.met",
+   };
+}
+
+describe("Preferences.getServers (preferences section)", () => {
+   it("requests EC_PREFS_SERVERS and parses presence-encoded booleans plus RETRIES/UPDATE_URL", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PREFS_SERVERS, new Uint8Array(), [
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD, new Uint8Array()),
+            new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES, 3),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE, new Uint8Array()),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_SERVERS_USE_SCORE_SYSTEM,
+               new Uint8Array(),
+            ),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_SERVERS_SMART_ID_CHECK,
+               new Uint8Array(),
+            ),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_SERVERS_SAFE_SERVER_CONNECT,
+               new Uint8Array(),
+            ),
+            new ec.ECStringTag(
+               ec.ECTagNames.EC_TAG_SERVERS_UPDATE_URL,
+               "http://example.com/server.met",
+            ),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getServers();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.SERVERS),
+      );
+      expect(prefs).to.deep.equal(serversPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getServers(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setServers (preferences section)", () => {
+   it("presence-encodes booleans and sends RETRIES/UPDATE_URL as plain value tags", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setServers(serversPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_SERVERS);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD)).to
+         .not.be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_SERVERS_MANUAL_HIGH_PRIO))
+         .to.be.undefined;
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES),
+      ).to.equal(3n);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setServers(serversPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+describe("Preferences.getKademlia", () => {
+   it("requests EC_PREFS_KADEMLIA and parses the single URL", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_KADEMLIA,
+            new Uint8Array(),
+            [
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL,
+                  "http://example.com/nodes.dat",
+               ),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getKademlia();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.KADEMLIA),
+      );
+      expect(prefs).to.deep.equal({
+         nodesUpdateUrl: "http://example.com/nodes.dat",
+      });
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getKademlia(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setKademlia", () => {
+   it("sends the URL as EC_TAG_KADEMLIA_UPDATE_URL", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setKademlia({
+         nodesUpdateUrl: "http://example.com/nodes.dat",
+      });
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_KADEMLIA);
+      expect(
+         section?.childString(ec.ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL),
+      ).to.equal("http://example.com/nodes.dat");
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setKademlia({ nodesUpdateUrl: "" }),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
 describe("Preferences.getCoreTweaks", () => {
    it("requests EC_PREFS_CORETWEAKS and parses ints plus the presence-encoded VERBOSE flag", async () => {
       const fake = createFakeConnection();

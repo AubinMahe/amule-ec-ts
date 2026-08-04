@@ -114,6 +114,23 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       "prefs directories autorescan <on|off>",
       "toggle auto-rescan of shared directories (preserves other fields)",
    ],
+   ["show prefs security", "security/IP-filter preferences"],
+   [
+      "prefs security filterlan <on|off>",
+      "toggle filtering of LAN IPs (preserves other fields)",
+   ],
+   ["show prefs onlinesig", "online signature preferences"],
+   [
+      "prefs onlinesig <on|off>",
+      "enable/disable the online signature (preserves other fields)",
+   ],
+   ["show prefs servers", "server-list preferences"],
+   [
+      "prefs servers autoupdate <on|off>",
+      "toggle auto-update of the known server list (preserves other fields)",
+   ],
+   ["show prefs kademlia", "Kademlia nodes.dat update URL"],
+   ["prefs kademlia seturl <url>", "set the Kademlia nodes.dat update URL"],
    ["show prefs coretweaks", "core tweaks preferences"],
    [
       "prefs coretweaks verbose <on|off>",
@@ -373,6 +390,50 @@ function printDirectoriesPrefs(prefs: ec.DirectoriesPrefs): void {
    console.log(
       `  excludeSharePatterns: "${prefs.excludeSharePatterns}"  excludeSharePatternsUseRegex: ${prefs.excludeSharePatternsUseRegex}`,
    );
+}
+
+function printSecurityPrefs(prefs: ec.SecurityPrefs): void {
+   console.log(
+      `canSeeShares: ${ec.ECVisibleShareAccess[prefs.canSeeShares]}  secureIdentEnabled: ${prefs.secureIdentEnabled}`,
+   );
+   console.log(
+      `  ipFilterClients: ${prefs.ipFilterClients}  ipFilterServers: ${prefs.ipFilterServers}  ipFilterAutoUpdate: ${prefs.ipFilterAutoUpdate}`,
+   );
+   console.log(
+      `  ipFilterUpdateUrl: "${prefs.ipFilterUpdateUrl}"  ipFilterLevel: ${prefs.ipFilterLevel}  filterLanIps: ${prefs.filterLanIps}`,
+   );
+   console.log(
+      `  obfuscationSupported: ${prefs.obfuscationSupported}  obfuscationRequested: ${prefs.obfuscationRequested}  obfuscationRequired: ${prefs.obfuscationRequired}`,
+   );
+   console.log(
+      `  ipFilterParanoid: ${prefs.ipFilterParanoid}  ipFilterSystem: ${prefs.ipFilterSystem}`,
+   );
+}
+
+function printOnlineSigPrefs(prefs: ec.OnlineSigPrefs): void {
+   console.log(`enabled: ${prefs.enabled}`);
+   console.log(`  directory: "${prefs.directory}"`);
+   console.log(`  updateIntervalSeconds: ${prefs.updateIntervalSeconds}`);
+}
+
+function printServersPrefs(prefs: ec.ServersPrefs): void {
+   console.log(
+      `removeDeadServers: ${prefs.removeDeadServers}  deadServerRetries: ${prefs.deadServerRetries}  autoUpdateServerList: ${prefs.autoUpdateServerList}`,
+   );
+   console.log(
+      `  addServersFromServer: ${prefs.addServersFromServer}  addServersFromClient: ${prefs.addServersFromClient}`,
+   );
+   console.log(
+      `  useScoreSystem: ${prefs.useScoreSystem}  smartIdCheck: ${prefs.smartIdCheck}  safeServerConnect: ${prefs.safeServerConnect}`,
+   );
+   console.log(
+      `  autoConnectStaticOnly: ${prefs.autoConnectStaticOnly}  manualHighPriority: ${prefs.manualHighPriority}`,
+   );
+   console.log(`  updateUrl: "${prefs.updateUrl}"`);
+}
+
+function printKademliaPrefs(prefs: ec.KademliaPrefs): void {
+   console.log(`nodesUpdateUrl: "${prefs.nodesUpdateUrl}"`);
 }
 
 function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
@@ -1064,13 +1125,86 @@ class Repl {
          await this.runPrefsDirectories(rest);
          return;
       }
+      if (section === "security") {
+         await this.runPrefsSecurity(rest);
+         return;
+      }
+      if (section === "onlinesig") {
+         await this.runPrefsOnlineSig(rest);
+         return;
+      }
+      if (section === "servers") {
+         await this.runPrefsServers(rest);
+         return;
+      }
+      if (section === "kademlia") {
+         await this.runPrefsKademlia(rest);
+         return;
+      }
       if (section === "coretweaks") {
          await this.runPrefsCoreTweaks(rest);
          return;
       }
       console.error(
-         "Usage: prefs <messagefilter|connections|files|directories|coretweaks> ...",
+         "Usage: prefs <messagefilter|connections|files|directories|security|onlinesig|servers|kademlia|coretweaks> ...",
       );
+   }
+
+   private async runPrefsSecurity(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "filterlan" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs security filterlan <on|off>");
+         return;
+      }
+      const current = await this.preferences.getSecurity();
+      await this.preferences.setSecurity({
+         ...current,
+         filterLanIps: onOff === "on",
+      });
+      console.log(`LAN IP filtering ${onOff === "on" ? "enabled" : "disabled"}.`);
+   }
+
+   private async runPrefsOnlineSig(args: string[]): Promise<void> {
+      const onOff = args[0]?.toLowerCase();
+      if (onOff !== "on" && onOff !== "off") {
+         console.error("Usage: prefs onlinesig <on|off>");
+         return;
+      }
+      const current = await this.preferences.getOnlineSig();
+      await this.preferences.setOnlineSig({
+         ...current,
+         enabled: onOff === "on",
+      });
+      console.log(`Online signature ${onOff === "on" ? "enabled" : "disabled"}.`);
+   }
+
+   private async runPrefsServers(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "autoupdate" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs servers autoupdate <on|off>");
+         return;
+      }
+      const current = await this.preferences.getServers();
+      await this.preferences.setServers({
+         ...current,
+         autoUpdateServerList: onOff === "on",
+      });
+      console.log(
+         `Server-list auto-update ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
+   }
+
+   private async runPrefsKademlia(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      const url = args[1];
+      if (sub !== "seturl" || !url) {
+         console.error("Usage: prefs kademlia seturl <url>");
+         return;
+      }
+      await this.preferences.setKademlia({ nodesUpdateUrl: url });
+      console.log(`Kademlia nodes.dat update URL set: ${url}.`);
    }
 
    private async runPrefsFiles(args: string[]): Promise<void> {
@@ -1414,6 +1548,30 @@ class Repl {
          case "show prefs directories": {
             const prefs = await this.preferences.getDirectories();
             printDirectoriesPrefs(prefs);
+            break;
+         }
+
+         case "show prefs security": {
+            const prefs = await this.preferences.getSecurity();
+            printSecurityPrefs(prefs);
+            break;
+         }
+
+         case "show prefs onlinesig": {
+            const prefs = await this.preferences.getOnlineSig();
+            printOnlineSigPrefs(prefs);
+            break;
+         }
+
+         case "show prefs servers": {
+            const prefs = await this.preferences.getServers();
+            printServersPrefs(prefs);
+            break;
+         }
+
+         case "show prefs kademlia": {
+            const prefs = await this.preferences.getKademlia();
+            printKademliaPrefs(prefs);
             break;
          }
 
