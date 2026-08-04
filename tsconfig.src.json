@@ -1,0 +1,19 @@
+{
+   "extends"        : "./tsconfig.json",
+   "compilerOptions": {
+      "composite"      : true,
+      "declaration"    : true,
+      "declarationMap" : true,
+      "esModuleInterop": true,
+      "lib"            : ["ES2024"],
+      "noEmitOnError"  : true,
+      "outDir"         : "./dist",
+      "rootDir"        : "./src",
+      "sourceMap"      : true,
+      "tsBuildInfoFile": "./tsconfig.src.tsbuildinfo",
+      "types"          : ["node"]
+   },
+   "include": [
+      "./src/**/*.ts"
+   ]
+}
