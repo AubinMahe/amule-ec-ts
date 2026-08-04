@@ -495,6 +495,96 @@ export class Downloads implements ECFetchable {
    }
 
    /**
+    * Swaps this file's sources to another "also available for" (A4AF) file
+    * sharing the same content - EC_OP_PARTFILE_SWAP_A4AF_THIS.
+    *
+    * Confirmed against Get_EC_Response_PartFile_Cmd's
+    * EC_OP_PARTFILE_SWAP_A4AF_THIS case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1915-L1917,
+    * `CoreNotify_PartFile_Swap_A4AF(pfile)`): same request/reply shape as
+    * pause()/resume()/stop() - a single EC_TAG_PARTFILE hash tag, no
+    * children. GUI-only upstream (no amulecmd equivalent).
+    */
+   public async swapA4AFThis(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS,
+         hash,
+         `Failed to swap A4AF for ${hash}.`,
+      );
+      debug("swapA4AFThis: hash=%s", hash);
+   }
+
+   /**
+    * Same as swapA4AFThis(), but also toggles the file's "auto swap" flag -
+    * EC_OP_PARTFILE_SWAP_A4AF_THIS_AUTO
+    * (`CoreNotify_PartFile_Swap_A4AF_Auto(pfile)`,
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1918-L1920).
+    * Same request/reply shape as swapA4AFThis().
+    */
+   public async swapA4AFThisAuto(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS_AUTO,
+         hash,
+         `Failed to swap A4AF (auto) for ${hash}.`,
+      );
+      debug("swapA4AFThisAuto: hash=%s", hash);
+   }
+
+   /**
+    * Swaps this file's sources to its other A4AF files (the reverse
+    * direction of swapA4AFThis()) - EC_OP_PARTFILE_SWAP_A4AF_OTHERS
+    * (`CoreNotify_PartFile_Swap_A4AF_Others(pfile)`,
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1921-L1923).
+    * Same request/reply shape as swapA4AFThis().
+    */
+   public async swapA4AFOthers(hash: string): Promise<void> {
+      await this.sendPartFileCommand(
+         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_OTHERS,
+         hash,
+         `Failed to swap A4AF (others) for ${hash}.`,
+      );
+      debug("swapA4AFOthers: hash=%s", hash);
+   }
+
+   /**
+    * Assigns a download to a category, identified by its MD4 hash -
+    * EC_OP_PARTFILE_SET_CAT.
+    *
+    * Confirmed against Get_EC_Response_PartFile_Cmd's EC_OP_PARTFILE_SET_CAT
+    * case (`pfile->SetCategory(hashtag.GetFirstTagSafe()->GetInt())`,
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1950-L1951)
+    * and TextClient.cpp's own use of the same child tag
+    * (https://github.com/amule-org/amule/blob/master/src/TextClient.cpp#L737-L738): the request's
+    * EC_TAG_PARTFILE tag (own data: MD4 hash) carries one EC_TAG_PARTFILE_CAT
+    * child (uint32) - the target category's index, 0 meaning "no category".
+    * Replies EC_OP_FAILED/EC_OP_NOOP exactly like pause()/resume()/stop().
+    */
+   public async setCategory(hash: string, categoryIndex: number): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_SET_CAT);
+      request.add(
+         new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
+            new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, categoryIndex),
+         ]),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to set category for ${hash}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("setCategory: hash=%s, categoryIndex=%d", hash, categoryIndex);
+   }
+
+   /**
     * Sets a download's priority, identified by its MD4 hash -
     * EC_OP_PARTFILE_PRIO_SET.
     *

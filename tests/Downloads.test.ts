@@ -268,14 +268,17 @@ describe("Downloads.rename", () => {
    });
 });
 
-describe("Downloads.pause/resume/stop", () => {
+describe("Downloads.pause/resume/stop/swapA4AF*", () => {
    const cases: {
-      method: "pause" | "resume" | "stop";
+      method: "pause" | "resume" | "stop" | "swapA4AFThis" | "swapA4AFThisAuto" | "swapA4AFOthers";
       opcode: ec.ECOpcode;
    }[] = [
       { method: "pause", opcode: ec.ECOpcode.EC_OP_PARTFILE_PAUSE },
       { method: "resume", opcode: ec.ECOpcode.EC_OP_PARTFILE_RESUME },
       { method: "stop", opcode: ec.ECOpcode.EC_OP_PARTFILE_STOP },
+      { method: "swapA4AFThis", opcode: ec.ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS },
+      { method: "swapA4AFThisAuto", opcode: ec.ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS_AUTO },
+      { method: "swapA4AFOthers", opcode: ec.ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_OTHERS },
    ];
 
    for (const { method, opcode } of cases) {
@@ -348,6 +351,32 @@ describe("Downloads.prioritySet", () => {
          downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_HIGH),
          /FileHash not found/,
       );
+   });
+});
+
+describe("Downloads.setCategory", () => {
+   it("sends the hash as EC_TAG_PARTFILE with an EC_TAG_PARTFILE_CAT child", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.setCategory(hexHash("a"), 2);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_PARTFILE_SET_CAT);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      const catTag = hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_CAT);
+      expect(catTag?.intValue).to.equal(2n);
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"));
+      fake.queueReply(failure);
+
+      await expectRejection(downloads.setCategory(hexHash("a"), 2), /FileHash not found/);
    });
 });
 
