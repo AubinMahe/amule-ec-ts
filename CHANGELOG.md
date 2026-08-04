@@ -12,6 +12,21 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-08-04
+
+### Added
+
+- `Preferences.getFiles`/`setFiles` (`EC_TAG_PREFS_FILES`) and
+  `getDirectories`/`setDirectories` (`EC_TAG_PREFS_DIRECTORIES`), third of
+  five planned `Preferences` batches. `DirectoriesPrefs.sharedDirs` mirrors
+  the same shared-directory list as `SharedFiles.getSharedDirs`/
+  `setSharedDirs` but as a flat path list with no per-directory `recursive`
+  flag - prefer the dedicated opcode for that. Found and documented (in
+  `FilesPrefs`'s doc comment) that two tags already declared in
+  `ECTagNames.ts` (`EC_TAG_FILES_UL_FULL_CHUNKS`,
+  `EC_TAG_FILES_EXTRACT_METADATA`) are dead/nonexistent in the current
+  daemon and are excluded from this wrapper's interface.
+
 ## [2.8.0] - 2026-08-04
 
 ### Added

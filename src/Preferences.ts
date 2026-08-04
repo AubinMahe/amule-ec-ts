@@ -123,6 +123,80 @@ export interface ConnectionsPrefs {
    upnpTcpPort: number;
 }
 
+/**
+ * FILES section of the daemon preferences - EC_TAG_PREFS_FILES.
+ *
+ * Two tags declared in `ECTagNames.ts` are deliberately left out of this
+ * interface: `EC_TAG_FILES_UL_FULL_CHUNKS` is a real protocol tag but is
+ * never built into a GET_PREFERENCES reply nor read by `Apply()` anywhere
+ * in the current C++ source (only a dead reference remains in the
+ * deprecated PHP webserver template mapping,
+ * https://github.com/amule-org/amule/blob/master/src/webserver/src/php_amule_lib.cpp#L396); and
+ * `EC_TAG_FILES_EXTRACT_METADATA` doesn't exist at all upstream (see the
+ * commit that first declared it, 3703bba, for how that was found). Both
+ * would always read back empty/absent and have no effect if sent.
+ *
+ * `mmapSupported` is purely informational: on the daemon side, `Apply()`
+ * only consults this tag under `#ifdef CLIENT_GUI`
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L829-L833) - i.e. it's
+ * the remote GUI mirroring the daemon's own advertised capability locally,
+ * not something a daemon build ever applies to itself. `setFiles()`
+ * doesn't transmit it back for that reason. `mmapEnabled` is only ever
+ * present in a reply when `mmapSupported` is true (nested inside the same
+ * `if` in the reply builder,
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L371-L375), but is
+ * otherwise a normal presence-encoded, settable boolean.
+ */
+export interface FilesPrefs {
+   ichEnabled: boolean;
+   aichTrust: boolean;
+   newFilesPaused: boolean;
+   newAutoDownloadPriority: boolean;
+   previewPrio: boolean;
+   endgame: boolean;
+   newAutoUploadPriority: boolean;
+   startNextFilePaused: boolean;
+   resumeSameCategory: boolean;
+   saveSources: boolean;
+   allocFullFileSize: boolean;
+   mmapSupported: boolean;
+   mmapEnabled: boolean;
+   checkFreeSpace: boolean;
+   minFreeDiskSpaceMb: number;
+   createFilesNormal: boolean;
+   mediaMetadataEnabled: boolean;
+   mediaMetadataFfprobePath: string;
+   startNextFileAlpha: boolean;
+}
+
+/**
+ * DIRECTORIES section of the daemon preferences - EC_TAG_PREFS_DIRECTORIES.
+ *
+ * `sharedDirs` mirrors the same underlying `vector<CPath>` as
+ * `SharedFiles.getSharedDirs()`/`setSharedDirs()`
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L844-L850), but as a
+ * flat path list with no per-directory `recursive` flag (that flag lives
+ * elsewhere, only reachable through the dedicated
+ * `EC_OP_GET_SHARED_DIRS`/`EC_OP_SET_SHARED_DIRS` opcodes) - prefer those
+ * for anything that needs to preserve recursion settings. Round-tripping
+ * `sharedDirs` through get/setDirectories() alone is safe (no recursion
+ * data exists at this layer to lose), just coarser.
+ *
+ * `excludeSharePatternsUseRegex` is, like `ConnectionsPrefs.upnpEnabled`,
+ * an explicit 0/1 int tag rather than presence-encoded
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L415-L416,866-871).
+ */
+export interface DirectoriesPrefs {
+   incomingDir: string;
+   tempDir: string;
+   sharedDirs: string[];
+   shareHiddenFiles: boolean;
+   autoRescanSharedDirs: boolean;
+   followSymlinksInShares: boolean;
+   excludeSharePatterns: string;
+   excludeSharePatternsUseRegex: boolean;
+}
+
 /** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
 export class Category {
 
@@ -146,8 +220,8 @@ export class Category {
  * and CEC_Prefs_Packet's constructor
  * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L89-L216)); this class
  * grows section-by-section across several batches. So far: MESSAGEFILTER,
- * CONNECTIONS, CORETWEAKS, and the read-only CATEGORIES helper
- * `listCategories()`.
+ * CONNECTIONS, FILES, DIRECTORIES, CORETWEAKS, and the read-only
+ * CATEGORIES helper `listCategories()`.
  *
  * Two protocol quirks worth calling out:
  *  - A GET_PREFERENCES reply is a `CEC_Prefs_Packet`, whose base-class
@@ -387,6 +461,185 @@ export class Preferences {
       );
       await this.applySection(section);
       debug("setConnections: applied");
+   }
+
+   /** Fetches the FILES section - EC_TAG_PREFS_FILES. */
+   public async getFiles(): Promise<FilesPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.FILES,
+         ECTagNames.EC_TAG_PREFS_FILES,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the FILES section.");
+      }
+      const has = (name: number): boolean =>
+         section.findChild(name) !== undefined;
+      const prefs: FilesPrefs = {
+         ichEnabled: has(ECTagNames.EC_TAG_FILES_ICH_ENABLED),
+         aichTrust: has(ECTagNames.EC_TAG_FILES_AICH_TRUST),
+         newFilesPaused: has(ECTagNames.EC_TAG_FILES_NEW_PAUSED),
+         newAutoDownloadPriority: has(ECTagNames.EC_TAG_FILES_NEW_AUTO_DL_PRIO),
+         previewPrio: has(ECTagNames.EC_TAG_FILES_PREVIEW_PRIO),
+         endgame: has(ECTagNames.EC_TAG_FILES_ENDGAME),
+         newAutoUploadPriority: has(ECTagNames.EC_TAG_FILES_NEW_AUTO_UL_PRIO),
+         startNextFilePaused: has(ECTagNames.EC_TAG_FILES_START_NEXT_PAUSED),
+         resumeSameCategory: has(ECTagNames.EC_TAG_FILES_RESUME_SAME_CAT),
+         saveSources: has(ECTagNames.EC_TAG_FILES_SAVE_SOURCES),
+         allocFullFileSize: has(ECTagNames.EC_TAG_FILES_ALLOC_FULL_SIZE),
+         mmapSupported: has(ECTagNames.EC_TAG_FILES_MMAP_SUPPORTED),
+         mmapEnabled: has(ECTagNames.EC_TAG_FILES_MMAP_ENABLED),
+         checkFreeSpace: has(ECTagNames.EC_TAG_FILES_CHECK_FREE_SPACE),
+         minFreeDiskSpaceMb: Number(
+            section.childInt(ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE) ?? 0n,
+         ),
+         createFilesNormal: has(ECTagNames.EC_TAG_FILES_CREATE_NORMAL),
+         mediaMetadataEnabled: has(ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED),
+         mediaMetadataFfprobePath:
+            section.childString(ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH) ?? "",
+         startNextFileAlpha: has(ECTagNames.EC_TAG_FILES_START_NEXT_ALPHA),
+      };
+      debug("getFiles: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole FILES section - EC_TAG_PREFS_FILES. */
+   public async setFiles(prefs: FilesPrefs): Promise<void> {
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_FILES, new Uint8Array(), [
+         ...flag(ECTagNames.EC_TAG_FILES_ICH_ENABLED, prefs.ichEnabled),
+         ...flag(ECTagNames.EC_TAG_FILES_AICH_TRUST, prefs.aichTrust),
+         ...flag(ECTagNames.EC_TAG_FILES_NEW_PAUSED, prefs.newFilesPaused),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_NEW_AUTO_DL_PRIO,
+            prefs.newAutoDownloadPriority,
+         ),
+         ...flag(ECTagNames.EC_TAG_FILES_PREVIEW_PRIO, prefs.previewPrio),
+         ...flag(ECTagNames.EC_TAG_FILES_ENDGAME, prefs.endgame),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_NEW_AUTO_UL_PRIO,
+            prefs.newAutoUploadPriority,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_START_NEXT_PAUSED,
+            prefs.startNextFilePaused,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_RESUME_SAME_CAT,
+            prefs.resumeSameCategory,
+         ),
+         ...flag(ECTagNames.EC_TAG_FILES_SAVE_SOURCES, prefs.saveSources),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_ALLOC_FULL_SIZE,
+            prefs.allocFullFileSize,
+         ),
+         ...flag(ECTagNames.EC_TAG_FILES_MMAP_ENABLED, prefs.mmapEnabled),
+         ...flag(ECTagNames.EC_TAG_FILES_CHECK_FREE_SPACE, prefs.checkFreeSpace),
+         new ECUInt32Tag(
+            ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE,
+            prefs.minFreeDiskSpaceMb,
+         ),
+         ...flag(ECTagNames.EC_TAG_FILES_CREATE_NORMAL, prefs.createFilesNormal),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED,
+            prefs.mediaMetadataEnabled,
+         ),
+         new ECStringTag(
+            ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH,
+            prefs.mediaMetadataFfprobePath,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_FILES_START_NEXT_ALPHA,
+            prefs.startNextFileAlpha,
+         ),
+      ]);
+      await this.applySection(section);
+      debug("setFiles: applied");
+   }
+
+   /** Fetches the DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
+   public async getDirectories(): Promise<DirectoriesPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.DIRECTORIES,
+         ECTagNames.EC_TAG_PREFS_DIRECTORIES,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the DIRECTORIES section.");
+      }
+      const sharedTag = section.findChild(ECTagNames.EC_TAG_DIRECTORIES_SHARED);
+      const prefs: DirectoriesPrefs = {
+         incomingDir:
+            section.childString(ECTagNames.EC_TAG_DIRECTORIES_INCOMING) ?? "",
+         tempDir: section.childString(ECTagNames.EC_TAG_DIRECTORIES_TEMP) ?? "",
+         sharedDirs: (sharedTag?.children ?? []).map((child) =>
+            child instanceof ECStringTag ? child.value : "",
+         ),
+         shareHiddenFiles:
+            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN) !==
+            undefined,
+         autoRescanSharedDirs:
+            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN) !==
+            undefined,
+         followSymlinksInShares:
+            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS) !==
+            undefined,
+         excludeSharePatterns:
+            section.childString(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS) ??
+            "",
+         excludeSharePatternsUseRegex:
+            Number(
+               section.childInt(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX) ??
+                  0n,
+            ) !== 0,
+      };
+      debug("getDirectories: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
+   public async setDirectories(prefs: DirectoriesPrefs): Promise<void> {
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_DIRECTORIES,
+         new Uint8Array(),
+         [
+            new ECStringTag(
+               ECTagNames.EC_TAG_DIRECTORIES_INCOMING,
+               prefs.incomingDir,
+            ),
+            new ECStringTag(ECTagNames.EC_TAG_DIRECTORIES_TEMP, prefs.tempDir),
+            new ECUInt32Tag(
+               ECTagNames.EC_TAG_DIRECTORIES_SHARED,
+               prefs.sharedDirs.length,
+               prefs.sharedDirs.map(
+                  (path) => new ECStringTag(ECTagNames.EC_TAG_STRING, path),
+               ),
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN,
+               prefs.shareHiddenFiles,
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN,
+               prefs.autoRescanSharedDirs,
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS,
+               prefs.followSymlinksInShares,
+            ),
+            new ECStringTag(
+               ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS,
+               prefs.excludeSharePatterns,
+            ),
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX,
+               prefs.excludeSharePatternsUseRegex ? 1 : 0,
+            ),
+         ],
+      );
+      await this.applySection(section);
+      debug("setDirectories: applied");
    }
 
    /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */

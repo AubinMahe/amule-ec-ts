@@ -104,6 +104,16 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       "prefs connections reconnect <on|off>",
       "toggle ed2k auto-reconnect (preserves other fields)",
    ],
+   ["show prefs files", "files preferences"],
+   [
+      "prefs files checkfreespace <on|off>",
+      "toggle the free-disk-space check (preserves other fields)",
+   ],
+   ["show prefs directories", "directories preferences"],
+   [
+      "prefs directories autorescan <on|off>",
+      "toggle auto-rescan of shared directories (preserves other fields)",
+   ],
    ["show prefs coretweaks", "core tweaks preferences"],
    [
       "prefs coretweaks verbose <on|off>",
@@ -327,6 +337,42 @@ function printConnectionsPrefs(prefs: ec.ConnectionsPrefs): void {
       `  proxy: enabled=${prefs.proxy.enabled} type=${ec.ECProxyType[prefs.proxy.type]} host=${prefs.proxy.host} port=${prefs.proxy.port}`,
    );
    console.log(`  upnpEnabled: ${prefs.upnpEnabled}  upnpTcpPort: ${prefs.upnpTcpPort}`);
+}
+
+function printFilesPrefs(prefs: ec.FilesPrefs): void {
+   console.log(
+      `ichEnabled: ${prefs.ichEnabled}  aichTrust: ${prefs.aichTrust}  newFilesPaused: ${prefs.newFilesPaused}`,
+   );
+   console.log(
+      `  newAutoDownloadPriority: ${prefs.newAutoDownloadPriority}  newAutoUploadPriority: ${prefs.newAutoUploadPriority}  previewPrio: ${prefs.previewPrio}`,
+   );
+   console.log(
+      `  endgame: ${prefs.endgame}  startNextFilePaused: ${prefs.startNextFilePaused}  resumeSameCategory: ${prefs.resumeSameCategory}  startNextFileAlpha: ${prefs.startNextFileAlpha}`,
+   );
+   console.log(
+      `  saveSources: ${prefs.saveSources}  allocFullFileSize: ${prefs.allocFullFileSize}  createFilesNormal: ${prefs.createFilesNormal}`,
+   );
+   console.log(
+      `  mmapSupported: ${prefs.mmapSupported}  mmapEnabled: ${prefs.mmapEnabled}`,
+   );
+   console.log(
+      `  checkFreeSpace: ${prefs.checkFreeSpace}  minFreeDiskSpaceMb: ${prefs.minFreeDiskSpaceMb}`,
+   );
+   console.log(
+      `  mediaMetadataEnabled: ${prefs.mediaMetadataEnabled}  mediaMetadataFfprobePath: "${prefs.mediaMetadataFfprobePath}"`,
+   );
+}
+
+function printDirectoriesPrefs(prefs: ec.DirectoriesPrefs): void {
+   console.log(`incomingDir: "${prefs.incomingDir}"`);
+   console.log(`  tempDir: "${prefs.tempDir}"`);
+   console.log(`  sharedDirs: [${prefs.sharedDirs.join(", ")}]`);
+   console.log(
+      `  shareHiddenFiles: ${prefs.shareHiddenFiles}  autoRescanSharedDirs: ${prefs.autoRescanSharedDirs}  followSymlinksInShares: ${prefs.followSymlinksInShares}`,
+   );
+   console.log(
+      `  excludeSharePatterns: "${prefs.excludeSharePatterns}"  excludeSharePatternsUseRegex: ${prefs.excludeSharePatternsUseRegex}`,
+   );
 }
 
 function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
@@ -1010,11 +1056,53 @@ class Repl {
          await this.runPrefsConnections(rest);
          return;
       }
+      if (section === "files") {
+         await this.runPrefsFiles(rest);
+         return;
+      }
+      if (section === "directories") {
+         await this.runPrefsDirectories(rest);
+         return;
+      }
       if (section === "coretweaks") {
          await this.runPrefsCoreTweaks(rest);
          return;
       }
-      console.error("Usage: prefs <messagefilter|connections|coretweaks> ...");
+      console.error(
+         "Usage: prefs <messagefilter|connections|files|directories|coretweaks> ...",
+      );
+   }
+
+   private async runPrefsFiles(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "checkfreespace" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs files checkfreespace <on|off>");
+         return;
+      }
+      const current = await this.preferences.getFiles();
+      await this.preferences.setFiles({
+         ...current,
+         checkFreeSpace: onOff === "on",
+      });
+      console.log(`Free-disk-space check ${onOff === "on" ? "enabled" : "disabled"}.`);
+   }
+
+   private async runPrefsDirectories(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "autorescan" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs directories autorescan <on|off>");
+         return;
+      }
+      const current = await this.preferences.getDirectories();
+      await this.preferences.setDirectories({
+         ...current,
+         autoRescanSharedDirs: onOff === "on",
+      });
+      console.log(
+         `Shared-dirs auto-rescan ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
    }
 
    private async runPrefsMessageFilter(args: string[]): Promise<void> {
@@ -1314,6 +1402,18 @@ class Repl {
          case "show prefs connections": {
             const prefs = await this.preferences.getConnections();
             printConnectionsPrefs(prefs);
+            break;
+         }
+
+         case "show prefs files": {
+            const prefs = await this.preferences.getFiles();
+            printFilesPrefs(prefs);
+            break;
+         }
+
+         case "show prefs directories": {
+            const prefs = await this.preferences.getDirectories();
+            printDirectoriesPrefs(prefs);
             break;
          }
 

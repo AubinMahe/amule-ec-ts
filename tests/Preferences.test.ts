@@ -280,6 +280,229 @@ describe("Preferences.setConnections", () => {
    });
 });
 
+function filesPrefsFixture(): ec.FilesPrefs {
+   return {
+      ichEnabled: true,
+      aichTrust: false,
+      newFilesPaused: false,
+      newAutoDownloadPriority: true,
+      previewPrio: false,
+      endgame: true,
+      newAutoUploadPriority: false,
+      startNextFilePaused: true,
+      resumeSameCategory: false,
+      saveSources: true,
+      allocFullFileSize: false,
+      mmapSupported: true,
+      mmapEnabled: true,
+      checkFreeSpace: true,
+      minFreeDiskSpaceMb: 500,
+      createFilesNormal: false,
+      mediaMetadataEnabled: true,
+      mediaMetadataFfprobePath: "/usr/bin/ffprobe",
+      startNextFileAlpha: false,
+   };
+}
+
+describe("Preferences.getFiles", () => {
+   it("requests EC_PREFS_FILES and parses presence-encoded booleans plus MIN_FREE_SPACE/FFPROBE_PATH", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PREFS_FILES, new Uint8Array(), [
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FILES_ICH_ENABLED, new Uint8Array()),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_FILES_NEW_AUTO_DL_PRIO,
+               new Uint8Array(),
+            ),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FILES_ENDGAME, new Uint8Array()),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_FILES_START_NEXT_PAUSED,
+               new Uint8Array(),
+            ),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FILES_SAVE_SOURCES, new Uint8Array()),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_FILES_MMAP_SUPPORTED,
+               new Uint8Array(),
+            ),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FILES_MMAP_ENABLED, new Uint8Array()),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_FILES_CHECK_FREE_SPACE,
+               new Uint8Array(),
+            ),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE, 500),
+            new ec.ECCustomTag(
+               ec.ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED,
+               new Uint8Array(),
+            ),
+            new ec.ECStringTag(
+               ec.ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH,
+               "/usr/bin/ffprobe",
+            ),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getFiles();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(BigInt(ec.ECPreferencesSelection.FILES));
+      expect(prefs).to.deep.equal(filesPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getFiles(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setFiles", () => {
+   it("presence-encodes booleans and sends MIN_FREE_SPACE/FFPROBE_PATH as plain value tags", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setFiles(filesPrefsFixture());
+
+      const sent = fake.sent[0];
+      expect(sent?.opcode).to.equal(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      const section = sent?.find(ec.ECTagNames.EC_TAG_PREFS_FILES);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_FILES_ICH_ENABLED)).to.not
+         .be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_FILES_AICH_TRUST)).to.be
+         .undefined;
+      // FILES_MMAP_SUPPORTED is GET-only informational - never sent back.
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_FILES_MMAP_SUPPORTED)).to
+         .be.undefined;
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE),
+      ).to.equal(500n);
+      expect(
+         section?.childString(ec.ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH),
+      ).to.equal("/usr/bin/ffprobe");
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setFiles(filesPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+function directoriesPrefsFixture(): ec.DirectoriesPrefs {
+   return {
+      incomingDir: "/downloads/incoming",
+      tempDir: "/downloads/temp",
+      sharedDirs: ["/media/movies", "/media/music"],
+      shareHiddenFiles: false,
+      autoRescanSharedDirs: true,
+      followSymlinksInShares: false,
+      excludeSharePatterns: "*.tmp;*.part",
+      excludeSharePatternsUseRegex: false,
+   };
+}
+
+describe("Preferences.getDirectories", () => {
+   it("requests EC_PREFS_DIRECTORIES and parses the shared-dirs list plus the explicit-int EXCLUDE_REGEX flag", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_DIRECTORIES,
+            new Uint8Array(),
+            [
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_DIRECTORIES_INCOMING,
+                  "/downloads/incoming",
+               ),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_DIRECTORIES_TEMP,
+                  "/downloads/temp",
+               ),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_DIRECTORIES_SHARED, 2, [
+                  new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "/media/movies"),
+                  new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "/media/music"),
+               ]),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN,
+                  new Uint8Array(),
+               ),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS,
+                  "*.tmp;*.part",
+               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX, 0),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getDirectories();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.DIRECTORIES),
+      );
+      expect(prefs).to.deep.equal(directoriesPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getDirectories(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setDirectories", () => {
+   it("sends the shared-dirs list as EC_TAG_STRING children and EXCLUDE_REGEX as an explicit int", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setDirectories(directoriesPrefsFixture());
+
+      const sent = fake.sent[0];
+      expect(sent?.opcode).to.equal(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      const section = sent?.find(ec.ECTagNames.EC_TAG_PREFS_DIRECTORIES);
+      const sharedTag = section?.findChild(ec.ECTagNames.EC_TAG_DIRECTORIES_SHARED);
+      expect(sharedTag?.intValue).to.equal(2n);
+      expect(
+         sharedTag?.children.map((child) =>
+            child instanceof ec.ECStringTag ? child.value : undefined,
+         ),
+      ).to.deep.equal(["/media/movies", "/media/music"]);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX),
+      ).to.equal(0n);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setDirectories(directoriesPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
 describe("Preferences.getCoreTweaks", () => {
    it("requests EC_PREFS_CORETWEAKS and parses ints plus the presence-encoded VERBOSE flag", async () => {
       const fake = createFakeConnection();
