@@ -26,6 +26,45 @@ export default ts.config(
    ...ts.configs.stylisticTypeChecked,
    {
       files: [
+         './src/**/*.ts'
+      ],
+      languageOptions: {
+         parser: ts.parser,
+         parserOptions: {
+            project: [
+               './tsconfig.src.json'
+            ],
+            tsconfigRootDir: import.meta.dirname,
+         },
+      },
+      rules: {
+         "sonarjs/no-commented-code": "off",
+         "sonarjs/constructor-for-side-effects": "off",
+         '@typescript-eslint/explicit-function-return-type': 'error',
+         '@typescript-eslint/restrict-template-expressions': [
+            'error', {
+               allowNumber: true,
+               allowBoolean: true,
+               allowAny: true,
+               allowNullish: true,
+            },
+         ],
+         '@typescript-eslint/naming-convention': [
+            'error',
+            { selector: 'default', format: ['camelCase'], leadingUnderscore: 'allow' },
+            { selector: 'import', format: ['camelCase', 'PascalCase'] },
+            { selector: 'variable', format: ['camelCase', 'UPPER_CASE', 'PascalCase'], leadingUnderscore: 'allow' },
+            { selector: 'classProperty', modifiers: ['static', 'readonly'], format: ['camelCase', 'UPPER_CASE'] },
+            { selector: 'classProperty', format: ['camelCase'], leadingUnderscore: 'allow' },
+            { selector: 'typeLike', format: ['PascalCase'] },
+            { selector: 'enumMember', format: ['PascalCase', 'UPPER_CASE'] },
+            { selector: 'objectLiteralProperty', format: null },
+            { selector: 'typeProperty', format: null },
+         ],
+      },
+   },
+   {
+      files: [
          './src/**/*.ts',
          './tests/**/*.ts'
       ],
@@ -49,6 +88,18 @@ export default ts.config(
                allowAny: true,
                allowNullish: true,
             },
+         ],
+         '@typescript-eslint/naming-convention': [
+            'error',
+            { selector: 'default', format: ['camelCase'], leadingUnderscore: 'allow' },
+            { selector: 'import', format: ['camelCase', 'PascalCase'] },
+            { selector: 'variable', format: ['camelCase', 'UPPER_CASE', 'PascalCase'], leadingUnderscore: 'allow' },
+            { selector: 'classProperty', modifiers: ['static', 'readonly'], format: ['camelCase', 'UPPER_CASE'] },
+            { selector: 'classProperty', format: ['camelCase'], leadingUnderscore: 'allow' },
+            { selector: 'typeLike', format: ['PascalCase'] },
+            { selector: 'enumMember', format: ['PascalCase', 'UPPER_CASE'] },
+            { selector: 'objectLiteralProperty', format: null },
+            { selector: 'typeProperty', format: null },
          ],
       },
    }

@@ -44,10 +44,10 @@
       "url" : "git+https://github.com/AubinMahe/amule-ec-ts.git"
    },
    "scripts"        : {
-      "build"         : "tsc -p tsconfig.json",
+      "build"         : "tsc --build tsconfig.src.json",
       "format"        : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write",
       "format:package": "node scripts/format-package.mjs --in-place package.json",
-      "lint"          : "tsc --noEmit -p tsconfig.tests.json && eslint src tests --ext .ts",
+      "lint"          : "tsc --build tsconfig.json && eslint src tests --ext .ts",
       "pack-release"  : "npm pack",
       "prepack"       : "npm run build",
       "prepare"       : "npm run build",
