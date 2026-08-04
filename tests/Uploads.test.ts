@@ -82,3 +82,30 @@ describe("Uploads.fetch", () => {
       await expectRejection(uploads.fetch(), /EC_OP_ULOAD_QUEUE/);
    });
 });
+
+describe("Uploads.swapClientToAnotherFile", () => {
+   it("sends the client ECID as EC_TAG_CLIENT and the file hash as EC_TAG_PARTFILE", async () => {
+      const fake = createFakeConnection();
+      const uploads = new ec.Uploads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await uploads.swapClientToAnotherFile(7n, hexHash("a"));
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE);
+      const clientTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CLIENT);
+      expect(clientTag?.intValue).to.equal(7n);
+      const fileTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(Buffer.from((fileTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const uploads = new ec.Uploads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         uploads.swapClientToAnotherFile(7n, hexHash("a")),
+         /EC_OP_NOOP/,
+      );
+   });
+});

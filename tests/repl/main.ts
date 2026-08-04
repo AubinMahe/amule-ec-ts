@@ -89,6 +89,11 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["shareddir add <path> [recursive]", "add a shared directory"],
    ["shareddir remove <path>", "remove a shared directory"],
    ["shutdown", "tell the daemon to terminate"],
+   ["checkversion", "trigger an on-demand check for a new aMule release"],
+   ["swapclient <client-ecid> <hash>", "move an uploading client to another download"],
+   ["verify <hash>", "verify a shared file's local data against its hash"],
+   ["ipfilter reload", "reload the IP filter from its local file"],
+   ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
    ["friend remove <ecid>", "remove a friend"],
@@ -448,6 +453,7 @@ class Repl {
    private readonly debugLog    : ec.DebugLog;
    private readonly friends     : ec.Friends;
    private readonly chat        : ec.Chat;
+   private readonly ipFilter    : ec.IPFilter;
    private currentSearch?: ec.SearchSession;
 
    constructor(private readonly connection: ec.ECConnection) {
@@ -465,6 +471,7 @@ class Repl {
       this.debugLog    = new ec.DebugLog(this.connection);
       this.friends     = new ec.Friends(this.connection);
       this.chat        = new ec.Chat(this.connection);
+      this.ipFilter    = new ec.IPFilter(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -820,6 +827,48 @@ class Repl {
       console.log("Shutdown requested.");
    }
 
+   private async runCheckVersion(): Promise<void> {
+      await this.daemon.checkVersion();
+      console.log("Version check requested.");
+   }
+
+   private async runSwapClient(args: string[]): Promise<void> {
+      const ecidText = args[0];
+      const hash = args[1];
+      if (!ecidText || !hash) {
+         console.error("Usage: swapclient <client-ecid> <hash>");
+         return;
+      }
+      await this.uploads.swapClientToAnotherFile(BigInt(ecidText), hash);
+      console.log(`Swap requested: client ${ecidText} -> ${hash}.`);
+   }
+
+   private async runVerify(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         console.error("Usage: verify <hash>");
+         return;
+      }
+      await this.sharedFiles.verifyLocalData(hash);
+      console.log(`Verification requested: ${hash}.`);
+   }
+
+   private async runIpfilter(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      if (sub === "reload") {
+         await this.ipFilter.reload();
+         console.log("IP filter reloaded.");
+         return;
+      }
+      if (sub === "update") {
+         const url = args[1];
+         await this.ipFilter.updateFromUrl(url);
+         console.log(`IP filter update requested: ${url ?? "(default URL)"}.`);
+         return;
+      }
+      console.error("Usage: ipfilter <reload|update [url]>");
+   }
+
    private async runAddLog(args: string[]): Promise<void> {
       const text = args.join(" ");
       if (!text) {
@@ -997,6 +1046,10 @@ class Repl {
       kad: (args) => this.runKad(args),
       server: (args) => this.runServer(args),
       shutdown: () => this.runShutdown(),
+      checkversion: () => this.runCheckVersion(),
+      swapclient: (args) => this.runSwapClient(args),
+      verify: (args) => this.runVerify(args),
+      ipfilter: (args) => this.runIpfilter(args),
       addlog: (args) => this.runAddLog(args),
       adddebuglog: (args) => this.runAddDebugLog(args),
       friend: (args) => this.runFriend(args),

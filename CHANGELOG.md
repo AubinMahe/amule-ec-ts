@@ -12,6 +12,16 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-04
+
+### Added
+
+- `IPFilter` service: `reload`/`updateFromUrl` (`EC_OP_IPFILTER_RELOAD`/
+  `EC_OP_IPFILTER_UPDATE`).
+- `Daemon.checkVersion` (`EC_OP_VERSION_CHECK`).
+- `Uploads.swapClientToAnotherFile` (`EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE`).
+- `SharedFiles.verifyLocalData` (`EC_OP_VERIFY_LOCAL_DATA`).
+
 ## [2.3.0] - 2026-08-04
 
 ### Added

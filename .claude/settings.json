@@ -1,0 +1,11 @@
+{
+   "permissions": {
+      "allow": [
+         "Bash(npm run *)",
+         "Bash(NODE_DEBUG=* npm run *)",
+         "Bash(npx tsc --build tsconfig.json *)",
+         "Bash(git fetch origin *)",
+         "Bash(grep *)"
+      ]
+   }
+}

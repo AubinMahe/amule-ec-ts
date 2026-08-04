@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 74 of them; all 74 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 79 of them; all 79 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 70 opcodes
+(queued replies, no real socket). The REPL column reflects the 75 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -51,7 +51,7 @@ blank cell, which just means "not done yet, but could be".
 |0x28|`SEARCH_RESULTS`|Fetches the current search results|✓|✓||✓|
 |0x29|`SEARCH_PROGRESS`|Polls the search's lifecycle/progress|✓|✓||✓|
 |0x2a|`DOWNLOAD_SEARCH_RESULT`|Downloads one or more search results, by hash|✓|✓||✓|
-|0x2b|`IPFILTER_RELOAD`|Reloads the IP filter file|||||
+|0x2b|`IPFILTER_RELOAD`|Reloads the IP filter file|✓|✓||✓|
 |0x2c|`GET_SERVER_LIST`|Requests the known server list|✓|✓||✓|
 |0x2d|`SERVER_LIST`|Server list reply / push notification|✓|✓||✓|
 |0x2e|`SERVER_DISCONNECT`|Disconnects from the current ed2k server|✓|✓||✓|
@@ -88,16 +88,16 @@ blank cell, which just means "not done yet, but could be".
 |0x4e|`KAD_BOOTSTRAP_FROM_IP`|Bootstraps Kad from a given IP|✓|✓||✓|
 |0x4f|`AUTH_SALT`|Server's random salt for the password hash|✓|✓|✓|✓|
 |0x50|`AUTH_PASSWD`|Client's salted password hash|✓|✓|✓|✓|
-|0x51|`IPFILTER_UPDATE`|Updates the IP filter from its configured URL|||||
-|0x52|`GET_UPDATE`|Checks for a daemon update|||||
+|0x51|`IPFILTER_UPDATE`|Updates the IP filter from its configured URL|✓|✓||✓|
+|0x52|`GET_UPDATE`|amuleGUI's combined shared-files + partfile incremental-update feed (INC_UPDATE) - not a software-update check|||||
 |0x53|`CLEAR_COMPLETED`|Clears completed downloads from the list|✓|✓||✓|
-|0x54|`CLIENT_SWAP_TO_ANOTHER_FILE`|Moves an uploading client to another file|||||
+|0x54|`CLIENT_SWAP_TO_ANOTHER_FILE`|Moves an uploading client to another file|✓|✓||✓|
 |0x55|`SHARED_FILE_SET_COMMENT`|Sets a shared file's comment/rating|✓|✓||✓|
 |0x56|`SERVER_SET_STATIC_PRIO`|Sets a server's static priority|✓|✓||✓|
 |0x57|`FRIEND`|Adds/removes a friend, sets friend-slot (browse "View Files" not wrapped - needs multi-search)|✓|✓||✓|
-|0x58|`VERSION_CHECK`|Checks the daemon's version|||||
+|0x58|`VERSION_CHECK`|Triggers an on-demand check for a new aMule release (result relayed later via preferences/stats)|✓|✓||✓|
 |0x59|`SHARED_FILE_SEARCH_KAD_NOTES`|Searches Kad notes for a shared file|✓|✓||✓|
-|0x5a|`VERIFY_LOCAL_DATA`|Verifies a partial file's local data (hash check)|||||
+|0x5a|`VERIFY_LOCAL_DATA`|Verifies a shared file's local data (hash check)|✓|✓||✓|
 |0x5b|`GET_CHAT_MESSAGES`|Requests buffered chat messages|✓|✓||✓|
 |0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES, draining buffered incoming chat|✓|✓||✓|
 |0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|✓|✓||✓|
@@ -107,9 +107,10 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 14 feature classes: `Downloads`, `Uploads`,
+`tests/repl/main.ts` drives all 15 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`,
-`Daemon`, `DebugLog`, `Friends`, `Chat` and `Categories` - commands
+`Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories` and `IPFilter` -
+commands
 `show dl`, `show ul`,
 `show shared`, `show servers`, `show log`, `reset log`, `show log last`,
 `addlog <text>`, `show debug log`, `reset debug log`,
@@ -132,6 +133,8 @@ blank cell, which just means "not done yet, but could be".
 `shareddir remove <path>`,
 `clear completed`, `kad start`, `kad stop`,
 `kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`,
+`checkversion`, `swapclient <client-ecid> <hash>`, `verify <hash>`,
+`ipfilter reload`, `ipfilter update [url]`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,
 `comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`.
