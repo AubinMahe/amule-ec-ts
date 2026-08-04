@@ -6,7 +6,8 @@
          "Bash(git fetch origin *)",
          "Bash(grep *)",
          "Bash(awk -F'|' *)",
-         "Bash(rm -rf dist *.tsbuildinfo coverage)"
+         "Bash(rm -rf dist *.tsbuildinfo coverage)",
+         "Bash(timeout 15 node scripts/repl-run.mjs * 2>&1 | tail -5; echo \"EXIT: $?\")"
       ]
    }
 }

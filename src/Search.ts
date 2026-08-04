@@ -57,6 +57,28 @@ export interface ECSearchProgress {
 }
 
 /**
+ * One EC_TAG_SEARCH_ID entry from an EC_OP_SEARCH_LIST reply -
+ * Search.list()'s doc.
+ *
+ * Confirmed against Get_EC_Response_Search_List
+ * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2498-L2518): own data is
+ * the search ID; children are EC_TAG_SEARCH_NAME (the query string),
+ * EC_TAG_SEARCH_LIFECYCLE_KIND and EC_TAG_SEARCH_LIFECYCLE_STATE - the
+ * same two enums ECSearchProgress.kind/state already use, reused here
+ * unchanged. Unlike EC_OP_SEARCH_PROGRESS, there is no result count or
+ * percent here by design (ExternalConn.cpp:2481-2496) - fetch progress
+ * for a specific ID from SearchSession/EC_OP_SEARCH_PROGRESS instead.
+ */
+export class KnownSearch {
+   public constructor(
+      public readonly id: bigint,
+      public readonly name: string,
+      public readonly kind: ECSearchType,
+      public readonly state: ECSearchLifecycleState,
+   ) {}
+}
+
+/**
  * One EC_TAG_SEARCHFILE entry from an EC_OP_SEARCH_RESULTS reply.
  *
  * Confirmed against
@@ -378,5 +400,84 @@ export class Search {
          );
       }
       debug("download: %d hash(es) requested", hashes.length);
+   }
+
+   /**
+    * Re-asks already-queried Kad peers for a wider result frontier on one
+    * running search - EC_OP_SEARCH_REQUEST_MORE.
+    *
+    * Confirmed against Get_EC_Response_Search_Request_More
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2726-L2745): Kad-only -
+    * silently does nothing for a local/global (ed2k) search, and is capped
+    * at a handful of reasks per search server-side, past which it's also a
+    * silent no-op. `searchId` mirrors SearchSession.stop()'s optional
+    * EC_TAG_SEARCH_ID (omit for "the current/most-recent search" when
+    * multi-search is active). Always replies EC_OP_MISC_DATA with no
+    * tags - fire-and-forget: whether a peer was actually reasked is never
+    * surfaced over EC, only logged daemon-side.
+    */
+   public async requestMore(searchId?: bigint): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SEARCH_REQUEST_MORE);
+      if (searchId !== undefined) {
+         request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_ID, Number(searchId)));
+      }
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
+         throw new Error(
+            `Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("requestMore: searchId=%s", searchId);
+   }
+
+   /**
+    * Lists every search the daemon currently holds - EC_OP_SEARCH_LIST.
+    *
+    * Confirmed against Get_EC_Response_Search_List
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2498-L2518): this is
+    * daemon-wide, not scoped to this connection - it includes searches
+    * started by any EC client or the local GUI, restored from disk, etc.
+    * "View Files" browse tabs are deliberately excluded (they're
+    * discovered via EC_OP_STRINGS/browse replies instead, not this list).
+    * Parameterless request. A legacy (non-multi-search) connection gets
+    * back an empty list, not an error (ExternalConn.cpp:3478-3479).
+    *
+    * Guarded on `connection.remoteCapabilities.searchList`, like
+    * SharedFiles.getSharedDirs()/setSharedDirs() - EC_TAG_CAN_SEARCH_LIST
+    * is a version-compat probe, not a real opt-in (see
+    * ECCapabilities.searchList's doc): a daemon predating EC_OP_SEARCH_LIST
+    * has no case for it in its opcode switch and asserts on receiving it.
+    */
+   public async list(): Promise<readonly KnownSearch[]> {
+      if (!this.connection.remoteCapabilities.searchList) {
+         throw new Error(
+            "The daemon did not confirm EC_TAG_CAN_SEARCH_LIST during authentication - " +
+               "it likely predates EC_OP_SEARCH_LIST and may not handle it safely.",
+         );
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_SEARCH_LIST);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_SEARCH_LIST) {
+         throw new Error(
+            `Expected EC_OP_SEARCH_LIST, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      const searches = reply.tags
+         .filter((tag) => {
+            const name: ECTagNames = tag.name;
+            return name === ECTagNames.EC_TAG_SEARCH_ID;
+         })
+         .map((tag) => {
+            return new KnownSearch(
+               tag.intValue ?? 0n,
+               tag.childString(ECTagNames.EC_TAG_SEARCH_NAME) ?? "",
+               Number(tag.childInt(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND) ?? 0n),
+               Number(tag.childInt(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE) ?? 0n),
+            );
+         });
+      debug("list: %d search(es)", searches.length);
+      return searches;
    }
 }

@@ -15,4 +15,16 @@ export class ECCapabilities {
     * unconditionally, there is no client-side preference to gate it on.
     */
    public sharedDirsConfig = false;
+   /**
+    * Whether the daemon serves EC_OP_SEARCH_LIST - same "unconditionally
+    * advertised, remoteCapabilities-only" shape as sharedDirsConfig, for
+    * the same reason: EC_TAG_CAN_SEARCH_LIST isn't a real opt-in, it's a
+    * version-compat probe ("this daemon build is new enough to have a
+    * case for opcode 0x60 at all") - RemoteConnect.cpp adds it to every
+    * AUTH_REQ unconditionally, and the daemon echoes it in AUTH_OK
+    * unconditionally once auth succeeds. A daemon predating it has no
+    * `default:` case in its opcode switch and asserts on an unknown
+    * opcode - see Search.list()'s doc.
+    */
+   public searchList = false;
 }
