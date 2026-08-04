@@ -12,6 +12,25 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-04
+
+### Added
+
+- `Servers.remove`/`add`/`updateFromUrl` (`EC_OP_SERVER_REMOVE`/
+  `EC_OP_SERVER_ADD`/`EC_OP_SERVER_UPDATE_FROM_URL`).
+- `SharedFiles.setPriority` (`EC_OP_SHARED_SET_PRIO`) and
+  `SharedFiles.getSharedDirs`/`setSharedDirs` (`EC_OP_GET_SHARED_DIRS`/
+  `EC_OP_SET_SHARED_DIRS`) - the latter two guarded on a new negotiated
+  capability, `ECCapabilities.sharedDirsConfig`, since a daemon that
+  doesn't support them can hit an assertion failure if sent anyway
+  (confirmed live against aMule 2.3.3).
+
+### Fixed
+
+- The REPL (`tests/repl/main.ts`) no longer exits its whole session on the
+  first command that throws - each command's error is now caught and
+  reported without ending the loop.
+
 ## [2.2.0] - 2026-08-04
 
 ### Added

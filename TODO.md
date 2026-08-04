@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 68 of them; all 68 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 74 of them; all 74 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 64 opcodes
+(queued replies, no real socket). The REPL column reflects the 70 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -31,7 +31,7 @@ blank cell, which just means "not done yet, but could be".
 |0x0d|`GET_DLOAD_QUEUE`|Requests the download queue|✓|✓||✓|
 |0x0e|`GET_ULOAD_QUEUE`|Requests the upload queue|✓|✓||✓|
 |0x10|`GET_SHARED_FILES`|Requests the shared files list|✓|✓||✓|
-|0x11|`SHARED_SET_PRIO`|Sets a shared file's upload priority|||||
+|0x11|`SHARED_SET_PRIO`|Sets a shared file's upload priority|✓|✓||✓|
 |0x16|`PARTFILE_SWAP_A4AF_THIS`|Swaps a source to this file ("also available for")|✓|✓||✓|
 |0x17|`PARTFILE_SWAP_A4AF_THIS_AUTO`|Same, toggling the "auto swap" flag|✓|✓||✓|
 |0x18|`PARTFILE_SWAP_A4AF_OTHERS`|Swaps this file's sources to other A4AF files|✓|✓||✓|
@@ -56,9 +56,9 @@ blank cell, which just means "not done yet, but could be".
 |0x2d|`SERVER_LIST`|Server list reply / push notification|✓|✓||✓|
 |0x2e|`SERVER_DISCONNECT`|Disconnects from the current ed2k server|✓|✓||✓|
 |0x2f|`SERVER_CONNECT`|Connects to a specific ed2k server|✓|✓||✓|
-|0x30|`SERVER_REMOVE`|Removes a server from the known list|||||
-|0x31|`SERVER_ADD`|Adds a server to the known list|||||
-|0x32|`SERVER_UPDATE_FROM_URL`|Updates the server list from a server.met URL|||||
+|0x30|`SERVER_REMOVE`|Removes a server from the known list|✓|✓||✓|
+|0x31|`SERVER_ADD`|Adds a server to the known list|✓|✓||✓|
+|0x32|`SERVER_UPDATE_FROM_URL`|Updates the server list from a server.met URL|✓|✓||✓|
 |0x33|`ADDLOGLINE`|Appends a line to the daemon's log (client request, not a push notification)|✓|✓||✓|
 |0x34|`ADDDEBUGLOGLINE`|Appends a line to the daemon's debug log (client request, not a push notification)|✓|✓||✓|
 |0x35|`GET_LOG`|Requests the accumulated log|✓|✓||✓|
@@ -100,8 +100,8 @@ blank cell, which just means "not done yet, but could be".
 |0x5a|`VERIFY_LOCAL_DATA`|Verifies a partial file's local data (hash check)|||||
 |0x5b|`GET_CHAT_MESSAGES`|Requests buffered chat messages|✓|✓||✓|
 |0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES, draining buffered incoming chat|✓|✓||✓|
-|0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|||||
-|0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|||||
+|0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|✓|✓||✓|
+|0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|✓|✓||✓|
 |0x5f|`SEARCH_REQUEST_MORE`|Kad-only: re-asks already-queried peers for more results on a multi-search-addressed search|||||
 |0x60|`SEARCH_LIST`|Multi-search only: lists the connection's known search IDs|||||
 
@@ -117,6 +117,8 @@ blank cell, which just means "not done yet, but could be".
 `status`, `connect <ip:port>`, `connect`, `disconnect`,
 `server disconnect`,
 `server priority <ecid> [static|nostatic] [normal|high|low]`,
+`server remove <ip:port>`, `server add <ip:port> [name]`,
+`server update <url>`,
 `search <keywords>`, `search stop`, `download <hash>...`, `cancel <hash>`,
 `pause <hash>`, `resume <hash>`, `stop <hash>`,
 `priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`,
@@ -125,6 +127,9 @@ blank cell, which just means "not done yet, but could be".
 `category create <title> <path> [comment] [color] [prio]`,
 `category update <index> <title> <path> [comment] [color] [prio]`,
 `category delete <index>`,
+`sharedprio <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`,
+`show shareddirs`, `shareddir add <path> [recursive]`,
+`shareddir remove <path>`,
 `clear completed`, `kad start`, `kad stop`,
 `kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,

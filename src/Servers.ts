@@ -168,6 +168,106 @@ export class Servers implements ECFetchable {
    }
 
    /**
+    * Removes a server from the daemon's known server list, identified the
+    * same way ServerInfo.ipPort formats one - EC_OP_SERVER_REMOVE.
+    *
+    * Confirmed against Get_EC_Response_Server (same function connect()
+    * dispatches EC_OP_SERVER_CONNECT into,
+    * https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1993-L2027): identical
+    * request shape to connect() (EC_TAG_SERVER carries an EC_IPv4_t), and
+    * the "server not found" EC_OP_FAILED case is actually the function's
+    * own early lookup failure (triggered before the opcode-specific switch
+    * even runs) - the EC_OP_SERVER_REMOVE case's own "need to define server
+    * to be removed" message is unreachable here, since this wrapper always
+    * sends an EC_TAG_SERVER tag.
+    */
+   public async remove(ipPort: string): Promise<void> {
+      const [ip, portText] = ipPort.split(":");
+      const address = new Uint8Array((ip ?? "").split(".").map(Number));
+      const port = Number(portText);
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_REMOVE);
+      request.add(new ECIPv4Tag(ECTagNames.EC_TAG_SERVER, address, port));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to remove ${ipPort}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("remove: %s", ipPort);
+   }
+
+   /**
+    * Adds a server to the daemon's known server list - EC_OP_SERVER_ADD.
+    *
+    * Confirmed against Get_EC_Response_Server_Add
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1967-L1992): unlike
+    * every other server op, the target is NOT an EC_TAG_SERVER/EC_IPv4_t -
+    * it's two top-level string tags, EC_TAG_SERVER_ADDRESS ("ip:port", split
+    * server-side on ':') and EC_TAG_SERVER_NAME (falls back to the address
+    * itself when empty). Replies EC_OP_NOOP on success, EC_OP_FAILED with a
+    * generic "Server not added" reason (no specifics - e.g. a malformed
+    * address or a duplicate both land here) otherwise.
+    */
+   public async add(ipPort: string, name = ""): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_ADD);
+      request.add(new ECStringTag(ECTagNames.EC_TAG_SERVER_ADDRESS, ipPort));
+      request.add(new ECStringTag(ECTagNames.EC_TAG_SERVER_NAME, name));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to add ${ipPort}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("add: ipPort=%s, name=%s", ipPort, name);
+   }
+
+   /**
+    * Updates the known server list from a server.met URL -
+    * EC_OP_SERVER_UPDATE_FROM_URL.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_SERVER_UPDATE_FROM_URL case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3409-L3417) and
+    * amule-remote-gui.cpp's UpdateServerMetFromURL()
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1612-L1618): the
+    * request carries the URL as a single EC_TAG_SERVERS_UPDATE_URL string
+    * tag - a different tag name than addLink()'s/Kad.updateNodesFromUrl()'s
+    * plain EC_TAG_STRING, despite the same "just a URL" shape. Fetching and
+    * merging the list happens asynchronously server-side; this call always
+    * replies EC_OP_NOOP immediately, with no indication of whether the
+    * fetch itself later succeeds.
+    */
+   public async updateFromUrl(url: string): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_UPDATE_FROM_URL);
+      request.add(new ECStringTag(ECTagNames.EC_TAG_SERVERS_UPDATE_URL, url));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("updateFromUrl: %s", url);
+   }
+
+   /**
     * Disconnects from the current ed2k server - EC_OP_SERVER_DISCONNECT.
     *
     * Confirmed against Get_EC_Response_Server's EC_OP_SERVER_DISCONNECT

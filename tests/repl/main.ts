@@ -76,8 +76,18 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       `server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`,
       "set a known server's static flag and/or priority",
    ],
+   ["server remove <ip:port>", "remove a server from the known list"],
+   ["server add <ip:port> [name]", "add a server to the known list"],
+   ["server update <url>", "update the known server list from a server.met URL"],
    ["show server log", "daemon's ed2k-connection log"],
    ["reset server log", "clear the ed2k-connection log"],
+   [
+      `sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+      "set a shared file's upload priority",
+   ],
+   ["show shareddirs", "list the daemon's shared directories"],
+   ["shareddir add <path> [recursive]", "add a shared directory"],
+   ["shareddir remove <path>", "remove a shared directory"],
    ["shutdown", "tell the daemon to terminate"],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
@@ -755,6 +765,37 @@ class Repl {
       console.log(`Server priority updated: ecid=${ecidText}.`);
    }
 
+   private async runServerRemove(args: string[]): Promise<void> {
+      const ipPort = args[0];
+      if (!ipPort) {
+         console.error("Usage: server remove <ip:port>");
+         return;
+      }
+      await this.servers.remove(ipPort);
+      console.log(`Server removed: ${ipPort}.`);
+   }
+
+   private async runServerAdd(args: string[]): Promise<void> {
+      const ipPort = args[0];
+      if (!ipPort) {
+         console.error("Usage: server add <ip:port> [name]");
+         return;
+      }
+      const name = args.slice(1).join(" ");
+      await this.servers.add(ipPort, name);
+      console.log(`Server added: ${ipPort}.`);
+   }
+
+   private async runServerUpdate(args: string[]): Promise<void> {
+      const url = args[0];
+      if (!url) {
+         console.error("Usage: server update <url>");
+         return;
+      }
+      await this.servers.updateFromUrl(url);
+      console.log(`Server list update requested: ${url}.`);
+   }
+
    private async runServer(args: string[]): Promise<void> {
       const sub = args[0]?.toLowerCase();
       if (sub === "disconnect") {
@@ -766,7 +807,12 @@ class Repl {
          await this.runServerPriority(args.slice(1));
          return;
       }
-      console.error("Usage: server <disconnect|priority <ecid> [static|nostatic] [low|normal|high]>");
+      if (sub === "remove") return this.runServerRemove(args.slice(1));
+      if (sub === "add") return this.runServerAdd(args.slice(1));
+      if (sub === "update") return this.runServerUpdate(args.slice(1));
+      console.error(
+         "Usage: server <disconnect|priority ...|remove <ip:port>|add <ip:port> [name]|update <url>>",
+      );
    }
 
    private async runShutdown(): Promise<void> {
@@ -864,6 +910,75 @@ class Repl {
       console.log(`Kad notes search requested: ${hash}.`);
    }
 
+   private async runSharedPrio(args: string[]): Promise<void> {
+      const hash = args[0];
+      const name = args[1]?.toLowerCase();
+      const priority = name ? PRIORITY_NAMES[name] : undefined;
+      if (!hash || priority === undefined) {
+         console.error(
+            `Usage: sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+         );
+         return;
+      }
+      await this.sharedFiles.setPriority(hash, priority);
+      console.log(`Shared file priority set: ${hash} -> ${name}.`);
+   }
+
+   private async runShowSharedDirs(): Promise<void> {
+      const dirs = await this.sharedFiles.getSharedDirs();
+      if (dirs.length === 0) {
+         console.log("No shared directories configured.");
+         return;
+      }
+      for (const dir of dirs) {
+         console.log(`${dir.path}${dir.recursive ? " (recursive)" : ""}`);
+      }
+   }
+
+   /** Reports any rejections from setSharedDirs() - see SharedFiles.setSharedDirs()'s doc on why this isn't all-or-nothing. */
+   private reportSharedDirRejections(rejections: readonly ec.SharedDirRejection[]): void {
+      for (const rejection of rejections) {
+         const reasonText =
+            rejection.reason === ec.SharedDirRejectReason.UNREADABLE
+               ? "unreadable"
+               : "missing or not a directory";
+         console.error(`Rejected: ${rejection.path} (${reasonText}).`);
+      }
+   }
+
+   private async runSharedDirAdd(args: string[]): Promise<void> {
+      const path = args[0];
+      const recursive = args[1]?.toLowerCase() === "recursive";
+      if (!path) {
+         console.error("Usage: shareddir add <path> [recursive]");
+         return;
+      }
+      const dirs = (await this.sharedFiles.getSharedDirs()).filter((dir) => dir.path !== path);
+      dirs.push(new ec.SharedDir(path, recursive));
+      const rejections = await this.sharedFiles.setSharedDirs(dirs);
+      this.reportSharedDirRejections(rejections);
+      console.log(`Shared directory added: ${path}.`);
+   }
+
+   private async runSharedDirRemove(args: string[]): Promise<void> {
+      const path = args[0];
+      if (!path) {
+         console.error("Usage: shareddir remove <path>");
+         return;
+      }
+      const dirs = (await this.sharedFiles.getSharedDirs()).filter((dir) => dir.path !== path);
+      const rejections = await this.sharedFiles.setSharedDirs(dirs);
+      this.reportSharedDirRejections(rejections);
+      console.log(`Shared directory removed: ${path}.`);
+   }
+
+   private async runSharedDir(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      if (sub === "add") return this.runSharedDirAdd(args.slice(1));
+      if (sub === "remove") return this.runSharedDirRemove(args.slice(1));
+      console.error("Usage: shareddir <add <path> [recursive]|remove <path>>");
+   }
+
    /** Verbs that take a variable argument list, dispatched by lookup rather than a long if-chain (keeps runCommand()'s complexity down). */
    private readonly verbHandlers: Record<string, (args: string[]) => Promise<void>> = {
       search: (args) => this.runSearch(args),
@@ -887,6 +1002,8 @@ class Repl {
       friend: (args) => this.runFriend(args),
       comment: (args) => this.runComment(args),
       kadnotes: (args) => this.runKadNotes(args),
+      sharedprio: (args) => this.runSharedPrio(args),
+      shareddir: (args) => this.runSharedDir(args),
    };
 
    private async runCommand(command: string[]): Promise<void> {
@@ -933,6 +1050,10 @@ class Repl {
             printSharedFiles(this.sharedFiles.files);
             break;
          }
+
+         case "show shareddirs":
+            await this.runShowSharedDirs();
+            break;
 
          case "clear completed":
             await this.runClearCompleted();
@@ -1027,7 +1148,11 @@ class Repl {
          if (command === "") continue;
          if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit")
             break;
-         await this.runCommand(command.split(/\s+/).filter(Boolean));
+         try {
+            await this.runCommand(command.split(/\s+/).filter(Boolean));
+         } catch (error) {
+            console.error("Error:", error instanceof Error ? error.message : error);
+         }
       }
       rl.close();
    }

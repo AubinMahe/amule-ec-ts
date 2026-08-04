@@ -7,4 +7,12 @@ export class ECCapabilities {
    public partialUpdate = false;
    public preferNoZlib = false;
    public multiSearch = false;
+   /**
+    * Whether the daemon serves EC_OP_GET/SET_SHARED_DIRS - only meaningful
+    * on `remoteCapabilities` (see ECConnection.authenticate()'s doc): unlike
+    * every other flag here, this one is never read off `localCapabilities`
+    * to decide what to send - EC_TAG_CAN_SHAREDDIRS_CONFIG is advertised
+    * unconditionally, there is no client-side preference to gate it on.
+    */
+   public sharedDirsConfig = false;
 }

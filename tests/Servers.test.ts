@@ -133,6 +133,93 @@ describe("Servers.connect", () => {
    });
 });
 
+describe("Servers.remove", () => {
+   it("parses \"ip:port\" and sends it as an EC_TAG_SERVER IPV4 tag", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.remove("192.0.2.1:4712");
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_REMOVE);
+      const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER) as ec.ECIPv4Tag;
+      expect(Array.from(tag.address)).to.deep.equal([192, 0, 2, 1]);
+      expect(tag.port).to.equal(4712);
+   });
+
+   it("throws the daemon's reason when the server isn't found", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "server not found"));
+      fake.queueReply(failure);
+
+      await expectRejection(servers.remove("192.0.2.1:4712"), /server not found/);
+   });
+});
+
+describe("Servers.add", () => {
+   it("sends the address/name as top-level EC_TAG_SERVER_ADDRESS/EC_TAG_SERVER_NAME string tags", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.add("192.0.2.1:4712", "Test Server");
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_ADD);
+      const addressTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_ADDRESS);
+      expect((addressTag as ec.ECStringTag).value).to.equal("192.0.2.1:4712");
+      const nameTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_NAME);
+      expect((nameTag as ec.ECStringTag).value).to.equal("Test Server");
+   });
+
+   it("defaults the name to an empty string when omitted", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.add("192.0.2.1:4712");
+
+      const nameTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_NAME);
+      expect((nameTag as ec.ECStringTag).value).to.equal("");
+   });
+
+   it("throws a generic reason on EC_OP_FAILED", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Server not added"));
+      fake.queueReply(failure);
+
+      await expectRejection(servers.add("192.0.2.1:4712"), /Server not added/);
+   });
+});
+
+describe("Servers.updateFromUrl", () => {
+   it("sends the URL as a single EC_TAG_SERVERS_UPDATE_URL tag and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.updateFromUrl("http://example.com/server.met");
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_UPDATE_FROM_URL);
+      const urlTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVERS_UPDATE_URL);
+      expect((urlTag as ec.ECStringTag).value).to.equal("http://example.com/server.met");
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         servers.updateFromUrl("http://example.com/server.met"),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
 describe("Servers.disconnect", () => {
    it("sends no request tags and succeeds on EC_OP_NOOP", async () => {
       const fake = createFakeConnection();

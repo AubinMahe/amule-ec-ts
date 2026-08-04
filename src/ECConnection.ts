@@ -268,6 +268,14 @@ export class ECConnection extends events.EventEmitter {
             ),
          );
       }
+      // Unconditional, unlike every capability above - no client-side
+      // preference exists to gate it on, see ECCapabilities.sharedDirsConfig's doc.
+      authRequest.add(
+         new ECCustomTag(
+            ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG,
+            new Uint8Array(),
+         ),
+      );
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
@@ -317,6 +325,11 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.multiSearch =
          this.localCapabilities.multiSearch &&
          reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
+      // Unconditional request above, so no ANDing with a local flag here -
+      // see ECCapabilities.sharedDirsConfig's doc.
+      this.remoteCapabilities.sharedDirsConfig = reply.has(
+         ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG,
+      );
    }
 
    public async send(packet: ECPacket): Promise<void> {
