@@ -5,9 +5,9 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
-A from-scratch TypeScript client for aMule's binary "External Connections" (EC)
-protocol - the protocol `amuled` exposes for remote control (the same one
-`amulecmd`, `amuleweb` and the aMule GUI use).
+A from-scratch TypeScript client for [aMule](https://github.com/amule-org/amule)'s
+binary "External Connections" (EC) protocol - the protocol `amuled` exposes for
+remote control (the same one `amulecmd`, `amuleweb` and the aMule GUI use).
 
 Zero runtime dependencies - only Node built-ins (`node:net`, `node:crypto`,
 `node:zlib`, `node:events`, `node:util`, `node:timers/promises`).
