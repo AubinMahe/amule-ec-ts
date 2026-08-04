@@ -12,6 +12,23 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-08-04
+
+### Added
+
+- `Preferences.getSecurity`/`setSecurity` (`EC_TAG_PREFS_SECURITY`),
+  `getOnlineSig`/`setOnlineSig` (`EC_TAG_PREFS_ONLINESIG`),
+  `getServers`/`setServers` (`EC_TAG_PREFS_SERVERS` - the preferences
+  section, distinct from the `Servers` class), and
+  `getKademlia`/`setKademlia` (`EC_TAG_PREFS_KADEMLIA`), fourth of five
+  planned `Preferences` batches. New `ECVisibleShareAccess` enum for
+  `SecurityPrefs.canSeeShares` (another explicit-uint8, non-presence-encoded
+  boolean-like field). Excludes `EC_TAG_SERVERS_URL_LIST` from
+  `ServersPrefs` - like the two dead FILES tags found in the previous
+  batch, it's declared in `ECTagNames.ts` but was never implemented
+  upstream (the reply builder has a literal "Here should come the URL
+  list..." comment in its place).
+
 ## [2.9.0] - 2026-08-04
 
 ### Added

@@ -197,6 +197,85 @@ export interface DirectoriesPrefs {
    excludeSharePatternsUseRegex: boolean;
 }
 
+/**
+ * `CanSeeShares` values - confirmed against `Preferences.h`
+ * (https://github.com/amule-org/amule/blob/master/src/Preferences.h#L1030, `// 0=everybody
+ * 1=friends only 2=noone`) and the `vsfaEverybody`/`vsfaFriends`/`vsfaNobody` enumerators
+ * used at the call sites (e.g.
+ * https://github.com/amule-org/amule/blob/master/src/ClientTCPSocket.cpp#L819-L820).
+ */
+export enum ECVisibleShareAccess {
+   EVERYBODY = 0,
+   FRIENDS = 1,
+   NOBODY = 2,
+}
+
+/**
+ * SECURITY section of the daemon preferences - EC_TAG_PREFS_SECURITY.
+ * Despite the name, most of this section is actually the IP filter's
+ * config (`EC_TAG_IPFILTER_*`) - see the dedicated `IPFilter` class for
+ * the two IP-filter *actions* (`reload`/`updateFromUrl`), which are
+ * separate from this section's settings.
+ *
+ * `canSeeShares` is NOT presence-encoded - it's always sent as an
+ * explicit uint8 value, like `ConnectionsPrefs.upnpEnabled`.
+ */
+export interface SecurityPrefs {
+   canSeeShares: ECVisibleShareAccess;
+   ipFilterClients: boolean;
+   ipFilterServers: boolean;
+   ipFilterAutoUpdate: boolean;
+   ipFilterUpdateUrl: string;
+   ipFilterLevel: number;
+   filterLanIps: boolean;
+   secureIdentEnabled: boolean;
+   obfuscationSupported: boolean;
+   obfuscationRequested: boolean;
+   obfuscationRequired: boolean;
+   ipFilterParanoid: boolean;
+   ipFilterSystem: boolean;
+}
+
+/** ONLINESIG section of the daemon preferences - EC_TAG_PREFS_ONLINESIG. */
+export interface OnlineSigPrefs {
+   enabled: boolean;
+   directory: string;
+   /** Seconds between refreshes - confirmed against amule.cpp's own consumer, which compares elapsed milliseconds against `GetOSUpdate() * 1000` (https://github.com/amule-org/amule/blob/master/src/amule.cpp#L2033). */
+   updateIntervalSeconds: number;
+}
+
+/**
+ * SERVERS section of the daemon preferences - EC_TAG_PREFS_SERVERS.
+ *
+ * `EC_TAG_SERVERS_URL_LIST` is declared in `ECTagNames.ts` but was never
+ * implemented upstream - the reply builder has a literal `// Here should
+ * come the URL list...` comment in its place
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L306) - so it's
+ * excluded here too, same reasoning as the two dead `FilesPrefs` tags.
+ */
+export interface ServersPrefs {
+   removeDeadServers: boolean;
+   deadServerRetries: number;
+   autoUpdateServerList: boolean;
+   addServersFromServer: boolean;
+   addServersFromClient: boolean;
+   useScoreSystem: boolean;
+   smartIdCheck: boolean;
+   safeServerConnect: boolean;
+   autoConnectStaticOnly: boolean;
+   manualHighPriority: boolean;
+   updateUrl: string;
+}
+
+/**
+ * KADEMLIA section of the daemon preferences - EC_TAG_PREFS_KADEMLIA. The
+ * smallest section in the protocol: a single URL
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L481-L485).
+ */
+export interface KademliaPrefs {
+   nodesUpdateUrl: string;
+}
+
 /** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
 export class Category {
 
@@ -220,8 +299,9 @@ export class Category {
  * and CEC_Prefs_Packet's constructor
  * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L89-L216)); this class
  * grows section-by-section across several batches. So far: MESSAGEFILTER,
- * CONNECTIONS, FILES, DIRECTORIES, CORETWEAKS, and the read-only
- * CATEGORIES helper `listCategories()`.
+ * CONNECTIONS, FILES, DIRECTORIES, SECURITY, ONLINESIG, SERVERS,
+ * KADEMLIA, CORETWEAKS, and the read-only CATEGORIES helper
+ * `listCategories()`.
  *
  * Two protocol quirks worth calling out:
  *  - A GET_PREFERENCES reply is a `CEC_Prefs_Packet`, whose base-class
@@ -640,6 +720,235 @@ export class Preferences {
       );
       await this.applySection(section);
       debug("setDirectories: applied");
+   }
+
+   /** Fetches the SECURITY section - EC_TAG_PREFS_SECURITY. */
+   public async getSecurity(): Promise<SecurityPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.SECURITY,
+         ECTagNames.EC_TAG_PREFS_SECURITY,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the SECURITY section.");
+      }
+      const has = (name: number): boolean =>
+         section.findChild(name) !== undefined;
+      const num = (name: number): number => Number(section.childInt(name) ?? 0n);
+      const prefs: SecurityPrefs = {
+         canSeeShares: num(ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES),
+         ipFilterClients: has(ECTagNames.EC_TAG_IPFILTER_CLIENTS),
+         ipFilterServers: has(ECTagNames.EC_TAG_IPFILTER_SERVERS),
+         ipFilterAutoUpdate: has(ECTagNames.EC_TAG_IPFILTER_AUTO_UPDATE),
+         ipFilterUpdateUrl:
+            section.childString(ECTagNames.EC_TAG_IPFILTER_UPDATE_URL) ?? "",
+         ipFilterLevel: num(ECTagNames.EC_TAG_IPFILTER_LEVEL),
+         filterLanIps: has(ECTagNames.EC_TAG_IPFILTER_FILTER_LAN),
+         secureIdentEnabled: has(ECTagNames.EC_TAG_SECURITY_USE_SECIDENT),
+         obfuscationSupported: has(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_SUPPORTED),
+         obfuscationRequested: has(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUESTED),
+         obfuscationRequired: has(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUIRED),
+         ipFilterParanoid: has(ECTagNames.EC_TAG_IPFILTER_PARANOID),
+         ipFilterSystem: has(ECTagNames.EC_TAG_IPFILTER_SYSTEM),
+      };
+      debug("getSecurity: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole SECURITY section - EC_TAG_PREFS_SECURITY. */
+   public async setSecurity(prefs: SecurityPrefs): Promise<void> {
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_SECURITY,
+         new Uint8Array(),
+         [
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES,
+               prefs.canSeeShares,
+            ),
+            ...flag(ECTagNames.EC_TAG_IPFILTER_CLIENTS, prefs.ipFilterClients),
+            ...flag(ECTagNames.EC_TAG_IPFILTER_SERVERS, prefs.ipFilterServers),
+            ...flag(
+               ECTagNames.EC_TAG_IPFILTER_AUTO_UPDATE,
+               prefs.ipFilterAutoUpdate,
+            ),
+            new ECStringTag(
+               ECTagNames.EC_TAG_IPFILTER_UPDATE_URL,
+               prefs.ipFilterUpdateUrl,
+            ),
+            new ECUInt8Tag(ECTagNames.EC_TAG_IPFILTER_LEVEL, prefs.ipFilterLevel),
+            ...flag(ECTagNames.EC_TAG_IPFILTER_FILTER_LAN, prefs.filterLanIps),
+            ...flag(
+               ECTagNames.EC_TAG_SECURITY_USE_SECIDENT,
+               prefs.secureIdentEnabled,
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_SUPPORTED,
+               prefs.obfuscationSupported,
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUESTED,
+               prefs.obfuscationRequested,
+            ),
+            ...flag(
+               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUIRED,
+               prefs.obfuscationRequired,
+            ),
+            ...flag(ECTagNames.EC_TAG_IPFILTER_PARANOID, prefs.ipFilterParanoid),
+            ...flag(ECTagNames.EC_TAG_IPFILTER_SYSTEM, prefs.ipFilterSystem),
+         ],
+      );
+      await this.applySection(section);
+      debug("setSecurity: applied");
+   }
+
+   /** Fetches the ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
+   public async getOnlineSig(): Promise<OnlineSigPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.ONLINESIG,
+         ECTagNames.EC_TAG_PREFS_ONLINESIG,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the ONLINESIG section.");
+      }
+      const prefs: OnlineSigPrefs = {
+         enabled: section.findChild(ECTagNames.EC_TAG_ONLINESIG_ENABLED) !== undefined,
+         directory:
+            section.childString(ECTagNames.EC_TAG_ONLINESIG_DIRECTORY) ?? "",
+         updateIntervalSeconds: Number(
+            section.childInt(ECTagNames.EC_TAG_ONLINESIG_UPDATE) ?? 0n,
+         ),
+      };
+      debug("getOnlineSig: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
+   public async setOnlineSig(prefs: OnlineSigPrefs): Promise<void> {
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_ONLINESIG,
+         new Uint8Array(),
+         [
+            ...(prefs.enabled
+               ? [
+                    new ECCustomTag(
+                       ECTagNames.EC_TAG_ONLINESIG_ENABLED,
+                       new Uint8Array(),
+                    ),
+                 ]
+               : []),
+            new ECStringTag(
+               ECTagNames.EC_TAG_ONLINESIG_DIRECTORY,
+               prefs.directory,
+            ),
+            new ECUInt16Tag(
+               ECTagNames.EC_TAG_ONLINESIG_UPDATE,
+               prefs.updateIntervalSeconds,
+            ),
+         ],
+      );
+      await this.applySection(section);
+      debug("setOnlineSig: applied");
+   }
+
+   /** Fetches the SERVERS section - EC_TAG_PREFS_SERVERS. */
+   public async getServers(): Promise<ServersPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.SERVERS,
+         ECTagNames.EC_TAG_PREFS_SERVERS,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the SERVERS section.");
+      }
+      const has = (name: number): boolean =>
+         section.findChild(name) !== undefined;
+      const prefs: ServersPrefs = {
+         removeDeadServers: has(ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD),
+         deadServerRetries: Number(
+            section.childInt(ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES) ?? 0n,
+         ),
+         autoUpdateServerList: has(ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE),
+         addServersFromServer: has(ECTagNames.EC_TAG_SERVERS_ADD_FROM_SERVER),
+         addServersFromClient: has(ECTagNames.EC_TAG_SERVERS_ADD_FROM_CLIENT),
+         useScoreSystem: has(ECTagNames.EC_TAG_SERVERS_USE_SCORE_SYSTEM),
+         smartIdCheck: has(ECTagNames.EC_TAG_SERVERS_SMART_ID_CHECK),
+         safeServerConnect: has(ECTagNames.EC_TAG_SERVERS_SAFE_SERVER_CONNECT),
+         autoConnectStaticOnly: has(ECTagNames.EC_TAG_SERVERS_AUTOCONN_STATIC_ONLY),
+         manualHighPriority: has(ECTagNames.EC_TAG_SERVERS_MANUAL_HIGH_PRIO),
+         updateUrl: section.childString(ECTagNames.EC_TAG_SERVERS_UPDATE_URL) ?? "",
+      };
+      debug("getServers: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole SERVERS section - EC_TAG_PREFS_SERVERS. */
+   public async setServers(prefs: ServersPrefs): Promise<void> {
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SERVERS, new Uint8Array(), [
+         ...flag(ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD, prefs.removeDeadServers),
+         new ECUInt16Tag(
+            ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES,
+            prefs.deadServerRetries,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE,
+            prefs.autoUpdateServerList,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_ADD_FROM_SERVER,
+            prefs.addServersFromServer,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_ADD_FROM_CLIENT,
+            prefs.addServersFromClient,
+         ),
+         ...flag(ECTagNames.EC_TAG_SERVERS_USE_SCORE_SYSTEM, prefs.useScoreSystem),
+         ...flag(ECTagNames.EC_TAG_SERVERS_SMART_ID_CHECK, prefs.smartIdCheck),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_SAFE_SERVER_CONNECT,
+            prefs.safeServerConnect,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_AUTOCONN_STATIC_ONLY,
+            prefs.autoConnectStaticOnly,
+         ),
+         ...flag(
+            ECTagNames.EC_TAG_SERVERS_MANUAL_HIGH_PRIO,
+            prefs.manualHighPriority,
+         ),
+         new ECStringTag(ECTagNames.EC_TAG_SERVERS_UPDATE_URL, prefs.updateUrl),
+      ]);
+      await this.applySection(section);
+      debug("setServers: applied");
+   }
+
+   /** Fetches the KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
+   public async getKademlia(): Promise<KademliaPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.KADEMLIA,
+         ECTagNames.EC_TAG_PREFS_KADEMLIA,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the KADEMLIA section.");
+      }
+      const prefs: KademliaPrefs = {
+         nodesUpdateUrl:
+            section.childString(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL) ?? "",
+      };
+      debug("getKademlia: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
+   public async setKademlia(prefs: KademliaPrefs): Promise<void> {
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_KADEMLIA,
+         new Uint8Array(),
+         [new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, prefs.nodesUpdateUrl)],
+      );
+      await this.applySection(section);
+      debug("setKademlia: applied");
    }
 
    /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
