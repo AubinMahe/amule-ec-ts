@@ -56,8 +56,10 @@ interface PendingReceive {
  * how that's told apart from an awaited `receive()` reply, and its limits.
  *
  * Emits a "disconnected" event (no payload) once when the underlying socket
- * closes or errors - see onClose(). reconnect() re-establishes the TCP
- * socket in place afterward (same instance, so every service that captured
+ * closes or errors unexpectedly - see onClose(). Not emitted when close()
+ * caused the closure (see its doc) - a deliberate shutdown shouldn't trigger
+ * ECEngine's automatic reconnect. reconnect() re-establishes the TCP socket
+ * in place afterward (same instance, so every service that captured
  * `ec.ECEngine.connection` keeps working); ECEngine wires the two together
  * into an automatic reconnect loop, see its doc.
  */
@@ -83,6 +85,7 @@ export class ECConnection extends events.EventEmitter {
    private readonly pendingReceives: PendingReceive[] = [];
    private closed = false;
    private closeError: Error | undefined;
+   private intentionalClose = false;
 
    public constructor(private socket: net.Socket) {
       super();
@@ -377,7 +380,19 @@ export class ECConnection extends events.EventEmitter {
       return this.on("notification", listener);
    }
 
+   /**
+    * Closes the socket without triggering ECEngine's automatic reconnect -
+    * confirmed live 2026-08-04: before this flag existed, close() still
+    * fired onClose() -> "disconnected" like any other drop, so every
+    * deliberate shutdown (e.g. the REPL's terminate()) made ECEngine
+    * reconnect anyway. The reconnected socket was then never closed again
+    * (nothing was left running to call close() a second time), leaking a
+    * live, open connection that kept the process running forever - 17
+    * such orphaned `tests/repl/main.ts` processes were found still running
+    * from earlier in this same session.
+    */
    public close(): void {
+      this.intentionalClose = true;
       this.socket.end();
    }
 
@@ -490,6 +505,10 @@ export class ECConnection extends events.EventEmitter {
     * ECEngine's reconnect loop can react. pump()'s own catch block rejects
     * pendingReceives; this handles pendingReads (readBytes() callers still
     * waiting on the socket directly) and the reconnect signal.
+    *
+    * Skips the "disconnected" emit entirely when close() caused this - see
+    * its doc for why reconnecting after a deliberate close is a bug, not a
+    * feature.
     */
    private onClose(error: Error): void {
       if (this.closed) return;
@@ -498,6 +517,8 @@ export class ECConnection extends events.EventEmitter {
       while (this.pendingReads.length > 0) {
          this.pendingReads.shift()?.reject(error);
       }
-      this.emit("disconnected");
+      if (!this.intentionalClose) {
+         this.emit("disconnected");
+      }
    }
 }

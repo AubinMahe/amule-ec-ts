@@ -267,4 +267,28 @@ describe("ECConnection disconnect/reconnect", () => {
       await ended;
       expect(peer.socket.readableEnded).to.equal(true);
    });
+
+   it(
+      "does not emit 'disconnected' when close() caused the closure - " +
+      "regression test: this used to fire ECEngine's reconnect loop on every " +
+      "deliberate shutdown, leaking an unclosed reconnected socket that kept " +
+      "the process running forever (17 orphaned tests/repl/main.ts processes " +
+      "found still running from earlier in one real session)",
+      async () => {
+         const { connection, peer } = await connectPeer(server);
+         let disconnectedFired = false;
+         connection.once("disconnected", () => {
+            disconnectedFired = true;
+         });
+
+         connection.close();
+         // Drive the socket to a genuine full close (close() alone only
+         // half-closes the write side) the same way it reaches one in
+         // production, once the peer closes back.
+         peer.socket.destroy();
+         await new Promise((resolve) => setTimeout(resolve, 50));
+
+         expect(disconnectedFired).to.equal(false);
+      },
+   );
 });

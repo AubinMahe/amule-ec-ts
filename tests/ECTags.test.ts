@@ -47,6 +47,15 @@ describe("ECTag encode/decode round-trip", () => {
       expect(decoded.port).to.equal(4712);
    });
 
+   it("round-trips a leaf DOUBLE tag, readable via doubleValue/childDouble", () => {
+      const tag = new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_STATSGRAPH_LAST, 1735689600.5);
+      const decoded = roundTrip(tag);
+      expect(decoded).to.be.instanceOf(ec.ECDoubleTag);
+      expect(decoded.doubleValue).to.equal(1735689600.5);
+      const parent = new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_DETAIL_LEVEL, 0, [tag]);
+      expect(parent.childDouble(ec.ECTagNames.EC_TAG_STATSGRAPH_LAST)).to.equal(1735689600.5);
+   });
+
    it(
       "round-trips a tag that carries BOTH own data and children - " +
       "regression test for the TAGLEN bug that closed the EC connection " +

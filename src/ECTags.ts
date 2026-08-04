@@ -26,6 +26,12 @@ export abstract class ECTag {
       return typeof value === "bigint" ? value : undefined;
    }
 
+   /** Reads this tag's double value (only ECDoubleTag has one) - undefined otherwise. */
+   public get doubleValue(): number | undefined {
+      const value = (this as { value?: unknown }).value;
+      return typeof value === "number" ? value : undefined;
+   }
+
    public findChild(name: number): ECTag | undefined {
       return this.children.find((child) => child.name === name);
    }
@@ -37,6 +43,10 @@ export abstract class ECTag {
 
    public childInt(name: number): bigint | undefined {
       return this.findChild(name)?.intValue;
+   }
+
+   public childDouble(name: number): number | undefined {
+      return this.findChild(name)?.doubleValue;
    }
 
    /**
@@ -247,7 +257,7 @@ export class ECStringTag extends ECTag {
    }
 }
 
-class ECDoubleTag extends ECTag {
+export class ECDoubleTag extends ECTag {
 
    public constructor(
       name: number,
