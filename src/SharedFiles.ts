@@ -6,6 +6,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
+import type { ECDownloadPriority } from "./Downloads.js";
 
 const debug = debuglog("amule-ec:sharedfiles");
 
@@ -202,6 +203,38 @@ export class SharedFile {
    }
 }
 
+/**
+ * A shared directory root, as returned by EC_OP_GET_SHARED_DIRS or sent to
+ * EC_OP_SET_SHARED_DIRS - a path plus whether its entire subtree is shared
+ * ("recursive") rather than just its top level. See SharedFiles.getSharedDirs()'s
+ * doc for why only these two intent lists travel over EC.
+ */
+export class SharedDir {
+   public constructor(
+      public readonly path: string,
+      public readonly recursive: boolean,
+   ) {}
+}
+
+/**
+ * The reason SharedFiles.setSharedDirs() rejected one of the given paths -
+ * `EC_TAG_SHAREDDIR_ERROR`'s value, confirmed against
+ * Get_EC_Response_SetSharedDirs
+ * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1425-L1454).
+ */
+export enum SharedDirRejectReason {
+   MISSING_OR_NOT_A_DIRECTORY = 1,
+   UNREADABLE = 2,
+}
+
+/** One rejected path from SharedFiles.setSharedDirs()'s reply - see SharedDirRejectReason's doc. */
+export class SharedDirRejection {
+   public constructor(
+      public readonly path: string,
+      public readonly reason: SharedDirRejectReason,
+   ) {}
+}
+
 /** The shared file list, as returned by EC_OP_GET_SHARED_FILES / EC_OP_SHARED_FILES. */
 export class SharedFiles implements ECFetchable {
 
@@ -275,6 +308,40 @@ export class SharedFiles implements ECFetchable {
          );
       }
       debug("reload: shared file list reloaded");
+   }
+
+   /**
+    * Sets a shared file's upload priority, by hash - EC_OP_SHARED_SET_PRIO.
+    *
+    * Confirmed against Get_EC_Response_Set_SharedFile_Prio
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2843-L2865) and
+    * amule-remote-gui.cpp's SetFilePrio()
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1964-L1974):
+    * the request's EC_TAG_PARTFILE tag (own data: MD4 hash) carries one
+    * EC_TAG_PARTFILE_PRIO child (uint8) - the exact same tag names and
+    * wire shape as Downloads.prioritySet(), including PR_AUTO being sent
+    * as-is (5), not +10. Always replies EC_OP_NOOP - the daemon silently
+    * skips any hash that isn't a currently shared file, no EC_OP_FAILED
+    * case exists (unlike Downloads.prioritySet()).
+    */
+   public async setPriority(
+      hash: string,
+      priority: ECDownloadPriority,
+   ): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SHARED_SET_PRIO);
+      request.add(
+         new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
+            new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_PRIO, priority),
+         ]),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(
+            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      debug("setPriority: hash=%s, priority=%d", hash, priority);
    }
 
    /**
@@ -355,6 +422,121 @@ export class SharedFiles implements ECFetchable {
          );
       }
       debug("searchKadNotes: hash=%s", hash);
+   }
+
+   /**
+    * Requests the daemon's shared-directory configuration -
+    * EC_OP_GET_SHARED_DIRS.
+    *
+    * Confirmed against Get_EC_Response_GetSharedDirs
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1405-L1418): the reply
+    * carries one EC_TAG_SHAREDDIR per configured root (its own data: the
+    * path), with an EC_TAG_SHAREDDIR_RECURSIVE child on the roots whose
+    * entire subtree is shared. Only these two *intent* lists travel - the
+    * daemon's runtime union of explicit+expanded-recursive roots is a
+    * derived artifact it regenerates itself, never sent. No request tag
+    * needed.
+    *
+    * Guarded on `connection.remoteCapabilities.sharedDirsConfig`, unlike
+    * every other method in this library - live-tested 2026-08-04 against a
+    * daemon predating this opcode (aMule 2.3.3): sending EC_OP_GET_SHARED_DIRS
+    * unconditionally made it log "opcode reçu invalide: 0x5d" and hit a
+    * wxASSERT in ProcessRequest2 (it survived, but see RemoteConnect.cpp's
+    * own comment on EC_TAG_CAN_SEARCH_LIST for the same class of daemon:
+    * "logs ... and trips an assert"). Throws immediately instead of risking
+    * that.
+    */
+   public async getSharedDirs(): Promise<readonly SharedDir[]> {
+      if (!this.connection.remoteCapabilities.sharedDirsConfig) {
+         throw new Error(
+            "The daemon did not confirm EC_TAG_CAN_SHAREDDIRS_CONFIG during authentication - " +
+               "it likely predates EC_OP_GET_SHARED_DIRS and may not handle it safely.",
+         );
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_GET_SHARED_DIRS);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_GET_SHARED_DIRS) {
+         throw new Error(
+            `Expected EC_OP_GET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      const dirs = reply.tags
+         .filter((tag) => {
+            const name: ECTagNames = tag.name;
+            return name === ECTagNames.EC_TAG_SHAREDDIR;
+         })
+         .map((tag) => {
+            const path = tag instanceof ECStringTag ? tag.value : "";
+            const recursive = (tag.childInt(ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE) ?? 0n) !== 0n;
+            return new SharedDir(path, recursive);
+         });
+      debug("getSharedDirs: %d dir(s)", dirs.length);
+      return dirs;
+   }
+
+   /**
+    * Replaces the daemon's shared-directory configuration - EC_OP_SET_SHARED_DIRS.
+    *
+    * Confirmed against Get_EC_Response_SetSharedDirs
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1420-L1479): unlike
+    * every other opcode in this library, the reply is neither EC_OP_NOOP
+    * nor EC_OP_FAILED - it echoes EC_OP_SET_SHARED_DIRS itself, carrying
+    * zero or more EC_TAG_SHAREDDIR_REJECTED tags (own data: the rejected
+    * path, with an EC_TAG_SHAREDDIR_ERROR child - see SharedDirRejectReason)
+    * for whichever entries didn't validate. This is not all-or-nothing:
+    * every path that DID validate is applied regardless of the others -
+    * the returned array is purely informational, listing what was
+    * rejected and why, empty if every path was accepted.
+    *
+    * Guarded on `connection.remoteCapabilities.sharedDirsConfig` - see
+    * getSharedDirs()'s doc for why (live-tested 2026-08-04): unlike a plain
+    * read, sending this unsupported would also risk actually mutating the
+    * daemon's shared-directory config on a build with partial/differing
+    * support, not just tripping an assert.
+    */
+   public async setSharedDirs(
+      dirs: readonly SharedDir[],
+   ): Promise<readonly SharedDirRejection[]> {
+      if (!this.connection.remoteCapabilities.sharedDirsConfig) {
+         throw new Error(
+            "The daemon did not confirm EC_TAG_CAN_SHAREDDIRS_CONFIG during authentication - " +
+               "it likely predates EC_OP_SET_SHARED_DIRS and may not handle it safely.",
+         );
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_SET_SHARED_DIRS);
+      for (const dir of dirs) {
+         request.add(
+            new ECStringTag(
+               ECTagNames.EC_TAG_SHAREDDIR,
+               dir.path,
+               dir.recursive
+                  ? [new ECUInt8Tag(ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE, 1)]
+                  : [],
+            ),
+         );
+      }
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_SET_SHARED_DIRS) {
+         throw new Error(
+            `Expected EC_OP_SET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      const rejections = reply.tags
+         .filter((tag) => {
+            const name: ECTagNames = tag.name;
+            return name === ECTagNames.EC_TAG_SHAREDDIR_REJECTED;
+         })
+         .map((tag) => {
+            const path = tag instanceof ECStringTag ? tag.value : "";
+            const reason: SharedDirRejectReason = Number(
+               tag.childInt(ECTagNames.EC_TAG_SHAREDDIR_ERROR) ?? 0n,
+            );
+            return new SharedDirRejection(path, reason);
+         });
+      debug("setSharedDirs: %d dir(s), %d rejected", dirs.length, rejections.length);
+      return rejections;
    }
 }
 

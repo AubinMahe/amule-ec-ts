@@ -176,6 +176,137 @@ describe("SharedFiles.reload", () => {
    });
 });
 
+describe("SharedFiles.setPriority", () => {
+   it("sends the hash as EC_TAG_PARTFILE with an EC_TAG_PARTFILE_PRIO child", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await sharedFiles.setPriority(hexHash("a"), ec.ECDownloadPriority.PR_HIGH);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SHARED_SET_PRIO);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      const prioTag = hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_PRIO);
+      expect(prioTag?.intValue).to.equal(BigInt(ec.ECDownloadPriority.PR_HIGH));
+   });
+
+   it("throws a generic error on any unexpected opcode (no EC_OP_FAILED case exists)", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         sharedFiles.setPriority(hexHash("a"), ec.ECDownloadPriority.PR_HIGH),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+describe("SharedFiles.getSharedDirs", () => {
+   it("throws when the daemon never confirmed EC_TAG_CAN_SHAREDDIRS_CONFIG, without sending anything", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+
+      await expectRejection(sharedFiles.getSharedDirs(), /EC_TAG_CAN_SHAREDDIRS_CONFIG/);
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("parses each EC_TAG_SHAREDDIR into a SharedDir, decoding EC_TAG_SHAREDDIR_RECURSIVE", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.sharedDirsConfig = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_GET_SHARED_DIRS);
+      reply.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_SHAREDDIR, "/incoming"));
+      reply.add(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_SHAREDDIR, "/media", [
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE, 1),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const dirs = await sharedFiles.getSharedDirs();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_SHARED_DIRS);
+      expect(dirs).to.deep.equal([
+         new ec.SharedDir("/incoming", false),
+         new ec.SharedDir("/media", true),
+      ]);
+   });
+
+   it("throws when the daemon replies with an unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.sharedDirsConfig = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(sharedFiles.getSharedDirs(), /EC_OP_GET_SHARED_DIRS/);
+   });
+});
+
+describe("SharedFiles.setSharedDirs", () => {
+   it("throws when the daemon never confirmed EC_TAG_CAN_SHAREDDIRS_CONFIG, without sending anything", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+
+      await expectRejection(sharedFiles.setSharedDirs([]), /EC_TAG_CAN_SHAREDDIRS_CONFIG/);
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("sends one EC_TAG_SHAREDDIR per dir, with EC_TAG_SHAREDDIR_RECURSIVE only when recursive", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.sharedDirsConfig = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_SET_SHARED_DIRS));
+
+      await sharedFiles.setSharedDirs([
+         new ec.SharedDir("/incoming", false),
+         new ec.SharedDir("/media", true),
+      ]);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SET_SHARED_DIRS);
+      const dirTags = fake.sent[0]?.tags.filter((tag) => {
+         const name: ec.ECTagNames = tag.name;
+         return name === ec.ECTagNames.EC_TAG_SHAREDDIR;
+      });
+      expect(dirTags).to.have.lengthOf(2);
+      expect((dirTags?.[0] as ec.ECStringTag).value).to.equal("/incoming");
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(dirTags?.[0]?.findChild(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE)).to.be.undefined;
+      expect((dirTags?.[1] as ec.ECStringTag).value).to.equal("/media");
+      expect(
+         dirTags?.[1]?.findChild(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE)?.intValue,
+      ).to.equal(1n);
+   });
+
+   it("parses EC_TAG_SHAREDDIR_REJECTED entries into SharedDirRejection, empty when none rejected", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.sharedDirsConfig = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_SHARED_DIRS);
+      const rejected = new ec.ECStringTag(ec.ECTagNames.EC_TAG_SHAREDDIR_REJECTED, "/nope", [
+         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SHAREDDIR_ERROR, 1),
+      ]);
+      reply.add(rejected);
+      fake.queueReply(reply);
+
+      const rejections = await sharedFiles.setSharedDirs([new ec.SharedDir("/nope", false)]);
+
+      expect(rejections).to.deep.equal([
+         new ec.SharedDirRejection("/nope", ec.SharedDirRejectReason.MISSING_OR_NOT_A_DIRECTORY),
+      ]);
+   });
+
+   it("throws when the daemon replies with an unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.sharedDirsConfig = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(sharedFiles.setSharedDirs([]), /EC_OP_SET_SHARED_DIRS/);
+   });
+});
+
 describe("SharedFiles.setComment", () => {
    it("sends hash/comment/rating as EC_TAG_KNOWNFILE/_COMMENT/_RATING and succeeds on EC_OP_NOOP", async () => {
       const fake = createFakeConnection();

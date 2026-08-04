@@ -31,6 +31,11 @@ export function createFakeConnection(): FakeConnection {
          }
          return Promise.resolve(next);
       },
+      // Real ECCapabilities instance (all flags default false, same as a
+      // fresh ECConnection before authenticate() runs) - lets tests opt a
+      // capability in (e.g. `fake.connection.remoteCapabilities.sharedDirsConfig = true`)
+      // for methods that gate on it, see SharedFiles.getSharedDirs()'s doc.
+      remoteCapabilities: new ec.ECCapabilities(),
    };
 
    return {
