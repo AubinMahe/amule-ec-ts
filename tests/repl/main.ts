@@ -97,6 +97,11 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["verify <hash>", "verify a shared file's local data against its hash"],
    ["ipfilter reload", "reload the IP filter from its local file"],
    ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
+   ["show prefs general", "general preferences (nick, user hash, version-check)"],
+   [
+      "prefs general checknewversion <on|off>",
+      "toggle the check-new-version preference (preserves other fields)",
+   ],
    ["show prefs messagefilter", "message filter preferences"],
    ["prefs messagefilter <on|off>", "enable/disable the message filter (preserves other fields)"],
    ["show prefs connections", "connection preferences"],
@@ -131,6 +136,19 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ],
    ["show prefs kademlia", "Kademlia nodes.dat update URL"],
    ["prefs kademlia seturl <url>", "set the Kademlia nodes.dat update URL"],
+   [
+      "show prefs remotecontrols",
+      "webserver/amuleapi preferences (ports, autorun, gzip - password hashes never printed)",
+   ],
+   [
+      "prefs remotecontrols gzip <on|off>",
+      "toggle webserver gzip compression (preserves other fields, including passwords)",
+   ],
+   ["show prefs ip2country", "GeoIP preferences and live resolver status"],
+   [
+      "prefs ip2country autoupdate <on|off>",
+      "toggle automatic GeoIP database updates (preserves other fields)",
+   ],
    ["show prefs coretweaks", "core tweaks preferences"],
    [
       "prefs coretweaks verbose <on|off>",
@@ -434,6 +452,50 @@ function printServersPrefs(prefs: ec.ServersPrefs): void {
 
 function printKademliaPrefs(prefs: ec.KademliaPrefs): void {
    console.log(`nodesUpdateUrl: "${prefs.nodesUpdateUrl}"`);
+}
+
+function printGeneralPrefs(prefs: ec.GeneralPrefs): void {
+   console.log(`userNick: "${prefs.userNick}"  userHash: ${prefs.userHash}`);
+   console.log(`  userHost: "${prefs.userHost}"`);
+   console.log(
+      `  checkNewVersion: ${prefs.checkNewVersion}  versionCheckAvailable: ${prefs.versionCheckAvailable}  upnpAvailable: ${prefs.upnpAvailable}`,
+   );
+}
+
+function printRemoteControlsPrefs(prefs: ec.RemoteControlsPrefs): void {
+   console.log(
+      `webserverPort: ${prefs.webserverPort}  webserverAutorun: ${prefs.webserverAutorun}  webserverPasswordSet: ${prefs.webserverPasswordHash !== undefined}`,
+   );
+   console.log(
+      `  webserverGuest: enabled=${prefs.webserverGuest.enabled} passwordSet=${prefs.webserverGuest.passwordHash !== undefined}`,
+   );
+   console.log(
+      `  webserverUseGzip: ${prefs.webserverUseGzip}  webserverRefreshSeconds: ${prefs.webserverRefreshSeconds}  webserverTemplate: "${prefs.webserverTemplate}"`,
+   );
+   console.log(
+      `  amuleApiPort: ${prefs.amuleApiPort}  amuleApiAutorun: ${prefs.amuleApiAutorun}  amuleApiBindAddress: "${prefs.amuleApiBindAddress}"`,
+   );
+   console.log(
+      `  amuleApiAdmin: enabled=${prefs.amuleApiAdmin.enabled} passwordSet=${prefs.amuleApiAdmin.passwordHash !== undefined}`,
+   );
+   console.log(
+      `  amuleApiGuest: enabled=${prefs.amuleApiGuest.enabled} passwordSet=${prefs.amuleApiGuest.passwordHash !== undefined}`,
+   );
+}
+
+function printIP2CountryPrefs(prefs: ec.IP2CountryPrefs): void {
+   console.log(
+      `supported: ${prefs.supported}  enabled: ${prefs.enabled}  source: ${ec.ECGeoIPSource[prefs.source]}  autoUpdate: ${prefs.autoUpdate}`,
+   );
+   console.log(
+      `  customUrl: "${prefs.customUrl}"  maxMindLicense: ${prefs.maxMindLicense ? "(set)" : "(empty)"}`,
+   );
+   console.log(
+      `  loadedSource: ${prefs.loadedSource ?? "(n/a)"}  databasePath: ${prefs.databasePath ?? "(n/a)"}`,
+   );
+   console.log(
+      `  databaseLoaded: ${prefs.databaseLoaded ?? "(n/a)"}  downloading: ${prefs.downloading ?? "(n/a)"}  lastResult: ${prefs.lastResult ?? "(n/a)"}`,
+   );
 }
 
 function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
@@ -1106,6 +1168,57 @@ class Repl {
       console.error("Usage: ipfilter <reload|update [url]>");
    }
 
+   private readonly showPrefsHandlers: Record<string, () => Promise<void>> = {
+      general: async () => {
+         printGeneralPrefs(await this.preferences.getGeneral());
+      },
+      messagefilter: async () => {
+         printMessageFilterPrefs(await this.preferences.getMessageFilter());
+      },
+      connections: async () => {
+         printConnectionsPrefs(await this.preferences.getConnections());
+      },
+      files: async () => {
+         printFilesPrefs(await this.preferences.getFiles());
+      },
+      directories: async () => {
+         printDirectoriesPrefs(await this.preferences.getDirectories());
+      },
+      security: async () => {
+         printSecurityPrefs(await this.preferences.getSecurity());
+      },
+      onlinesig: async () => {
+         printOnlineSigPrefs(await this.preferences.getOnlineSig());
+      },
+      servers: async () => {
+         printServersPrefs(await this.preferences.getServers());
+      },
+      kademlia: async () => {
+         printKademliaPrefs(await this.preferences.getKademlia());
+      },
+      remotecontrols: async () => {
+         printRemoteControlsPrefs(await this.preferences.getRemoteControls());
+      },
+      ip2country: async () => {
+         printIP2CountryPrefs(await this.preferences.getIP2Country());
+      },
+      coretweaks: async () => {
+         printCoreTweaksPrefs(await this.preferences.getCoreTweaks());
+      },
+   };
+
+   /** Dispatches "show prefs <section>" - kept out of runCommand's own switch to stay under its max-case limit. */
+   private async runShowPrefs(subject: string): Promise<void> {
+      const handler = this.showPrefsHandlers[subject];
+      if (!handler) {
+         console.error(
+            `Usage: show prefs <${Object.keys(this.showPrefsHandlers).join("|")}>`,
+         );
+         return;
+      }
+      await handler();
+   }
+
    private async runPrefs(args: string[]): Promise<void> {
       const section = args[0]?.toLowerCase();
       const rest = args.slice(1);
@@ -1141,12 +1254,24 @@ class Repl {
          await this.runPrefsKademlia(rest);
          return;
       }
+      if (section === "general") {
+         await this.runPrefsGeneral(rest);
+         return;
+      }
+      if (section === "remotecontrols") {
+         await this.runPrefsRemoteControls(rest);
+         return;
+      }
+      if (section === "ip2country") {
+         await this.runPrefsIP2Country(rest);
+         return;
+      }
       if (section === "coretweaks") {
          await this.runPrefsCoreTweaks(rest);
          return;
       }
       console.error(
-         "Usage: prefs <messagefilter|connections|files|directories|security|onlinesig|servers|kademlia|coretweaks> ...",
+         "Usage: prefs <general|messagefilter|connections|files|directories|security|onlinesig|servers|kademlia|remotecontrols|ip2country|coretweaks> ...",
       );
    }
 
@@ -1205,6 +1330,55 @@ class Repl {
       }
       await this.preferences.setKademlia({ nodesUpdateUrl: url });
       console.log(`Kademlia nodes.dat update URL set: ${url}.`);
+   }
+
+   private async runPrefsGeneral(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "checknewversion" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs general checknewversion <on|off>");
+         return;
+      }
+      const current = await this.preferences.getGeneral();
+      await this.preferences.setGeneral({
+         ...current,
+         checkNewVersion: onOff === "on",
+      });
+      console.log(
+         `Check-new-version preference ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
+   }
+
+   private async runPrefsRemoteControls(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "gzip" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs remotecontrols gzip <on|off>");
+         return;
+      }
+      const current = await this.preferences.getRemoteControls();
+      await this.preferences.setRemoteControls({
+         ...current,
+         webserverUseGzip: onOff === "on",
+      });
+      console.log(`Webserver gzip ${onOff === "on" ? "enabled" : "disabled"}.`);
+   }
+
+   private async runPrefsIP2Country(args: string[]): Promise<void> {
+      const field = args[0]?.toLowerCase();
+      const onOff = args[1]?.toLowerCase();
+      if (field !== "autoupdate" || (onOff !== "on" && onOff !== "off")) {
+         console.error("Usage: prefs ip2country autoupdate <on|off>");
+         return;
+      }
+      const current = await this.preferences.getIP2Country();
+      await this.preferences.setIP2Country({
+         ...current,
+         autoUpdate: onOff === "on",
+      });
+      console.log(
+         `GeoIP auto-update ${onOff === "on" ? "enabled" : "disabled"}.`,
+      );
    }
 
    private async runPrefsFiles(args: string[]): Promise<void> {
@@ -1486,6 +1660,11 @@ class Repl {
          return;
       }
 
+      if (verb === "show" && command[1]?.toLowerCase() === "prefs" && command[2]) {
+         await this.runShowPrefs(command[2].toLowerCase());
+         return;
+      }
+
       const joined = command.join(" ").toLowerCase();
 
       switch (joined) {
@@ -1526,60 +1705,6 @@ class Repl {
          case "show shareddirs":
             await this.runShowSharedDirs();
             break;
-
-         case "show prefs messagefilter": {
-            const prefs = await this.preferences.getMessageFilter();
-            printMessageFilterPrefs(prefs);
-            break;
-         }
-
-         case "show prefs connections": {
-            const prefs = await this.preferences.getConnections();
-            printConnectionsPrefs(prefs);
-            break;
-         }
-
-         case "show prefs files": {
-            const prefs = await this.preferences.getFiles();
-            printFilesPrefs(prefs);
-            break;
-         }
-
-         case "show prefs directories": {
-            const prefs = await this.preferences.getDirectories();
-            printDirectoriesPrefs(prefs);
-            break;
-         }
-
-         case "show prefs security": {
-            const prefs = await this.preferences.getSecurity();
-            printSecurityPrefs(prefs);
-            break;
-         }
-
-         case "show prefs onlinesig": {
-            const prefs = await this.preferences.getOnlineSig();
-            printOnlineSigPrefs(prefs);
-            break;
-         }
-
-         case "show prefs servers": {
-            const prefs = await this.preferences.getServers();
-            printServersPrefs(prefs);
-            break;
-         }
-
-         case "show prefs kademlia": {
-            const prefs = await this.preferences.getKademlia();
-            printKademliaPrefs(prefs);
-            break;
-         }
-
-         case "show prefs coretweaks": {
-            const prefs = await this.preferences.getCoreTweaks();
-            printCoreTweaksPrefs(prefs);
-            break;
-         }
 
          case "show categories": {
             const categories = await this.preferences.listCategories();

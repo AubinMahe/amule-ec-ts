@@ -12,6 +12,21 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-08-04
+
+### Added
+
+- `Preferences.getGeneral`/`setGeneral` (`EC_TAG_PREFS_GENERAL`),
+  `getRemoteControls`/`setRemoteControls` (`EC_TAG_PREFS_REMOTECTRL`), and
+  `getIP2Country`/`setIP2Country` (`EC_TAG_PREFS_IP2COUNTRY`) - fifth and
+  last of the planned `Preferences` batches. New `ECGeoIPSource` enum and
+  `AmuleApiAccountPrefs` interface (shared shape for the three
+  differently-nested password-hash fields in `RemoteControlsPrefs` -
+  webserver admin, webserver guest, amuleapi admin, amuleapi guest - each
+  with its own set/clear semantics, documented on the interface). This
+  completes all 14 GET/SET_PREFERENCES sections except the
+  never-implemented `STATISTICS` stub (a literal `#warning TODO` upstream).
+
 ## [2.10.1] - 2026-08-04
 
 ### Added

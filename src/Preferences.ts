@@ -13,6 +13,7 @@ import {
    ECUInt64Tag,
    ECStringTag,
    ECCustomTag,
+   ECHash16Tag,
 } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:preferences");
@@ -276,6 +277,125 @@ export interface KademliaPrefs {
    nodesUpdateUrl: string;
 }
 
+/**
+ * GENERAL section of the daemon preferences - EC_TAG_PREFS_GENERAL.
+ *
+ * `versionCheckAvailable`/`upnpAvailable` are read-only capability
+ * signals: `Apply()` only ever consults an incoming value for these
+ * under `#ifdef CLIENT_GUI`
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L578-L593) - i.e. it's
+ * the remote GUI mirroring the daemon's own advertised capability
+ * locally, not something a daemon build ever applies to itself.
+ * `setGeneral()` doesn't transmit either back for that reason.
+ */
+export interface GeneralPrefs {
+   userNick: string;
+   /** Hex-encoded MD4 hash identifying this client - EC_TAG_USER_HASH. */
+   userHash: string;
+   userHost: string;
+   checkNewVersion: boolean;
+   versionCheckAvailable: boolean;
+   upnpAvailable: boolean;
+}
+
+/**
+ * amuleapi's per-account section of REMOTECONTROLS - see
+ * `RemoteControlsPrefs`'s doc comment for the full request/state duality
+ * this models.
+ */
+export interface AmuleApiAccountPrefs {
+   enabled: boolean;
+   /** GET: real hash if one happens to be readable (rare/legacy path) - almost always undefined even when a password IS configured. SET: provide to set/replace; omit to leave unchanged. */
+   passwordHash?: string;
+}
+
+/**
+ * REMOTECONTROLS section of the daemon preferences -
+ * EC_TAG_PREFS_REMOTECTRL. Confirmed against the reply builder
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L214-L283) and
+ * `Apply()` (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L695-L759).
+ *
+ * Three different password hashes ride this section, at three different
+ * nesting depths, with three different semantics:
+ *  - `webserverPasswordHash`: a direct child of the section. The real
+ *    hash is always echoed back on GET when a password is set; on SET,
+ *    provide to set/replace, omit to leave unchanged. There is no way to
+ *    clear it via this opcode once set.
+ *  - `webserverGuest.passwordHash`: nested under the guest container,
+ *    which itself is presence-encoded (`webserverGuest.enabled`). The
+ *    real hash is echoed on GET when guest access is enabled and a
+ *    distinct password is set. On SET, enabling/disabling the guest
+ *    account never touches its stored password (same no-clear behavior
+ *    as the admin one) - provide `passwordHash` alongside `enabled: true`
+ *    only when actually changing it.
+ *  - `amuleApiAdmin.passwordHash`: amuleapi's credentials are stored
+ *    salted and stretched (`AmuleApiCredentials`), so unlike the
+ *    webserver's there is normally no digest to put on the wire - GET
+ *    almost always reports `enabled` (a password is configured) with
+ *    `passwordHash` left undefined. SET: provide `passwordHash` to
+ *    set/replace it; omit to leave it unchanged. `enabled` has no "off"
+ *    state here on purpose - clearing it from a stray prefs push would
+ *    leave a non-loopback deployment with no way back in.
+ *  - `amuleApiGuest.passwordHash`: unlike every other credential here,
+ *    disabling amuleapi guest access (`enabled: false`) DOES clear the
+ *    stored guest password server-side - re-enabling later requires
+ *    setting a new one.
+ */
+export interface RemoteControlsPrefs {
+   webserverPort: number;
+   webserverAutorun: boolean;
+   webserverPasswordHash?: string;
+   webserverGuest: AmuleApiAccountPrefs;
+   webserverUseGzip: boolean;
+   webserverRefreshSeconds: number;
+   webserverTemplate: string;
+   amuleApiPort: number;
+   amuleApiAutorun: boolean;
+   amuleApiBindAddress: string;
+   amuleApiAdmin: AmuleApiAccountPrefs;
+   amuleApiGuest: AmuleApiAccountPrefs;
+}
+
+/**
+ * GeoIP source selector - confirmed against `Preferences.h`
+ * (https://github.com/amule-org/amule/blob/master/src/Preferences.h#L859-L864).
+ */
+export enum ECGeoIPSource {
+   DBIP = 0,
+   MAXMIND = 1,
+   CUSTOM = 2,
+}
+
+/**
+ * IP2COUNTRY section of the daemon preferences - EC_TAG_PREFS_IP2COUNTRY.
+ *
+ * `supported` is a read-only capability signal (like
+ * `GeneralPrefs.versionCheckAvailable`) - `setIP2Country()` never sends
+ * it back. `loadedSource`/`databasePath`/`databaseLoaded`/`downloading`/
+ * `lastResult` are read-only live resolver status, only populated by a
+ * daemon/monolithic build with an active resolver
+ * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L505-L519) - undefined
+ * otherwise. `updateNow` is a write-only one-shot trigger: set it to
+ * `true` on a `setIP2Country()` call to make the daemon immediately
+ * re-download its GeoIP database from the just-applied source;
+ * `getIP2Country()` always reports it as `false` (the daemon's own reply
+ * never carries a request-in-progress marker for this).
+ */
+export interface IP2CountryPrefs {
+   supported: boolean;
+   enabled: boolean;
+   source: ECGeoIPSource;
+   customUrl: string;
+   maxMindLicense: string;
+   autoUpdate: boolean;
+   loadedSource?: string;
+   databasePath?: string;
+   databaseLoaded?: boolean;
+   downloading?: boolean;
+   lastResult?: string;
+   updateNow: boolean;
+}
+
 /** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
 export class Category {
 
@@ -298,10 +418,11 @@ export class Category {
  * (https://github.com/amule-org/amule/blob/master/src/libs/ec/abstracts/ECCodes.abstract#L679-L693)
  * and CEC_Prefs_Packet's constructor
  * (https://github.com/amule-org/amule/blob/master/src/ECSpecialMuleTags.cpp#L89-L216)); this class
- * grows section-by-section across several batches. So far: MESSAGEFILTER,
- * CONNECTIONS, FILES, DIRECTORIES, SECURITY, ONLINESIG, SERVERS,
- * KADEMLIA, CORETWEAKS, and the read-only CATEGORIES helper
- * `listCategories()`.
+ * covers all 14 named sections: GENERAL, CONNECTIONS, MESSAGEFILTER,
+ * REMOTECONTROLS, ONLINESIG, SERVERS, FILES, DIRECTORIES, SECURITY,
+ * CORETWEAKS, KADEMLIA, IP2COUNTRY, plus the read-only CATEGORIES
+ * helper `listCategories()`. (STATISTICS is the one exception - it was
+ * never implemented upstream either, see `ECPreferencesSelection`.)
  *
  * Two protocol quirks worth calling out:
  *  - A GET_PREFERENCES reply is a `CEC_Prefs_Packet`, whose base-class
@@ -949,6 +1070,276 @@ export class Preferences {
       );
       await this.applySection(section);
       debug("setKademlia: applied");
+   }
+
+   /** Fetches the GENERAL section - EC_TAG_PREFS_GENERAL. */
+   public async getGeneral(): Promise<GeneralPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.GENERAL,
+         ECTagNames.EC_TAG_PREFS_GENERAL,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the GENERAL section.");
+      }
+      const hashTag = section.findChild(ECTagNames.EC_TAG_USER_HASH);
+      const prefs: GeneralPrefs = {
+         userNick: section.childString(ECTagNames.EC_TAG_USER_NICK) ?? "",
+         userHash:
+            hashTag instanceof ECHash16Tag
+               ? Buffer.from(hashTag.value).toString("hex")
+               : "",
+         userHost: section.childString(ECTagNames.EC_TAG_USER_HOST) ?? "",
+         checkNewVersion:
+            Number(
+               section.childInt(ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION) ??
+                  0n,
+            ) !== 0,
+         versionCheckAvailable:
+            Number(
+               section.childInt(
+                  ECTagNames.EC_TAG_GENERAL_VERSION_CHECK_AVAILABLE,
+               ) ?? 0n,
+            ) !== 0,
+         upnpAvailable:
+            Number(
+               section.childInt(ECTagNames.EC_TAG_GENERAL_UPNP_AVAILABLE) ??
+                  0n,
+            ) !== 0,
+      };
+      debug("getGeneral: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole GENERAL section - EC_TAG_PREFS_GENERAL. */
+   public async setGeneral(prefs: GeneralPrefs): Promise<void> {
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_GENERAL,
+         new Uint8Array(),
+         [
+            new ECStringTag(ECTagNames.EC_TAG_USER_NICK, prefs.userNick),
+            new ECHash16Tag(
+               ECTagNames.EC_TAG_USER_HASH,
+               new Uint8Array(Buffer.from(prefs.userHash, "hex")),
+            ),
+            new ECStringTag(ECTagNames.EC_TAG_USER_HOST, prefs.userHost),
+            new ECUInt8Tag(
+               ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION,
+               prefs.checkNewVersion ? 1 : 0,
+            ),
+         ],
+      );
+      await this.applySection(section);
+      debug("setGeneral: applied");
+   }
+
+   /** Fetches the REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL. */
+   public async getRemoteControls(): Promise<RemoteControlsPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.REMOTECONTROLS,
+         ECTagNames.EC_TAG_PREFS_REMOTECTRL,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the REMOTECONTROLS section.");
+      }
+      const hashOf = (tag: ECTag | undefined): string | undefined => {
+         const hashChild = tag?.findChild(ECTagNames.EC_TAG_PASSWD_HASH);
+         return hashChild instanceof ECHash16Tag
+            ? Buffer.from(hashChild.value).toString("hex")
+            : undefined;
+      };
+      const webserverGuestTag = section.findChild(
+         ECTagNames.EC_TAG_WEBSERVER_GUEST,
+      );
+      const amuleApiAdminTag = section.findChild(
+         ECTagNames.EC_TAG_AMULEAPI_PASSWD,
+      );
+      const amuleApiGuestTag = section.findChild(
+         ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
+      );
+      const webserverPasswordTag = section.findChild(
+         ECTagNames.EC_TAG_PASSWD_HASH,
+      );
+      const prefs: RemoteControlsPrefs = {
+         webserverPort: Number(
+            section.childInt(ECTagNames.EC_TAG_WEBSERVER_PORT) ?? 0n,
+         ),
+         webserverAutorun:
+            section.findChild(ECTagNames.EC_TAG_WEBSERVER_AUTORUN) !==
+            undefined,
+         webserverPasswordHash:
+            webserverPasswordTag instanceof ECHash16Tag
+               ? Buffer.from(webserverPasswordTag.value).toString("hex")
+               : undefined,
+         webserverGuest: {
+            enabled: webserverGuestTag !== undefined,
+            passwordHash: hashOf(webserverGuestTag),
+         },
+         webserverUseGzip:
+            section.findChild(ECTagNames.EC_TAG_WEBSERVER_USEGZIP) !==
+            undefined,
+         webserverRefreshSeconds: Number(
+            section.childInt(ECTagNames.EC_TAG_WEBSERVER_REFRESH) ?? 0n,
+         ),
+         webserverTemplate:
+            section.childString(ECTagNames.EC_TAG_WEBSERVER_TEMPLATE) ?? "",
+         amuleApiPort: Number(
+            section.childInt(ECTagNames.EC_TAG_AMULEAPI_PORT) ?? 0n,
+         ),
+         amuleApiAutorun:
+            section.findChild(ECTagNames.EC_TAG_AMULEAPI_AUTORUN) !==
+            undefined,
+         amuleApiBindAddress:
+            section.childString(ECTagNames.EC_TAG_AMULEAPI_BIND) ?? "",
+         amuleApiAdmin: {
+            enabled: amuleApiAdminTag !== undefined,
+            passwordHash: hashOf(amuleApiAdminTag),
+         },
+         amuleApiGuest: {
+            enabled: amuleApiGuestTag !== undefined,
+            passwordHash: hashOf(amuleApiGuestTag),
+         },
+      };
+      debug("getRemoteControls: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL. */
+   public async setRemoteControls(prefs: RemoteControlsPrefs): Promise<void> {
+      const account = (name: number, value: AmuleApiAccountPrefs): ECTag[] => {
+         if (!value.enabled) {
+            return [];
+         }
+         const children = value.passwordHash
+            ? [
+                 new ECHash16Tag(
+                    ECTagNames.EC_TAG_PASSWD_HASH,
+                    new Uint8Array(Buffer.from(value.passwordHash, "hex")),
+                 ),
+              ]
+            : [];
+         return [new ECCustomTag(name, new Uint8Array(), children)];
+      };
+      const flag = (name: number, value: boolean): ECTag[] =>
+         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_REMOTECTRL,
+         new Uint8Array(),
+         [
+            new ECUInt16Tag(
+               ECTagNames.EC_TAG_WEBSERVER_PORT,
+               prefs.webserverPort,
+            ),
+            ...flag(ECTagNames.EC_TAG_WEBSERVER_AUTORUN, prefs.webserverAutorun),
+            ...(prefs.webserverPasswordHash
+               ? [
+                    new ECHash16Tag(
+                       ECTagNames.EC_TAG_PASSWD_HASH,
+                       new Uint8Array(
+                          Buffer.from(prefs.webserverPasswordHash, "hex"),
+                       ),
+                    ),
+                 ]
+               : []),
+            ...account(ECTagNames.EC_TAG_WEBSERVER_GUEST, prefs.webserverGuest),
+            ...flag(ECTagNames.EC_TAG_WEBSERVER_USEGZIP, prefs.webserverUseGzip),
+            new ECUInt32Tag(
+               ECTagNames.EC_TAG_WEBSERVER_REFRESH,
+               prefs.webserverRefreshSeconds,
+            ),
+            new ECStringTag(
+               ECTagNames.EC_TAG_WEBSERVER_TEMPLATE,
+               prefs.webserverTemplate,
+            ),
+            new ECUInt16Tag(ECTagNames.EC_TAG_AMULEAPI_PORT, prefs.amuleApiPort),
+            ...flag(ECTagNames.EC_TAG_AMULEAPI_AUTORUN, prefs.amuleApiAutorun),
+            new ECStringTag(
+               ECTagNames.EC_TAG_AMULEAPI_BIND,
+               prefs.amuleApiBindAddress,
+            ),
+            ...account(ECTagNames.EC_TAG_AMULEAPI_PASSWD, prefs.amuleApiAdmin),
+            ...account(
+               ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
+               prefs.amuleApiGuest,
+            ),
+         ],
+      );
+      await this.applySection(section);
+      debug("setRemoteControls: applied");
+   }
+
+   /** Fetches the IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY. */
+   public async getIP2Country(): Promise<IP2CountryPrefs> {
+      const section = await this.fetchSection(
+         ECPreferencesSelection.IP2COUNTRY,
+         ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
+      );
+      if (!section) {
+         throw new Error("Daemon did not return the IP2COUNTRY section.");
+      }
+      const bool = (name: number): boolean =>
+         Number(section.childInt(name) ?? 0n) !== 0;
+      const boolOrUndefined = (name: number): boolean | undefined => {
+         const value = section.childInt(name);
+         return value === undefined ? undefined : Number(value) !== 0;
+      };
+      const prefs: IP2CountryPrefs = {
+         supported: bool(ECTagNames.EC_TAG_IP2COUNTRY_SUPPORTED),
+         enabled: bool(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED),
+         source: Number(
+            section.childInt(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE) ?? 0n,
+         ),
+         customUrl:
+            section.childString(ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL) ?? "",
+         maxMindLicense:
+            section.childString(
+               ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
+            ) ?? "",
+         autoUpdate: bool(ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE),
+         loadedSource: section.childString(
+            ECTagNames.EC_TAG_IP2COUNTRY_LOADED_SOURCE,
+         ),
+         databasePath: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_DB_PATH),
+         databaseLoaded: boolOrUndefined(ECTagNames.EC_TAG_IP2COUNTRY_DB_LOADED),
+         downloading: boolOrUndefined(ECTagNames.EC_TAG_IP2COUNTRY_DOWNLOADING),
+         lastResult: section.childString(
+            ECTagNames.EC_TAG_IP2COUNTRY_LAST_RESULT,
+         ),
+         updateNow: false,
+      };
+      debug("getIP2Country: %o", prefs);
+      return prefs;
+   }
+
+   /** Replaces the whole IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY. */
+   public async setIP2Country(prefs: IP2CountryPrefs): Promise<void> {
+      const children: ECTag[] = [
+         new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, prefs.enabled ? 1 : 0),
+         new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE, prefs.source),
+         new ECStringTag(
+            ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL,
+            prefs.customUrl,
+         ),
+         new ECStringTag(
+            ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
+            prefs.maxMindLicense,
+         ),
+         new ECUInt8Tag(
+            ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE,
+            prefs.autoUpdate ? 1 : 0,
+         ),
+      ];
+      if (prefs.updateNow) {
+         children.push(
+            new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_UPDATE_NOW, 1),
+         );
+      }
+      const section = new ECCustomTag(
+         ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
+         new Uint8Array(),
+         children,
+      );
+      await this.applySection(section);
+      debug("setIP2Country: applied");
    }
 
    /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
