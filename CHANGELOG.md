@@ -12,6 +12,14 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-08-04
+
+### Added
+
+- 5 new EC tags declared after a fresh upstream C++ pull (4 for the new
+  X25519 handshake, 1 verify-local-data progress counter) - declaration
+  only, no class wraps these yet. See CONTRIBUTING.md's tracking policy.
+
 ## [2.10.0] - 2026-08-04
 
 ### Added
