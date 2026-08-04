@@ -71,7 +71,7 @@ blank cell, which just means "not done yet, but could be".
 |0x3c|`RESET_DEBUGLOG`|Clears the debug log|✓|✓||✓|
 |0x3d|`CLEAR_SERVERINFO`|Clears the ed2k-connection log|✓|✓||✓|
 |0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|✓|✓||✓|
-|0x3f|`GET_PREFERENCES`|Requests daemon preferences (partial: MessageFilter, Connections, Files, Directories, Security, OnlineSig, Servers, Kademlia, CoreTweaks, Categories sections so far)|✓|✓||✓|
+|0x3f|`GET_PREFERENCES`|Requests daemon preferences (all 14 sections except the never-implemented STATISTICS: General, Connections, MessageFilter, RemoteControls, OnlineSig, Servers, Files, Directories, Security, CoreTweaks, Kademlia, IP2Country, Categories)|✓|✓||✓|
 |0x40|`SET_PREFERENCES`|Sets daemon preferences (same partial section coverage)|✓|✓||✓|
 |0x41|`CREATE_CATEGORY`|Creates a download category|✓|✓||✓|
 |0x42|`UPDATE_CATEGORY`|Updates a download category|✓|✓||✓|
@@ -147,5 +147,8 @@ blank cell, which just means "not done yet, but could be".
 `show prefs onlinesig`, `prefs onlinesig <on|off>`,
 `show prefs servers`, `prefs servers autoupdate <on|off>`,
 `show prefs kademlia`, `prefs kademlia seturl <url>`,
+`show prefs general`, `prefs general checknewversion <on|off>`,
+`show prefs remotecontrols`, `prefs remotecontrols gzip <on|off>`,
+`show prefs ip2country`, `prefs ip2country autoupdate <on|off>`,
 `show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
 `show categories`.

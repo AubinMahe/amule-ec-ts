@@ -850,6 +850,407 @@ describe("Preferences.setKademlia", () => {
    });
 });
 
+const USER_HASH_HEX = "0123456789abcdef0123456789abcdef";
+
+function generalPrefsFixture(): ec.GeneralPrefs {
+   return {
+      userNick: "aMuleUser",
+      userHash: USER_HASH_HEX,
+      userHost: "myhost.example.com",
+      checkNewVersion: true,
+      versionCheckAvailable: true,
+      upnpAvailable: false,
+   };
+}
+
+describe("Preferences.getGeneral", () => {
+   it("requests EC_PREFS_GENERAL and decodes the hash-typed EC_TAG_USER_HASH", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PREFS_GENERAL, new Uint8Array(), [
+            new ec.ECStringTag(ec.ECTagNames.EC_TAG_USER_NICK, "aMuleUser"),
+            new ec.ECHash16Tag(
+               ec.ECTagNames.EC_TAG_USER_HASH,
+               new Uint8Array(Buffer.from(USER_HASH_HEX, "hex")),
+            ),
+            new ec.ECStringTag(
+               ec.ECTagNames.EC_TAG_USER_HOST,
+               "myhost.example.com",
+            ),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION, 1),
+            new ec.ECUInt8Tag(
+               ec.ECTagNames.EC_TAG_GENERAL_VERSION_CHECK_AVAILABLE,
+               1,
+            ),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_GENERAL_UPNP_AVAILABLE, 0),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getGeneral();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.GENERAL),
+      );
+      expect(prefs).to.deep.equal(generalPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getGeneral(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setGeneral", () => {
+   it("sends the hash back as EC_TAG_USER_HASH and never sends the read-only capability signals", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setGeneral(generalPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_GENERAL);
+      expect(section?.childString(ec.ECTagNames.EC_TAG_USER_NICK)).to.equal(
+         "aMuleUser",
+      );
+      const hashTag = section?.findChild(ec.ECTagNames.EC_TAG_USER_HASH);
+      expect(
+         hashTag instanceof ec.ECHash16Tag
+            ? Buffer.from(hashTag.value).toString("hex")
+            : undefined,
+      ).to.equal(USER_HASH_HEX);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(
+         section?.findChild(ec.ECTagNames.EC_TAG_GENERAL_VERSION_CHECK_AVAILABLE),
+      ).to.be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_GENERAL_UPNP_AVAILABLE)).to
+         .be.undefined;
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setGeneral(generalPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+const WEBSERVER_HASH_HEX = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const AMULEAPI_GUEST_HASH_HEX = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+function remoteControlsPrefsFixture(): ec.RemoteControlsPrefs {
+   return {
+      webserverPort: 4711,
+      webserverAutorun: true,
+      webserverPasswordHash: WEBSERVER_HASH_HEX,
+      webserverGuest: { enabled: false, passwordHash: undefined },
+      webserverUseGzip: true,
+      webserverRefreshSeconds: 20,
+      webserverTemplate: "default",
+      amuleApiPort: 4712,
+      amuleApiAutorun: true,
+      amuleApiBindAddress: "127.0.0.1",
+      amuleApiAdmin: { enabled: true, passwordHash: undefined },
+      amuleApiGuest: { enabled: true, passwordHash: AMULEAPI_GUEST_HASH_HEX },
+   };
+}
+
+describe("Preferences.getRemoteControls", () => {
+   it("requests EC_PREFS_REMOTECONTROLS and decodes the 3 differently-nested password hashes", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_REMOTECTRL,
+            new Uint8Array(),
+            [
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_WEBSERVER_PORT, 4711),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_WEBSERVER_AUTORUN,
+                  new Uint8Array(),
+               ),
+               new ec.ECHash16Tag(
+                  ec.ECTagNames.EC_TAG_PASSWD_HASH,
+                  new Uint8Array(Buffer.from(WEBSERVER_HASH_HEX, "hex")),
+               ),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_WEBSERVER_USEGZIP,
+                  new Uint8Array(),
+               ),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_WEBSERVER_REFRESH, 20),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_WEBSERVER_TEMPLATE,
+                  "default",
+               ),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_AMULEAPI_PORT, 4712),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_AMULEAPI_AUTORUN,
+                  new Uint8Array(),
+               ),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_AMULEAPI_BIND,
+                  "127.0.0.1",
+               ),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_AMULEAPI_PASSWD,
+                  new Uint8Array(),
+               ),
+               new ec.ECCustomTag(
+                  ec.ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
+                  new Uint8Array(),
+                  [
+                     new ec.ECHash16Tag(
+                        ec.ECTagNames.EC_TAG_PASSWD_HASH,
+                        new Uint8Array(
+                           Buffer.from(AMULEAPI_GUEST_HASH_HEX, "hex"),
+                        ),
+                     ),
+                  ],
+               ),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getRemoteControls();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.REMOTECONTROLS),
+      );
+      expect(prefs).to.deep.equal(remoteControlsPrefsFixture());
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.getRemoteControls(),
+         /EC_OP_SET_PREFERENCES/,
+      );
+   });
+});
+
+describe("Preferences.setRemoteControls", () => {
+   it("omits disabled account containers and nests each hash under the right parent", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setRemoteControls(remoteControlsPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_REMOTECTRL);
+      const topHash = section?.findChild(ec.ECTagNames.EC_TAG_PASSWD_HASH);
+      expect(
+         topHash instanceof ec.ECHash16Tag
+            ? Buffer.from(topHash.value).toString("hex")
+            : undefined,
+      ).to.equal(WEBSERVER_HASH_HEX);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_WEBSERVER_GUEST)).to.be
+         .undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_AMULEAPI_PASSWD)).to.not
+         .be.undefined;
+      const guestTag = section?.findChild(
+         ec.ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
+      );
+      const guestHash = guestTag?.findChild(ec.ECTagNames.EC_TAG_PASSWD_HASH);
+      expect(
+         guestHash instanceof ec.ECHash16Tag
+            ? Buffer.from(guestHash.value).toString("hex")
+            : undefined,
+      ).to.equal(AMULEAPI_GUEST_HASH_HEX);
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setRemoteControls(remoteControlsPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
+function ip2CountryPrefsFixture(): ec.IP2CountryPrefs {
+   return {
+      supported: true,
+      enabled: true,
+      source: ec.ECGeoIPSource.MAXMIND,
+      customUrl: "",
+      maxMindLicense: "abc123",
+      autoUpdate: true,
+      loadedSource: "MaxMind",
+      databasePath: "/var/lib/amule/GeoLite2-Country.mmdb",
+      databaseLoaded: true,
+      downloading: false,
+      lastResult: "OK",
+      updateNow: false,
+   };
+}
+
+describe("Preferences.getIP2Country", () => {
+   it("requests EC_PREFS_IP2COUNTRY and parses the explicit-int booleans plus optional live-status fields", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
+            new Uint8Array(),
+            [
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_SUPPORTED, 1),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, 1),
+               new ec.ECUInt8Tag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_SOURCE,
+                  ec.ECGeoIPSource.MAXMIND,
+               ),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL, ""),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
+                  "abc123",
+               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE, 1),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_LOADED_SOURCE,
+                  "MaxMind",
+               ),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_DB_PATH,
+                  "/var/lib/amule/GeoLite2-Country.mmdb",
+               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_DB_LOADED, 1),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_DOWNLOADING, 0),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_IP2COUNTRY_LAST_RESULT, "OK"),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getIP2Country();
+
+      const selectTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SELECT_PREFS);
+      expect(selectTag?.intValue).to.equal(
+         BigInt(ec.ECPreferencesSelection.IP2COUNTRY),
+      );
+      expect(prefs).to.deep.equal(ip2CountryPrefsFixture());
+   });
+
+   it("leaves the live-status fields undefined when the daemon omits them (no resolver)", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SET_PREFERENCES);
+      reply.add(
+         new ec.ECCustomTag(
+            ec.ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
+            new Uint8Array(),
+            [
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_SUPPORTED, 0),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, 0),
+               new ec.ECUInt8Tag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_SOURCE,
+                  ec.ECGeoIPSource.DBIP,
+               ),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL, ""),
+               new ec.ECStringTag(
+                  ec.ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
+                  "",
+               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE, 0),
+            ],
+         ),
+      );
+      fake.queueReply(reply);
+
+      const prefs = await preferences.getIP2Country();
+
+      /* eslint-disable @typescript-eslint/no-unused-expressions -- chai's getter-style assertion */
+      expect(prefs.loadedSource).to.be.undefined;
+      expect(prefs.databasePath).to.be.undefined;
+      expect(prefs.databaseLoaded).to.be.undefined;
+      expect(prefs.downloading).to.be.undefined;
+      expect(prefs.lastResult).to.be.undefined;
+      /* eslint-enable @typescript-eslint/no-unused-expressions */
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(preferences.getIP2Country(), /EC_OP_SET_PREFERENCES/);
+   });
+});
+
+describe("Preferences.setIP2Country", () => {
+   it("sends ENABLED/SOURCE/AUTO_UPDATE as explicit ints, and UPDATE_NOW only when true", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setIP2Country({
+         ...ip2CountryPrefsFixture(),
+         updateNow: true,
+      });
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_IP2COUNTRY);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_IP2COUNTRY_ENABLED),
+      ).to.equal(1n);
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_IP2COUNTRY_SOURCE),
+      ).to.equal(BigInt(ec.ECGeoIPSource.MAXMIND));
+      // SUPPORTED is read-only - never sent back.
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_IP2COUNTRY_SUPPORTED)).to
+         .be.undefined;
+      expect(
+         section?.childInt(ec.ECTagNames.EC_TAG_IP2COUNTRY_UPDATE_NOW),
+      ).to.equal(1n);
+   });
+
+   it("omits UPDATE_NOW when false", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await preferences.setIP2Country(ip2CountryPrefsFixture());
+
+      const section = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PREFS_IP2COUNTRY);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(section?.findChild(ec.ECTagNames.EC_TAG_IP2COUNTRY_UPDATE_NOW)).to
+         .be.undefined;
+   });
+
+   it("throws a generic error on any unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
+
+      await expectRejection(
+         preferences.setIP2Country(ip2CountryPrefsFixture()),
+         /EC_OP_NOOP/,
+      );
+   });
+});
+
 describe("Preferences.getCoreTweaks", () => {
    it("requests EC_PREFS_CORETWEAKS and parses ints plus the presence-encoded VERBOSE flag", async () => {
       const fake = createFakeConnection();
