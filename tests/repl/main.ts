@@ -58,6 +58,14 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       "set a download's priority",
    ],
    ["addlink <ed2k-link>", "start a download from a link"],
+   ["swap <this|auto|others> <hash>", "swap A4AF sources for a download"],
+   ["setcat <hash> <category-index>", "assign a download to a category"],
+   ["category create <title> <path> [comment] [color] [prio]", "create a download category"],
+   [
+      "category update <index> <title> <path> [comment] [color] [prio]",
+      "update a download category",
+   ],
+   ["category delete <index>", "delete a download category"],
    ["clear completed", "clear completed downloads"],
    ["kad start", "start the Kademlia network"],
    ["kad stop", "stop the Kademlia network"],
@@ -418,6 +426,7 @@ class Repl {
    private readonly activity          = new NotificationActivity();
    private readonly status      : ec.Status;
    private readonly downloads   : ec.Downloads;
+   private readonly categories  : ec.Categories;
    private readonly uploads     : ec.Uploads;
    private readonly sharedFiles : ec.SharedFiles;
    private readonly servers     : ec.Servers;
@@ -433,6 +442,7 @@ class Repl {
 
    constructor(private readonly connection: ec.ECConnection) {
       this.downloads   = new ec.Downloads(this.connection);
+      this.categories  = new ec.Categories(this.connection);
       this.uploads     = new ec.Uploads(this.connection);
       this.sharedFiles = new ec.SharedFiles(this.connection);
       this.status      = new ec.Status(this.connection);
@@ -621,6 +631,90 @@ class Repl {
       console.log(`Priority set: ${hash} -> ${name}.`);
    }
 
+   private async runSwap(args: string[]): Promise<void> {
+      const mode = args[0]?.toLowerCase();
+      const hash = args[1];
+      if (!hash || (mode !== "this" && mode !== "auto" && mode !== "others")) {
+         console.error("Usage: swap <this|auto|others> <hash>");
+         return;
+      }
+      if (mode === "this") {
+         await this.downloads.swapA4AFThis(hash);
+      } else if (mode === "auto") {
+         await this.downloads.swapA4AFThisAuto(hash);
+      } else {
+         await this.downloads.swapA4AFOthers(hash);
+      }
+      console.log(`A4AF swap (${mode}) requested: ${hash}.`);
+   }
+
+   private async runSetCategory(args: string[]): Promise<void> {
+      const hash = args[0];
+      const indexText = args[1];
+      const index = indexText ? Number(indexText) : NaN;
+      if (!hash || Number.isNaN(index)) {
+         console.error("Usage: setcat <hash> <category-index>");
+         return;
+      }
+      await this.downloads.setCategory(hash, index);
+      console.log(`Category set: ${hash} -> ${index}.`);
+   }
+
+   private async runCategoryCreate(args: string[]): Promise<void> {
+      const [title, path, comment, colorText, prioText] = args;
+      if (!title || !path) {
+         console.error("Usage: category create <title> <path> [comment] [color] [prio]");
+         return;
+      }
+      await this.categories.create(
+         title,
+         path,
+         comment,
+         colorText === undefined ? undefined : Number(colorText),
+         prioText === undefined ? undefined : Number(prioText),
+      );
+      console.log(`Category created: ${title}.`);
+   }
+
+   private async runCategoryUpdate(args: string[]): Promise<void> {
+      const [indexText, title, path, comment, colorText, prioText] = args;
+      const index = indexText ? Number(indexText) : NaN;
+      if (Number.isNaN(index) || !title || !path) {
+         console.error(
+            "Usage: category update <index> <title> <path> [comment] [color] [prio]",
+         );
+         return;
+      }
+      await this.categories.update(
+         index,
+         title,
+         path,
+         comment,
+         colorText === undefined ? undefined : Number(colorText),
+         prioText === undefined ? undefined : Number(prioText),
+      );
+      console.log(`Category updated: ${index}.`);
+   }
+
+   private async runCategoryDelete(args: string[]): Promise<void> {
+      const indexText = args[0];
+      const index = indexText ? Number(indexText) : NaN;
+      if (Number.isNaN(index)) {
+         console.error("Usage: category delete <index>");
+         return;
+      }
+      await this.categories.delete(index);
+      console.log(`Category deleted: ${index}.`);
+   }
+
+   private async runCategory(args: string[]): Promise<void> {
+      const sub = args[0]?.toLowerCase();
+      if (sub === "create") return this.runCategoryCreate(args.slice(1));
+      if (sub === "update") return this.runCategoryUpdate(args.slice(1));
+      if (sub === "delete") return this.runCategoryDelete(args.slice(1));
+      console.error("Usage: category <create ...|update ...|delete <index>>");
+   }
+
    private async runAddLink(args: string[]): Promise<void> {
       const link = args[0];
       if (!link) {
@@ -781,6 +875,9 @@ class Repl {
       stop: (args) => this.runStop(args),
       priority: (args) => this.runPriority(args),
       addlink: (args) => this.runAddLink(args),
+      swap: (args) => this.runSwap(args),
+      setcat: (args) => this.runSetCategory(args),
+      category: (args) => this.runCategory(args),
       disconnect: () => this.runDisconnect(),
       kad: (args) => this.runKad(args),
       server: (args) => this.runServer(args),

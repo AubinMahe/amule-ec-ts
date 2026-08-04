@@ -12,6 +12,17 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-04
+
+### Added
+
+- `Categories` service: `create`/`update`/`delete` for the daemon's download
+  categories (`EC_OP_CREATE_CATEGORY`/`EC_OP_UPDATE_CATEGORY`/
+  `EC_OP_DELETE_CATEGORY`).
+- `Downloads.swapA4AFThis`/`swapA4AFThisAuto`/`swapA4AFOthers` (A4AF source
+  swapping, `EC_OP_PARTFILE_SWAP_A4AF_*`) and `Downloads.setCategory`
+  (`EC_OP_PARTFILE_SET_CAT`).
+
 ## [1.0.0] - 2026-08-02
 
 ### Added

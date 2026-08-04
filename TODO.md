@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 61 of them; all 61 are
+`ECOpcode.ts` declares 88 opcodes. The library wraps 68 of them; all 68 are
 covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
 through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 57 opcodes
+(queued replies, no real socket). The REPL column reflects the 64 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -32,15 +32,15 @@ blank cell, which just means "not done yet, but could be".
 |0x0e|`GET_ULOAD_QUEUE`|Requests the upload queue|✓|✓||✓|
 |0x10|`GET_SHARED_FILES`|Requests the shared files list|✓|✓||✓|
 |0x11|`SHARED_SET_PRIO`|Sets a shared file's upload priority|||||
-|0x16|`PARTFILE_SWAP_A4AF_THIS`|Swaps a source to this file ("also available for")|||||
-|0x17|`PARTFILE_SWAP_A4AF_THIS_AUTO`|Same, toggling the "auto swap" flag|||||
-|0x18|`PARTFILE_SWAP_A4AF_OTHERS`|Swaps this file's sources to other A4AF files|||||
+|0x16|`PARTFILE_SWAP_A4AF_THIS`|Swaps a source to this file ("also available for")|✓|✓||✓|
+|0x17|`PARTFILE_SWAP_A4AF_THIS_AUTO`|Same, toggling the "auto swap" flag|✓|✓||✓|
+|0x18|`PARTFILE_SWAP_A4AF_OTHERS`|Swaps this file's sources to other A4AF files|✓|✓||✓|
 |0x19|`PARTFILE_PAUSE`|Pauses a download|✓|✓||✓|
 |0x1a|`PARTFILE_RESUME`|Resumes a paused download|✓|✓||✓|
 |0x1b|`PARTFILE_STOP`|Stops a download|✓|✓||✓|
 |0x1c|`PARTFILE_PRIO_SET`|Sets a download's priority|✓|✓||✓|
 |0x1d|`PARTFILE_DELETE`|Cancels/deletes a download|✓|✓||✓|
-|0x1e|`PARTFILE_SET_CAT`|Assigns a download to a category|||||
+|0x1e|`PARTFILE_SET_CAT`|Assigns a download to a category|✓|✓||✓|
 |0x1f|`DLOAD_QUEUE`|Download queue reply / push notification|✓|✓||✓|
 |0x20|`ULOAD_QUEUE`|Upload queue reply / push notification|✓|✓||✓|
 |0x22|`SHARED_FILES`|Shared files reply / push notification|✓|✓||✓|
@@ -73,9 +73,9 @@ blank cell, which just means "not done yet, but could be".
 |0x3e|`GET_LAST_LOG_ENTRY`|Requests only the last log line|✓|✓||✓|
 |0x3f|`GET_PREFERENCES`|Requests daemon preferences|||||
 |0x40|`SET_PREFERENCES`|Sets daemon preferences|||||
-|0x41|`CREATE_CATEGORY`|Creates a download category|||||
-|0x42|`UPDATE_CATEGORY`|Updates a download category|||||
-|0x43|`DELETE_CATEGORY`|Deletes a download category|||||
+|0x41|`CREATE_CATEGORY`|Creates a download category|✓|✓||✓|
+|0x42|`UPDATE_CATEGORY`|Updates a download category|✓|✓||✓|
+|0x43|`DELETE_CATEGORY`|Deletes a download category|✓|✓||✓|
 |0x44|`GET_STATSGRAPHS`|Requests historical stats graph data|||||
 |0x45|`STATSGRAPHS`|Stats graph data reply|||||
 |0x46|`GET_STATSTREE`|Requests the client-tree stats (STATTREE)|||||
@@ -107,9 +107,10 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 13 feature classes: `Downloads`, `Uploads`,
+`tests/repl/main.ts` drives all 14 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`,
-`Daemon`, `DebugLog`, `Friends` and `Chat` - commands `show dl`, `show ul`,
+`Daemon`, `DebugLog`, `Friends`, `Chat` and `Categories` - commands
+`show dl`, `show ul`,
 `show shared`, `show servers`, `show log`, `reset log`, `show log last`,
 `addlog <text>`, `show debug log`, `reset debug log`,
 `adddebuglog <text>`, `show server log`, `reset server log`, `show chat`,
@@ -119,7 +120,12 @@ blank cell, which just means "not done yet, but could be".
 `search <keywords>`, `search stop`, `download <hash>...`, `cancel <hash>`,
 `pause <hash>`, `resume <hash>`, `stop <hash>`,
 `priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`,
-`addlink <ed2k-link>`, `clear completed`, `kad start`, `kad stop`,
+`addlink <ed2k-link>`, `swap <this|auto|others> <hash>`,
+`setcat <hash> <category-index>`,
+`category create <title> <path> [comment] [color] [prio]`,
+`category update <index> <title> <path> [comment] [color] [prio]`,
+`category delete <index>`,
+`clear completed`, `kad start`, `kad stop`,
 `kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,
