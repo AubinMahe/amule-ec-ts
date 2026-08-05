@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/AubinMahe/amule-ec-ts/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/AubinMahe/amule-ec-ts/graph/badge.svg)](https://codecov.io/gh/AubinMahe/amule-ec-ts)
+[![npm](https://img.shields.io/npm/v/amule-ec.svg)](https://www.npmjs.com/package/amule-ec)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
@@ -14,8 +15,8 @@ Zero runtime dependencies - only Node built-ins (`node:net`, `node:crypto`,
 
 ## Status
 
-`1.0.0` - see [CHANGELOG.md](CHANGELOG.md) for released changes and
-[TODO.md](TODO.md) for planned work.
+All 88 EC opcodes are wrapped. See [CHANGELOG.md](CHANGELOG.md) for
+release history and [TODO.md](TODO.md) for open items.
 
 ## Usage
 
@@ -35,15 +36,14 @@ console.log(downloads.files);
 `port`/`passwordHash` come from - reading `amule.conf` is the caller's
 responsibility.
 
-## Debugging
+## Observability
 
 Connection loss and failed reconnect attempts are always logged to stderr
 via `console.error`/`console.log` - no opt-in needed. Everything else (wire
 framing, opcode dispatch, per-request results) is silent by default and
 opt-in per topic via Node's built-in `NODE_DEBUG` env var, one topic per
-class: `connection`, `packet`, `tags`, `engine`, `downloads`, `uploads`,
-`servers`, `sharedfiles`, `status`, `log`, `search` - all under the
-`amule-ec:` prefix.
+feature class, all under the `amule-ec:` prefix (e.g. `amule-ec:downloads`,
+`amule-ec:preferences`).
 
 ```bash
 NODE_DEBUG=amule-ec:downloads node app.js   # trace only Downloads
