@@ -45,6 +45,7 @@ export * from "./Servers.js";
 export * from "./SharedFiles.js";
 export * from "./Status.js";
 export * from "./StatsGraphs.js";
+export * from "./StatsTree.js";
 export * from "./Transmission.js";
 export * from "./Update.js";
 export * from "./Uploads.js";

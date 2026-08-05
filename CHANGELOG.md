@@ -12,6 +12,22 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-08-05
+
+### Added
+
+- `StatsTree` class (`EC_OP_GET_STATSTREE`/`EC_OP_STATSTREE`) - the
+  daemon's statistics tree, mirroring the aMule GUI's "Statistics" tab.
+  Despite 14 different C++ node classes server-side, the wire shape is
+  uniformly generic (one recursive `EC_TAG_STATTREE_NODE` per node,
+  `EC_TAG_STAT_NODE_VALUE` for its value(s)), so a single `StatNode`/
+  `StatValue` pair covers every case - no per-node-type modeling needed.
+  New `ECStatValueType` enum for the value's display-format hint.
+  `StatNode.findByKey()` looks up a node by its stable, locale-independent
+  key rather than matching against the untranslated-but-still-prose label.
+  This completes EC protocol coverage: the library now wraps all 88
+  declared opcodes.
+
 ## [2.12.0] - 2026-08-05
 
 ### Added

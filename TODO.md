@@ -2,12 +2,12 @@
 
 ## EC protocol coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps 86 of them; all 86 are
-covered by a unit test. Only 6 (the auth handshake + `NOOP`) are exercised
-through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
+`ECOpcode.ts` declares 88 opcodes. The library wraps all 88 of them; all 88
+are covered by a unit test. Only 6 (the auth handshake + `NOOP`) are
+exercised through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 82 opcodes
+(queued replies, no real socket). The REPL column reflects the 84 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -78,8 +78,8 @@ blank cell, which just means "not done yet, but could be".
 |0x43|`DELETE_CATEGORY`|Deletes a download category|✓|✓||✓|
 |0x44|`GET_STATSGRAPHS`|Requests historical stats graph data|✓|✓||✓|
 |0x45|`STATSGRAPHS`|Stats graph data reply|✓|✓||✓|
-|0x46|`GET_STATSTREE`|Requests the client-tree stats (STATTREE)|||||
-|0x47|`STATSTREE`|Client-tree stats reply|||||
+|0x46|`GET_STATSTREE`|Requests the client-tree stats (STATTREE)|✓|✓||✓|
+|0x47|`STATSTREE`|Client-tree stats reply|✓|✓||✓|
 |0x48|`KAD_START`|Starts the Kademlia network|✓|✓||✓|
 |0x49|`KAD_STOP`|Stops the Kademlia network|✓|✓||✓|
 |0x4a|`CONNECT`|Connects to the ed2k/Kad networks|✓|✓||✓|
@@ -107,10 +107,10 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 18 feature classes: `Downloads`, `Uploads`,
+`tests/repl/main.ts` drives all 19 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `StatsGraphs`, `Servers`, `Search`, `Log`, `Kad`,
 `ServerLog`, `Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories`,
-`IPFilter`, `Preferences` and `Update` - commands
+`IPFilter`, `Preferences`, `Update` and `StatsTree` - commands
 `show dl`, `show ul`,
 `show shared`, `show servers`, `show log`, `reset log`, `show log last`,
 `addlog <text>`, `show debug log`, `reset debug log`,
@@ -151,4 +151,4 @@ blank cell, which just means "not done yet, but could be".
 `show prefs remotecontrols`, `prefs remotecontrols gzip <on|off>`,
 `show prefs ip2country`, `prefs ip2country autoupdate <on|off>`,
 `show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
-`show categories`, `show update`.
+`show categories`, `show update`, `show statstree`, `show statstree <key>`.

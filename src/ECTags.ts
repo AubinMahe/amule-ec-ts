@@ -32,6 +32,12 @@ export abstract class ECTag {
       return typeof value === "number" ? value : undefined;
    }
 
+   /** Reads this tag's own string value (only ECStringTag has one) - undefined otherwise. */
+   public get stringValue(): string | undefined {
+      const value = (this as { value?: unknown }).value;
+      return typeof value === "string" ? value : undefined;
+   }
+
    public findChild(name: number): ECTag | undefined {
       return this.children.find((child) => child.name === name);
    }
