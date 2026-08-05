@@ -12,6 +12,28 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-08-05
+
+### Added
+
+- `Friends.browseSharedFiles(clientEcid)` - browses a currently-connected
+  client's shared files ("View Files" in the reference GUI), via
+  `EC_OP_FRIEND`'s previously-unwrapped `EC_TAG_FRIEND_SHARED` mode.
+  Requires `multiSearch` (the daemon only allocates a search ID for the
+  browse once it's negotiated); returns a `SearchSession` - the daemon's
+  reply reuses that exact shape, so polling/fetching a browse works
+  identically to a regular search. Live-verified against a real daemon
+  (147 real results from one peer).
+
+### Changed
+
+- `SearchSession`'s class doc now explains why no client-side
+  correlation token (`EC_TAG_SEARCH_REF`) is needed for concurrent
+  searches in an async/await client, and clarifies the real limit on
+  "multiple search tabs": independent Kad searches can run in parallel,
+  but ed2k (local/global) searches share one in-flight slot per
+  connection.
+
 ## [2.13.0] - 2026-08-05
 
 ### Added

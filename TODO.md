@@ -94,7 +94,7 @@ blank cell, which just means "not done yet, but could be".
 |0x54|`CLIENT_SWAP_TO_ANOTHER_FILE`|Moves an uploading client to another file|✓|✓||✓|
 |0x55|`SHARED_FILE_SET_COMMENT`|Sets a shared file's comment/rating|✓|✓||✓|
 |0x56|`SERVER_SET_STATIC_PRIO`|Sets a server's static priority|✓|✓||✓|
-|0x57|`FRIEND`|Adds/removes a friend, sets friend-slot (browse "View Files" not wrapped - needs multi-search)|✓|✓||✓|
+|0x57|`FRIEND`|Adds/removes a friend, sets friend-slot, browses a connected client's shared files ("View Files", requires multi-search)|✓|✓||✓|
 |0x58|`VERSION_CHECK`|Triggers an on-demand check for a new aMule release (result relayed later via preferences/stats)|✓|✓||✓|
 |0x59|`SHARED_FILE_SEARCH_KAD_NOTES`|Searches Kad notes for a shared file|✓|✓||✓|
 |0x5a|`VERIFY_LOCAL_DATA`|Verifies a shared file's local data (hash check)|✓|✓||✓|
@@ -138,6 +138,7 @@ The REPL (`tests/repl/`) drives all 19 feature classes: `Downloads`, `Uploads`,
 `sharedreload`, `rename <hash> <new-name>`,
 `ipfilter reload`, `ipfilter update [url]`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
+`friend browse <client-ecid>`,
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,
 `comment <hash> <rating 0-5> <text>`, `kadnotes <hash>`,
 `show prefs messagefilter`, `prefs messagefilter <on|off>`,

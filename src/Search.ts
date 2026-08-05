@@ -135,6 +135,22 @@ export class SearchResult {
  * only the last 20 EC-started searches (LRU ring, kMaxEcSearches) -
  * progress()/fetch() throw once this search's ID has been evicted or was
  * never known, signaled by EC_TAG_SEARCH_EXPIRED.
+ *
+ * For a multi-tab search UI: no client-side correlation token
+ * (EC_TAG_SEARCH_REF, which the reference GUI echoes back for its own
+ * optimistic tabs - see Friends.browseSharedFiles()'s doc, which reuses
+ * the same reply shape) is needed or wrapped here. That tag exists to
+ * solve a problem specific to amuleGUI's event-driven architecture,
+ * where a request can return control to the event loop before its reply
+ * arrives, leaving "which pending tab does this reply belong to"
+ * genuinely ambiguous without one. In an async/await client, each
+ * `Search.start()` call's own `await` already ties it to its own result
+ * - `Promise.all([search.start(a), search.start(b)])` is correctly
+ * paired by ECConnection's FIFO receive()-matching (see
+ * ECConnection.dispatchPacket()'s doc) without any protocol help. The
+ * only real limit on "multiple tabs" is the one above: as many
+ * independent Kad tabs as wanted, but only one live ed2k tab per
+ * connection at a time.
  */
 export class SearchSession {
 
