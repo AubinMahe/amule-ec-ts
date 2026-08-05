@@ -153,14 +153,3 @@ The REPL (`tests/repl/`) drives all 19 feature classes: `Downloads`, `Uploads`,
 `show prefs ip2country`, `prefs ip2country autoupdate <on|off>`,
 `show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
 `show categories`, `show update`, `show statstree`, `show statstree <key>`.
-
-## Housekeeping
-
-`tests/repl/main.ts` used to be a single ~1900-line file holding one
-monolithic class (command parsing, all `runXxx`/`printXxx` handlers, and
-the notification trackers). Split into `tests/repl/{Repl,help,format,
-notificationActivity}.ts`, `tests/repl/views/*.ts` (one file per feature's
-display functions), and `tests/repl/controllers/*.ts` (one thin
-controller class per feature area, each holding its own library instance
-and delegating straight to it) - `main.ts` is now just the CLI entry
-point (parses args, reads `~/.aMule/amule.conf`, starts `Repl`).
