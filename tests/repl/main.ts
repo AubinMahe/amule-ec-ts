@@ -159,6 +159,8 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       "show update",
       "poll the combined incremental-update feed (shared files/downloads/clients/servers/friends)",
    ],
+   ["show statstree", "the daemon's full statistics tree"],
+   ["show statstree <key>", "just the subtree rooted at a given node key (e.g. \"uploads\")"],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
    ["friend remove <ecid>", "remove a friend"],
@@ -517,6 +519,38 @@ function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
    );
 }
 
+function formatStatValue(value: ec.StatValue): string {
+   let base = "?";
+   if (value.stringValue !== undefined) {
+      base = value.stringValue;
+   } else if (value.intValue !== undefined) {
+      base = value.intValue.toString();
+   } else if (value.doubleValue !== undefined) {
+      base = value.doubleValue.toFixed(2);
+   }
+   const withEnum = value.enumToken ? `${base} [${value.enumToken}]` : base;
+   const withType =
+      value.type !== undefined ? `${withEnum} (${ec.ECStatValueType[value.type]})` : withEnum;
+   return value.companion ? `${withType} / ${formatStatValue(value.companion)}` : withType;
+}
+
+function printStatNode(node: ec.StatNode, indent: string): void {
+   const valuesText = node.values.map(formatStatValue).join(", ");
+   const suffix = valuesText ? `: ${valuesText}` : "";
+   const keyText = node.key ? `  [${node.key}]` : "";
+   let ratioText = "";
+   if (node.ratio !== undefined) {
+      ratioText = `  ratio=${node.ratio.toFixed(2)}`;
+      if (node.ratioTotal !== undefined) {
+         ratioText += ` (total ${node.ratioTotal.toFixed(2)})`;
+      }
+   }
+   console.log(`${indent}${node.label}${suffix}${keyText}${ratioText}`);
+   for (const child of node.children) {
+      printStatNode(child, `${indent}  `);
+   }
+}
+
 function printUpdate(update: ec.Update): void {
    console.log(
       `${update.sharedFiles.length} shared file(s), ${update.downloads.length} download(s), ${update.clients.length} client(s), ${update.servers.length} server(s), ${update.friends.length} friend(s)`,
@@ -772,6 +806,7 @@ class Repl {
    private readonly ipFilter    : ec.IPFilter;
    private readonly preferences : ec.Preferences;
    private readonly update      : ec.Update;
+   private readonly statsTree   : ec.StatsTree;
    private currentSearch?: ec.SearchSession;
 
    constructor(private readonly connection: ec.ECConnection) {
@@ -793,6 +828,7 @@ class Repl {
       this.ipFilter    = new ec.IPFilter(this.connection);
       this.preferences = new ec.Preferences(this.connection);
       this.update      = new ec.Update(this.connection);
+      this.statsTree   = new ec.StatsTree(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -1252,6 +1288,20 @@ class Repl {
       await handler();
    }
 
+   private async runShowStatsTree(key?: string): Promise<void> {
+      await this.statsTree.fetch();
+      if (!this.statsTree.root) {
+         console.error("Daemon returned no statistics tree.");
+         return;
+      }
+      const node = key ? this.statsTree.root.findByKey(key) : this.statsTree.root;
+      if (!node) {
+         console.error(`No node with key "${key}".`);
+         return;
+      }
+      printStatNode(node, "");
+   }
+
    private async runPrefs(args: string[]): Promise<void> {
       const section = args[0]?.toLowerCase();
       const rest = args.slice(1);
@@ -1695,6 +1745,11 @@ class Repl {
 
       if (verb === "show" && command[1]?.toLowerCase() === "prefs" && command[2]) {
          await this.runShowPrefs(command[2].toLowerCase());
+         return;
+      }
+
+      if (verb === "show" && command[1]?.toLowerCase() === "statstree") {
+         await this.runShowStatsTree(command[2]);
          return;
       }
 
