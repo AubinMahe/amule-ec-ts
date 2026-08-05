@@ -1,4 +1,8 @@
+import { setTimeout } from "node:timers/promises";
 import * as ec from "../../../src/index.js";
+import { printSearchResults } from "../views/search.js";
+
+const SEARCH_POLL_INTERVAL_MS = 250;
 
 export class FriendsController {
 
@@ -20,10 +24,31 @@ export class FriendsController {
       console.error("Usage: friend add <ecid>  |  friend add <hash> <ip> <port> <name>");
    }
 
+   /** Browses a currently-connected client's shared files ("View Files") - polls to completion, then prints results like `search <keywords>` does. */
+   public async browse(args: string[]): Promise<void> {
+      const ecidText = args[0];
+      if (!ecidText) {
+         console.error("Usage: friend browse <client-ecid>");
+         return;
+      }
+      const session = await this.friends.browseSharedFiles(BigInt(ecidText));
+      let progress: ec.ECSearchProgress;
+      do {
+         await setTimeout(SEARCH_POLL_INTERVAL_MS);
+         progress = await session.progress();
+      } while (progress.state === ec.ECSearchLifecycleState.RUNNING);
+      await session.fetch();
+      printSearchResults(session.results);
+   }
+
    public async dispatch(args: string[]): Promise<void> {
       const sub = args[0]?.toLowerCase();
       if (sub === "add") {
          await this.add(args.slice(1));
+         return;
+      }
+      if (sub === "browse") {
+         await this.browse(args.slice(1));
          return;
       }
       if (sub === "remove") {
@@ -47,6 +72,6 @@ export class FriendsController {
          console.log(`Friend slot ${state}: ecid=${ecid}.`);
          return;
       }
-      console.error("Usage: friend <add ...|remove <ecid>|slot <ecid> <on|off>>");
+      console.error("Usage: friend <add ...|browse <client-ecid>|remove <ecid>|slot <ecid> <on|off>>");
    }
 }

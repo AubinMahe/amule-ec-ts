@@ -154,6 +154,7 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["show statstree <key>", "just the subtree rooted at a given node key (e.g. \"uploads\")"],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
+   ["friend browse <client-ecid>", "browse a connected client's shared files (\"View Files\") - requires multi-search"],
    ["friend remove <ecid>", "remove a friend"],
    ["friend slot <ecid> <on|off>", "reserve/clear a friend's upload slot"],
    ["comment <hash> <rating 0-5> <text>", "set a shared file's comment/rating"],

@@ -3,6 +3,7 @@ import { ECConnection } from "./ECConnection.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
+import { SearchSession } from "./Search.js";
 import {
    ECCustomTag,
    ECUInt8Tag,
@@ -17,13 +18,8 @@ const debug = debuglog("amule-ec:friends");
 /**
  * Manages the daemon's friend list - EC_OP_FRIEND, multiplexed by which
  * top-level tag the request carries (add by ECID, add by hash/ip/port/
- * name, remove, set-friend-slot; a fifth mode, browsing a friend's shared
- * files, is deliberately not wrapped here - confirmed against
- * amule-remote-gui.cpp's SendBrowseRequest(): without multi-search
- * capability, which this library never advertises (see Search.ts's class
- * doc), the daemon's fire-and-forget EC_OP_NOOP reply carries no result
- * path at all - even the reference GUI skips opening a results view for
- * exactly this reason on a legacy connection).
+ * name, remove, set-friend-slot, browse a connected client's shared files
+ * - see browseSharedFiles()).
  *
  * There is no EC_OP_GET_FRIEND_LIST or equivalent anywhere in the EC
  * protocol - the friend list is only ever delivered through a different,
@@ -208,5 +204,71 @@ export class Friends {
          );
       }
       debug("setFriendSlot: ecid=%s, enabled=%s", ecid, enabled);
+   }
+
+   /**
+    * Requests a currently-connected client's shared file list ("View
+    * Files" in the reference GUI) - EC_OP_FRIEND with EC_TAG_FRIEND_SHARED
+    * > EC_TAG_CLIENT.
+    *
+    * Confirmed against ExternalConn.cpp's EC_TAG_FRIEND_SHARED branch
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2345-L2392):
+    * requires multiSearch (see ECEngineStartOptions.multiSearch's doc) -
+    * without it the daemon never allocates a search ID for the browse
+    * (`browseId = multiSearch ? AllocateBrowseSearchId() : 0`) and replies
+    * a bare EC_OP_NOOP, no result path at all; the reference GUI itself
+    * only offers "View Files" once multi-search is negotiated, for the
+    * same reason - so this throws up front rather than returning a
+    * SearchSession nothing will ever resolve.
+    *
+    * On success the daemon replies EC_OP_STRINGS carrying EC_TAG_SEARCH_ID
+    * - deliberately the exact shape Search.start()'s own reply has
+    * (BuildBrowseReply() reuses it, ExternalConn.cpp:2279-2293) - so the
+    * browse behaves like any other search from here on: poll the returned
+    * SearchSession's progress(), then fetch() for the peer's shared files
+    * as SearchResult entries.
+    *
+    * Only the EC_TAG_CLIENT form is wrapped - browsing a currently-
+    * connected client, by its *client* ECID (e.g. Uploads.UploadClient.ecid
+    * or Downloads/Search results) - not the EC_TAG_FRIEND form (browsing a
+    * saved friend, connected or not, by their separately-assigned *friend*
+    * ECID - see this class's doc on why that's a different ECID space).
+    * Add that form too if a consumer needs to browse an offline friend.
+    */
+   public async browseSharedFiles(clientEcid: bigint): Promise<SearchSession> {
+      if (!this.connection.remoteCapabilities.multiSearch) {
+         throw new Error(
+            "The daemon did not confirm EC_TAG_CAN_MULTI_SEARCH during authentication - " +
+               "browsing a client's shared files has no result path without it.",
+         );
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_FRIEND);
+      request.add(
+         new ECCustomTag(ECTagNames.EC_TAG_FRIEND_SHARED, new Uint8Array(), [
+            new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)),
+         ]),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason =
+            reasonTag instanceof ECStringTag
+               ? reasonTag.value
+               : `Failed to browse shared files for client ECID ${clientEcid}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
+         throw new Error(
+            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
+         );
+      }
+      const idTag = reply.find(ECTagNames.EC_TAG_SEARCH_ID);
+      const id = idTag?.intValue;
+      if (id === undefined) {
+         throw new Error("EC_OP_STRINGS reply carried no EC_TAG_SEARCH_ID.");
+      }
+      debug("browseSharedFiles: clientEcid=%s, searchId=%s", clientEcid, id);
+      return new SearchSession(this.connection, id);
    }
 }

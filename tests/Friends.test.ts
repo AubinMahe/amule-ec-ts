@@ -135,3 +135,60 @@ describe("Friends.setFriendSlot", () => {
       await expectRejection(friends.setFriendSlot(7n, true), /EC_OP_NOOP/);
    });
 });
+
+describe("Friends.browseSharedFiles", () => {
+   it("throws when the daemon never confirmed EC_TAG_CAN_MULTI_SEARCH, without sending anything", async () => {
+      const fake = createFakeConnection();
+      const friends = new ec.Friends(fake.connection);
+
+      await expectRejection(friends.browseSharedFiles(7n), /EC_TAG_CAN_MULTI_SEARCH/);
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("sends a bare EC_TAG_FRIEND_SHARED with an EC_TAG_CLIENT child and returns a SearchSession on EC_OP_STRINGS", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.multiSearch = true;
+      const friends = new ec.Friends(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_STRINGS);
+      reply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCH_ID, 42));
+      fake.queueReply(reply);
+
+      const session = await friends.browseSharedFiles(7n);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_FRIEND);
+      const sharedTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_FRIEND_SHARED);
+      expect(sharedTag).to.be.instanceOf(ec.ECCustomTag);
+      expect(sharedTag?.findChild(ec.ECTagNames.EC_TAG_CLIENT)?.intValue).to.equal(7n);
+      expect(session).to.be.instanceOf(ec.SearchSession);
+      expect(session.id).to.equal(42n);
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED (e.g. the client disconnected first)", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.multiSearch = true;
+      const friends = new ec.Friends(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Client not found."));
+      fake.queueReply(failure);
+
+      await expectRejection(friends.browseSharedFiles(7n), /Client not found/);
+   });
+
+   it("throws when the daemon replies with an unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.multiSearch = true;
+      const friends = new ec.Friends(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await expectRejection(friends.browseSharedFiles(7n), /EC_OP_STRINGS/);
+   });
+
+   it("throws when EC_OP_STRINGS carries no EC_TAG_SEARCH_ID", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.multiSearch = true;
+      const friends = new ec.Friends(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_STRINGS));
+
+      await expectRejection(friends.browseSharedFiles(7n), /EC_TAG_SEARCH_ID/);
+   });
+});
