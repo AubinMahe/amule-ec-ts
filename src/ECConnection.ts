@@ -286,6 +286,13 @@ export class ECConnection extends events.EventEmitter {
             new Uint8Array(),
          ),
       );
+      // Unconditional too - see ECCapabilities.partialUpdate's doc.
+      authRequest.add(
+         new ECCustomTag(
+            ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE,
+            new Uint8Array(),
+         ),
+      );
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
@@ -329,9 +336,6 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.largeTagCount =
          this.localCapabilities.largeTagCount &&
          reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
-      this.remoteCapabilities.partialUpdate =
-         this.localCapabilities.partialUpdate &&
-         reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
       this.remoteCapabilities.multiSearch =
          this.localCapabilities.multiSearch &&
          reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
@@ -342,6 +346,10 @@ export class ECConnection extends events.EventEmitter {
       );
       // Unconditional request above too - see ECCapabilities.searchList's doc.
       this.remoteCapabilities.searchList = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_LIST);
+      // Unconditional request above too - see ECCapabilities.partialUpdate's doc.
+      this.remoteCapabilities.partialUpdate = reply.has(
+         ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE,
+      );
    }
 
    public async send(packet: ECPacket): Promise<void> {
