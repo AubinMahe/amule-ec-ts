@@ -1,0 +1,170 @@
+import * as ec from "../../src/index.js";
+
+export const PRIORITY_NAMES: Record<string, ec.ECDownloadPriority> = {
+   low: ec.ECDownloadPriority.PR_LOW,
+   normal: ec.ECDownloadPriority.PR_NORMAL,
+   high: ec.ECDownloadPriority.PR_HIGH,
+   veryhigh: ec.ECDownloadPriority.PR_VERYHIGH,
+   verylow: ec.ECDownloadPriority.PR_VERY_LOW,
+   auto: ec.ECDownloadPriority.PR_AUTO,
+   powershare: ec.ECDownloadPriority.PR_POWERSHARE,
+};
+
+export const SERVER_PRIORITY_NAMES: Record<string, ec.ServerPriority> = {
+   normal: ec.ServerPriority.SRV_PR_NORMAL,
+   high: ec.ServerPriority.SRV_PR_HIGH,
+   low: ec.ServerPriority.SRV_PR_LOW,
+};
+
+/** One row per command: keyword(s)/arguments, then a short description - see HELP below. */
+const HELP_ENTRIES: readonly (readonly [command: string, description: string])[] = [
+   ["help", "show this help"],
+   ["info", "negotiated capabilities"],
+   ["status", "connection state and transfer stats"],
+   ["show statsgraphs", "transfer-history graph points since the last call"],
+   ["show dl", "download queue"],
+   ["show ul", "upload queue"],
+   ["show shared", "shared files"],
+   ["show servers", "known server list"],
+   ["show log", "daemon log"],
+   ["reset log", "clear the daemon log"],
+   ["show log last", "the daemon log's single latest line"],
+   ["addlog <text>", "append a line to the daemon log"],
+   ["show debug log", "daemon debug log"],
+   ["reset debug log", "clear the daemon debug log"],
+   ["adddebuglog <text>", "append a line to the daemon debug log"],
+   ["connect <ip:port>", "connect to a specific server"],
+   ["connect", "connect to ed2k/Kad per the daemon's preferences"],
+   ["disconnect", "disconnect from ed2k/Kad"],
+   ["search <keywords>", "start a search"],
+   ["search stop", "stop the running search"],
+   ["search more [id]", "re-ask Kad peers for more results (current search if id omitted)"],
+   ["show searches", "list every search the daemon currently holds"],
+   ["download <hash>...", "download one or more search results"],
+   ["cancel <hash>", "cancel a download"],
+   ["pause <hash>", "pause a download"],
+   ["resume <hash>", "resume a paused download"],
+   ["stop <hash>", "stop a download"],
+   [
+      `priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+      "set a download's priority",
+   ],
+   ["addlink <ed2k-link>", "start a download from a link"],
+   ["swap <this|auto|others> <hash>", "swap A4AF sources for a download"],
+   ["setcat <hash> <category-index>", "assign a download to a category"],
+   ["category create <title> <path> [comment] [color] [prio]", "create a download category"],
+   [
+      "category update <index> <title> <path> [comment] [color] [prio]",
+      "update a download category",
+   ],
+   ["category delete <index>", "delete a download category"],
+   ["clear completed", "clear completed downloads"],
+   ["kad start", "start the Kademlia network"],
+   ["kad stop", "stop the Kademlia network"],
+   ["kad bootstrap <ip> <port>", "bootstrap Kad from a known node"],
+   ["kad update <url>", "update Kad's nodes.dat from a URL"],
+   ["server disconnect", "disconnect from the current ed2k server"],
+   [
+      `server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`,
+      "set a known server's static flag and/or priority",
+   ],
+   ["server remove <ip:port>", "remove a server from the known list"],
+   ["server add <ip:port> [name]", "add a server to the known list"],
+   ["server update <url>", "update the known server list from a server.met URL"],
+   ["show server log", "daemon's ed2k-connection log"],
+   ["reset server log", "clear the ed2k-connection log"],
+   [
+      `sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
+      "set a shared file's upload priority",
+   ],
+   ["show shareddirs", "list the daemon's shared directories"],
+   ["shareddir add <path> [recursive]", "add a shared directory"],
+   ["shareddir remove <path>", "remove a shared directory"],
+   ["shutdown", "tell the daemon to terminate"],
+   ["checkversion", "trigger an on-demand check for a new aMule release"],
+   ["swapclient <client-ecid> <hash>", "move an uploading client to another download"],
+   ["verify <hash>", "verify a shared file's local data against its hash"],
+   ["ipfilter reload", "reload the IP filter from its local file"],
+   ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
+   ["show prefs general", "general preferences (nick, user hash, version-check)"],
+   [
+      "prefs general checknewversion <on|off>",
+      "toggle the check-new-version preference (preserves other fields)",
+   ],
+   ["show prefs messagefilter", "message filter preferences"],
+   ["prefs messagefilter <on|off>", "enable/disable the message filter (preserves other fields)"],
+   ["show prefs connections", "connection preferences"],
+   [
+      "prefs connections reconnect <on|off>",
+      "toggle ed2k auto-reconnect (preserves other fields)",
+   ],
+   ["show prefs files", "files preferences"],
+   [
+      "prefs files checkfreespace <on|off>",
+      "toggle the free-disk-space check (preserves other fields)",
+   ],
+   ["show prefs directories", "directories preferences"],
+   [
+      "prefs directories autorescan <on|off>",
+      "toggle auto-rescan of shared directories (preserves other fields)",
+   ],
+   ["show prefs security", "security/IP-filter preferences"],
+   [
+      "prefs security filterlan <on|off>",
+      "toggle filtering of LAN IPs (preserves other fields)",
+   ],
+   ["show prefs onlinesig", "online signature preferences"],
+   [
+      "prefs onlinesig <on|off>",
+      "enable/disable the online signature (preserves other fields)",
+   ],
+   ["show prefs servers", "server-list preferences"],
+   [
+      "prefs servers autoupdate <on|off>",
+      "toggle auto-update of the known server list (preserves other fields)",
+   ],
+   ["show prefs kademlia", "Kademlia nodes.dat update URL"],
+   ["prefs kademlia seturl <url>", "set the Kademlia nodes.dat update URL"],
+   [
+      "show prefs remotecontrols",
+      "webserver/amuleapi preferences (ports, autorun, gzip - password hashes never printed)",
+   ],
+   [
+      "prefs remotecontrols gzip <on|off>",
+      "toggle webserver gzip compression (preserves other fields, including passwords)",
+   ],
+   ["show prefs ip2country", "GeoIP preferences and live resolver status"],
+   [
+      "prefs ip2country autoupdate <on|off>",
+      "toggle automatic GeoIP database updates (preserves other fields)",
+   ],
+   ["show prefs coretweaks", "core tweaks preferences"],
+   [
+      "prefs coretweaks verbose <on|off>",
+      "toggle core verbose logging (preserves other fields)",
+   ],
+   ["show categories", "list download categories"],
+   [
+      "show update",
+      "poll the combined incremental-update feed (shared files/downloads/clients/servers/friends)",
+   ],
+   ["show statstree", "the daemon's full statistics tree"],
+   ["show statstree <key>", "just the subtree rooted at a given node key (e.g. \"uploads\")"],
+   ["friend add <ecid>", "add a connected client as a friend"],
+   ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
+   ["friend remove <ecid>", "remove a friend"],
+   ["friend slot <ecid> <on|off>", "reserve/clear a friend's upload slot"],
+   ["comment <hash> <rating 0-5> <text>", "set a shared file's comment/rating"],
+   ["kadnotes <hash>", "search Kad for a file's community notes"],
+   ["show chat", "drain buffered incoming chat messages"],
+   ["quit / exit / Ctrl-D", "leave the REPL"],
+];
+
+const HELP_COMMAND_WIDTH = Math.max(...HELP_ENTRIES.map(([command]) => command.length));
+
+export const HELP =
+   "Commands:\n" +
+   HELP_ENTRIES.map(
+      ([command, description]) => `  ${command.padEnd(HELP_COMMAND_WIDTH)}  ${description}`,
+   ).join("\n") +
+   "\n";
