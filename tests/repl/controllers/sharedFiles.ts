@@ -16,6 +16,11 @@ export class SharedFilesController {
       printSharedFiles(this.sharedFiles.files);
    }
 
+   public async reload(): Promise<void> {
+      await this.sharedFiles.reload();
+      console.log("Shared file list reload requested.");
+   }
+
    public async verify(args: string[]): Promise<void> {
       const hash = args[0];
       if (!hash) {

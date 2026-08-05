@@ -7,7 +7,7 @@ are covered by a unit test. Only 6 (the auth handshake + `NOOP`) are
 exercised through the full wire-level fake TCP server (`tests/fakeEcServer.ts`,
 byte-for-byte framing/compression/capabilities) - every other tested opcode
 goes through the lighter in-memory `FakeConnection` stub in `testUtils.ts`
-(queued replies, no real socket). The REPL column reflects the 84 opcodes
+(queued replies, no real socket). The REPL column reflects the 86 opcodes
 reachable on a REPL command's golden (success) path - see "REPL coverage"
 below for the command list. `N/A` marks the two opcodes (`AUTH_FAIL`,
 `FAILED`) that are inherently error-path-only replies - no REPL command
@@ -44,8 +44,8 @@ blank cell, which just means "not done yet, but could be".
 |0x1f|`DLOAD_QUEUE`|Download queue reply / push notification|✓|✓||✓|
 |0x20|`ULOAD_QUEUE`|Upload queue reply / push notification|✓|✓||✓|
 |0x22|`SHARED_FILES`|Shared files reply / push notification|✓|✓||✓|
-|0x23|`SHAREDFILES_RELOAD`|Rescans the shared directories|✓|✓|||
-|0x25|`RENAME_FILE`|Renames a partial/shared file|✓|✓|||
+|0x23|`SHAREDFILES_RELOAD`|Rescans the shared directories|✓|✓||✓|
+|0x25|`RENAME_FILE`|Renames a partial/shared file|✓|✓||✓|
 |0x26|`SEARCH_START`|Starts a search|✓|✓||✓|
 |0x27|`SEARCH_STOP`|Stops the running search|✓|✓||✓|
 |0x28|`SEARCH_RESULTS`|Fetches the current search results|✓|✓||✓|
@@ -107,7 +107,7 @@ blank cell, which just means "not done yet, but could be".
 
 ## REPL coverage
 
-`tests/repl/main.ts` drives all 19 feature classes: `Downloads`, `Uploads`,
+The REPL (`tests/repl/`) drives all 19 feature classes: `Downloads`, `Uploads`,
 `SharedFiles`, `Status`, `StatsGraphs`, `Servers`, `Search`, `Log`, `Kad`,
 `ServerLog`, `Daemon`, `DebugLog`, `Friends`, `Chat`, `Categories`,
 `IPFilter`, `Preferences`, `Update` and `StatsTree` - commands
@@ -135,6 +135,7 @@ blank cell, which just means "not done yet, but could be".
 `clear completed`, `kad start`, `kad stop`,
 `kad bootstrap <ip> <port>`, `kad update <url>`, `shutdown`,
 `checkversion`, `swapclient <client-ecid> <hash>`, `verify <hash>`,
+`sharedreload`, `rename <hash> <new-name>`,
 `ipfilter reload`, `ipfilter update [url]`,
 `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
 `friend remove <ecid>`, `friend slot <ecid> <on|off>`,

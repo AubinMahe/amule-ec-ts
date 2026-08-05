@@ -80,6 +80,8 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["show shareddirs", "list the daemon's shared directories"],
    ["shareddir add <path> [recursive]", "add a shared directory"],
    ["shareddir remove <path>", "remove a shared directory"],
+   ["sharedreload", "rescan the shared directories from disk"],
+   ["rename <hash> <new-name>", "rename a download or shared file"],
    ["shutdown", "tell the daemon to terminate"],
    ["checkversion", "trigger an on-demand check for a new aMule release"],
    ["swapclient <client-ecid> <hash>", "move an uploading client to another download"],
