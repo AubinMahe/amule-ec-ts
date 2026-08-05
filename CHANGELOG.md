@@ -12,6 +12,29 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-08-05
+
+### Added
+
+- `Update` class (`EC_OP_GET_UPDATE`) - amuleGUI's combined incremental-update
+  feed, bundling shared files, downloads, clients, servers and the friend
+  list into a single poll. New `ClientUpdate`/`ServerUpdate`/`FriendInfo`
+  classes (richer, mergeable siblings of `UploadClient`/`ServerInfo` - this
+  opcode's per-connection value-map diffing can omit any field unchanged
+  since the connection's last poll, so every entry merges onto the previous
+  snapshot rather than replacing it) and `ECClientSourceFrom`/`ECIdentState`
+  enums. `Update.fetch()` always sends `EC_DETAIL_LEVEL = EC_DETAIL_INC_UPDATE`
+  - omitting it routes the daemon into the same `wxFAIL`/`EC_OP_FAILED` path
+  as an actually-unknown opcode.
+
+### Fixed
+
+- Wired up `ECCapabilities.partialUpdate`, previously declared but never
+  actually sent or read: `EC_TAG_CAN_PARTIAL_UPDATE` is now unconditionally
+  advertised at auth (same shape as `sharedDirsConfig`/`searchList`) and its
+  echo is read into `remoteCapabilities.partialUpdate`, which `Update.fetch()`
+  requires.
+
 ## [2.11.0] - 2026-08-04
 
 ### Added

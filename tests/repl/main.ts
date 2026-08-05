@@ -155,6 +155,10 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
       "toggle core verbose logging (preserves other fields)",
    ],
    ["show categories", "list download categories"],
+   [
+      "show update",
+      "poll the combined incremental-update feed (shared files/downloads/clients/servers/friends)",
+   ],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
    ["friend remove <ecid>", "remove a friend"],
@@ -513,6 +517,33 @@ function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
    );
 }
 
+function printUpdate(update: ec.Update): void {
+   console.log(
+      `${update.sharedFiles.length} shared file(s), ${update.downloads.length} download(s), ${update.clients.length} client(s), ${update.servers.length} server(s), ${update.friends.length} friend(s)`,
+   );
+   for (const file of update.sharedFiles) {
+      console.log(`  [shared] ${file.name ?? "(unchanged)"}  hash=${file.hash ?? "?"}`);
+   }
+   for (const file of update.downloads) {
+      console.log(`  [download] ${file.name ?? "(unchanged)"}  hash=${file.hash ?? "?"}`);
+   }
+   for (const client of update.clients) {
+      console.log(
+         `  [client] ecid=${client.ecid}  name=${client.name ?? "(unchanged)"}  upSpeed=${client.uploadSpeed ?? "?"}  downSpeed=${client.downloadSpeed ?? "?"}`,
+      );
+   }
+   for (const server of update.servers) {
+      console.log(
+         `  [server] ecid=${server.ecid}  name=${server.name ?? "(unchanged)"}  ${server.ip ?? "?"}:${server.port ?? "?"}`,
+      );
+   }
+   for (const friend of update.friends) {
+      console.log(
+         `  [friend] ecid=${friend.ecid}  name=${friend.name ?? "(unchanged)"}  linkedClientEcid=${friend.linkedClientEcid ?? "?"}`,
+      );
+   }
+}
+
 function printCategories(categories: readonly ec.Category[]): void {
    if (categories.length === 0) {
       console.log("No categories beyond the built-in default (\"All\").");
@@ -740,6 +771,7 @@ class Repl {
    private readonly chat        : ec.Chat;
    private readonly ipFilter    : ec.IPFilter;
    private readonly preferences : ec.Preferences;
+   private readonly update      : ec.Update;
    private currentSearch?: ec.SearchSession;
 
    constructor(private readonly connection: ec.ECConnection) {
@@ -760,6 +792,7 @@ class Repl {
       this.chat        = new ec.Chat(this.connection);
       this.ipFilter    = new ec.IPFilter(this.connection);
       this.preferences = new ec.Preferences(this.connection);
+      this.update      = new ec.Update(this.connection);
       this.connection.onNotification((packet) => {this.applyNotification(packet)});
    }
 
@@ -1709,6 +1742,12 @@ class Repl {
          case "show categories": {
             const categories = await this.preferences.listCategories();
             printCategories(categories);
+            break;
+         }
+
+         case "show update": {
+            await this.update.fetch();
+            printUpdate(this.update);
             break;
          }
 

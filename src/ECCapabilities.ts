@@ -4,6 +4,16 @@ export class ECCapabilities {
    public utf8Numbers = false;
    public notify = false;
    public largeTagCount = false;
+   /**
+    * Whether the daemon serves the partial-update ("skip unchanged, signal
+    * deletions with EC_TAG_FILE_REMOVED") protocol for EC_OP_GET_UPDATE and
+    * friends - only meaningful on `remoteCapabilities`, same "unconditionally
+    * advertised, remoteCapabilities-only" shape as `sharedDirsConfig`/
+    * `searchList`: EC_TAG_CAN_PARTIAL_UPDATE isn't a client-side preference
+    * to gate on, it's always advertised, and old daemons simply ignore the
+    * unknown tag and fall back to alive-marker/absence-implies-deletion
+    * semantics for this connection - see Update's class doc.
+    */
    public partialUpdate = false;
    public preferNoZlib = false;
    public multiSearch = false;
