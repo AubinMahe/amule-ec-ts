@@ -152,3 +152,11 @@ blank cell, which just means "not done yet, but could be".
 `show prefs ip2country`, `prefs ip2country autoupdate <on|off>`,
 `show prefs coretweaks`, `prefs coretweaks verbose <on|off>`,
 `show categories`.
+
+## Housekeeping
+
+`tests/repl/main.ts` is a single ~1900-line file holding one monolithic
+class (command parsing, all `runXxx`/`printXxx` handlers, and the
+notification trackers). Splitting it into multiple files/classes - one
+per feature area, mirroring `src/`'s own per-feature-class layout - is
+not yet done.
