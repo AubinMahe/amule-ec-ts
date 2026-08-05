@@ -16,6 +16,18 @@ export class DownloadsController {
       printDownloadFiles(this.downloads.files);
    }
 
+   /** Works on a shared file too, not just a download - see Downloads.rename()'s doc. */
+   public async rename(args: string[]): Promise<void> {
+      const hash = args[0];
+      const newName = args.slice(1).join(" ");
+      if (!hash || !newName) {
+         console.error("Usage: rename <hash> <new-name>");
+         return;
+      }
+      await this.downloads.rename(hash, newName);
+      console.log(`Renamed: ${hash} -> ${newName}.`);
+   }
+
    public async cancel(args: string[]): Promise<void> {
       const hash = args[0];
       if (!hash) {
