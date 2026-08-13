@@ -12,6 +12,18 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-08-13
+
+### Added
+
+- `ServerInfo.priority`/`ServerInfo.isStatic` - `Servers.fetch()` already
+  requests `EC_DETAIL_FULL`, which carries `EC_TAG_SERVER_PRIO`/
+  `EC_TAG_SERVER_STATIC` on every `EC_TAG_SERVER` entry, but `ServerInfo`
+  didn't decode them - `Servers.setStaticPrio()` was write-only, with no
+  way to read a server's current priority/static-pin state back. Same
+  decoding `ServerUpdate` (`Update.ts`) already applies to the identical
+  tags.
+
 ## [2.14.0] - 2026-08-05
 
 ### Added
