@@ -11,13 +11,7 @@ export const enum ECFlag {
 
 const VALIDATION_MASK = (1 << 5) | (1 << 6);
 
-const RESERVED_MASK =
-   ~(
-      ECFlag.ZLIB |
-      ECFlag.UTF8_NUMBERS |
-      ECFlag.LARGE_TAG_COUNT |
-      ECFlag.PROTOCOL_MARKER
-   ) >>> 0;
+const RESERVED_MASK = ~(ECFlag.ZLIB | ECFlag.UTF8_NUMBERS | ECFlag.LARGE_TAG_COUNT | ECFlag.PROTOCOL_MARKER) >>> 0;
 
 function has(flags: number, flag: ECFlag): boolean {
    return (flags & flag) !== 0;
@@ -36,19 +30,11 @@ export const ECFlags = {
    VALIDATION_MASK,
    RESERVED_MASK,
 
-   create(
-      compressed = false,
-      utf8Numbers = false,
-      largeTagCount = false,
-   ): number {
+   create(compressed = false, utf8Numbers = false, largeTagCount = false): number {
       let flags: number = ECFlags.DEFAULT;
       flags = compressed ? set(flags, ECFlag.ZLIB) : clear(flags, ECFlag.ZLIB);
-      flags = utf8Numbers
-         ? set(flags, ECFlag.UTF8_NUMBERS)
-         : clear(flags, ECFlag.UTF8_NUMBERS);
-      flags = largeTagCount
-         ? set(flags, ECFlag.LARGE_TAG_COUNT)
-         : clear(flags, ECFlag.LARGE_TAG_COUNT);
+      flags = utf8Numbers ? set(flags, ECFlag.UTF8_NUMBERS) : clear(flags, ECFlag.UTF8_NUMBERS);
+      flags = largeTagCount ? set(flags, ECFlag.LARGE_TAG_COUNT) : clear(flags, ECFlag.LARGE_TAG_COUNT);
       return flags;
    },
 

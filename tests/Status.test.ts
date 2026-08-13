@@ -36,9 +36,7 @@ describe("Status.fetch", () => {
       const fake = createFakeConnection();
       const status = new ec.Status(fake.connection);
       fake.queueReply(statsReply());
-      fake.queueReply(
-         connStateReply(connStateTag({ bitmask: 0x11, ed2kId: 999_999, serverName: "eMule Security" })),
-      );
+      fake.queueReply(connStateReply(connStateTag({ bitmask: 0x11, ed2kId: 999_999, serverName: "eMule Security" })));
 
       await status.fetch();
 

@@ -26,7 +26,6 @@ const debug = debuglog("amule-ec:chat");
  * uint32 ECIDs.
  */
 export class ChatMessage {
-
    public readonly senderId: bigint;
    public readonly text: string;
 
@@ -53,7 +52,6 @@ export class ChatMessage {
  * `messages`, never again on a later call.
  */
 export class Chat implements ECFetchable {
-
    public messages: readonly ChatMessage[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -69,9 +67,7 @@ export class Chat implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_CHAT_MESSAGES) {
-         throw new Error(
-            `Expected EC_OP_CHAT_MESSAGES, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_CHAT_MESSAGES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       this.messages = reply.tags
          .filter((tag) => {

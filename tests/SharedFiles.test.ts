@@ -3,9 +3,7 @@ import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 /** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
-function commentsTag(
-   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
-): ec.ECTag {
+function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {
       children.push(
@@ -27,30 +25,19 @@ function sharedFileTag(fields: {
    kadCommentSearching?: boolean;
 }): ec.ECTag {
    const children: ec.ECTag[] = [
-      new ec.ECHash16Tag(
-         ec.ECTagNames.EC_TAG_PARTFILE_HASH,
-         new Uint8Array(Buffer.from(fields.hash, "hex")),
-      ),
+      new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
    ];
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
-      children.push(
-         new ec.ECUInt64Tag(
-            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
-            fields.kadCommentSearching ? 1n : 0n,
-         ),
-      );
+      children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, fields.ecid, children);
 }
 
 /** A removal push notification's shape: own data IS the hash, tag name is EC_TAG_PARTFILE (see SharedFile's class doc). */
 function sharedFileRemovalTag(hash: string): ec.ECTag {
-   return new ec.ECHash16Tag(
-      ec.ECTagNames.EC_TAG_PARTFILE,
-      new Uint8Array(Buffer.from(hash, "hex")),
-   );
+   return new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")));
 }
 
 describe("parseFileComments", () => {
@@ -68,12 +55,8 @@ describe("parseFileComments", () => {
       const comments = ec.parseFileComments(tag);
 
       expect(comments).to.have.lengthOf(2);
-      expect(comments?.[0]).to.deep.equal(
-         new ec.FileComment("Alice", "one.avi", ec.FileRating.EXCELLENT, "Great!"),
-      );
-      expect(comments?.[1]).to.deep.equal(
-         new ec.FileComment("Bob", "one (copy).avi", ec.FileRating.POOR, "Meh."),
-      );
+      expect(comments?.[0]).to.deep.equal(new ec.FileComment("Alice", "one.avi", ec.FileRating.EXCELLENT, "Great!"));
+      expect(comments?.[1]).to.deep.equal(new ec.FileComment("Bob", "one (copy).avi", ec.FileRating.POOR, "Meh."));
    });
 
    it("returns undefined when the file tag carries no EC_TAG_PARTFILE_COMMENTS container", () => {
@@ -139,9 +122,7 @@ describe("SharedFiles.fetch", () => {
             ecid: 1,
             hash: hexHash("a"),
             name: "one.avi",
-            comments: commentsTag([
-               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
-            ]),
+            comments: commentsTag([{ userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" }]),
             kadCommentSearching: true,
          }),
       );
@@ -196,10 +177,7 @@ describe("SharedFiles.setPriority", () => {
       const sharedFiles = new ec.SharedFiles(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
-      await expectRejection(
-         sharedFiles.setPriority(hexHash("a"), ec.ECDownloadPriority.PR_HIGH),
-         /EC_OP_NOOP/,
-      );
+      await expectRejection(sharedFiles.setPriority(hexHash("a"), ec.ECDownloadPriority.PR_HIGH), /EC_OP_NOOP/);
    });
 });
 
@@ -228,10 +206,7 @@ describe("SharedFiles.getSharedDirs", () => {
       const dirs = await sharedFiles.getSharedDirs();
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_SHARED_DIRS);
-      expect(dirs).to.deep.equal([
-         new ec.SharedDir("/incoming", false),
-         new ec.SharedDir("/media", true),
-      ]);
+      expect(dirs).to.deep.equal([new ec.SharedDir("/incoming", false), new ec.SharedDir("/media", true)]);
    });
 
    it("throws when the daemon replies with an unexpected opcode", async () => {
@@ -259,10 +234,7 @@ describe("SharedFiles.setSharedDirs", () => {
       const sharedFiles = new ec.SharedFiles(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_SET_SHARED_DIRS));
 
-      await sharedFiles.setSharedDirs([
-         new ec.SharedDir("/incoming", false),
-         new ec.SharedDir("/media", true),
-      ]);
+      await sharedFiles.setSharedDirs([new ec.SharedDir("/incoming", false), new ec.SharedDir("/media", true)]);
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SET_SHARED_DIRS);
       const dirTags = fake.sent[0]?.tags.filter((tag) => {
@@ -274,9 +246,7 @@ describe("SharedFiles.setSharedDirs", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(dirTags?.[0]?.findChild(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE)).to.be.undefined;
       expect((dirTags?.[1] as ec.ECStringTag).value).to.equal("/media");
-      expect(
-         dirTags?.[1]?.findChild(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE)?.intValue,
-      ).to.equal(1n);
+      expect(dirTags?.[1]?.findChild(ec.ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE)?.intValue).to.equal(1n);
    });
 
    it("parses EC_TAG_SHAREDDIR_REJECTED entries into SharedDirRejection, empty when none rejected", async () => {
@@ -292,9 +262,7 @@ describe("SharedFiles.setSharedDirs", () => {
 
       const rejections = await sharedFiles.setSharedDirs([new ec.SharedDir("/nope", false)]);
 
-      expect(rejections).to.deep.equal([
-         new ec.SharedDirRejection("/nope", ec.SharedDirRejectReason.MISSING_OR_NOT_A_DIRECTORY),
-      ]);
+      expect(rejections).to.deep.equal([new ec.SharedDirRejection("/nope", ec.SharedDirRejectReason.MISSING_OR_NOT_A_DIRECTORY)]);
    });
 
    it("throws when the daemon replies with an unexpected opcode", async () => {
@@ -329,10 +297,7 @@ describe("SharedFiles.setComment", () => {
       const sharedFiles = new ec.SharedFiles(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
-      await expectRejection(
-         sharedFiles.setComment(hexHash("a"), "x", ec.FileRating.NOT_RATED),
-         /EC_OP_NOOP/,
-      );
+      await expectRejection(sharedFiles.setComment(hexHash("a"), "x", ec.FileRating.NOT_RATED), /EC_OP_NOOP/);
    });
 });
 
@@ -441,9 +406,7 @@ describe("SharedFileTracker", () => {
             ecid: 1,
             hash: hexHash("a"),
             name: "one.avi",
-            comments: commentsTag([
-               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
-            ]),
+            comments: commentsTag([{ userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" }]),
             kadCommentSearching: true,
          }),
       );

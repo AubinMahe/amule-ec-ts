@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 import { printStatsGraphs } from "../views/statsGraphs.js";
 
 export class StatsGraphsController {
-
    public constructor(private readonly statsGraphs: ec.StatsGraphs) {}
 
    public async show(): Promise<void> {

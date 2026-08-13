@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 import { printStatNode } from "../views/statsTree.js";
 
 export class StatsTreeController {
-
    public constructor(private readonly statsTree: ec.StatsTree) {}
 
    public async show(key?: string): Promise<void> {

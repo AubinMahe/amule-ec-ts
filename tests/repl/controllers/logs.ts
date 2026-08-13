@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 import { printLog } from "../views/log.js";
 
 export class LogController {
-
    public constructor(private readonly log: ec.Log) {}
 
    public async show(): Promise<void> {
@@ -32,7 +31,6 @@ export class LogController {
 }
 
 export class DebugLogController {
-
    public constructor(private readonly debugLog: ec.DebugLog) {}
 
    public async show(): Promise<void> {
@@ -58,7 +56,6 @@ export class DebugLogController {
 }
 
 export class ServerLogController {
-
    public constructor(private readonly serverLog: ec.ServerLog) {}
 
    public async show(): Promise<void> {

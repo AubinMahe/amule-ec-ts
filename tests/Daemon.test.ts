@@ -34,9 +34,7 @@ describe("Daemon.checkVersion", () => {
       const fake = createFakeConnection();
       const daemon = new ec.Daemon(fake.connection);
       const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
-      failure.add(
-         new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Version check throttled; try again shortly."),
-      );
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Version check throttled; try again shortly."));
       fake.queueReply(failure);
 
       await expectRejection(daemon.checkVersion(), /throttled/);

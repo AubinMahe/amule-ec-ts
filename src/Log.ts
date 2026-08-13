@@ -10,7 +10,6 @@ const debug = debuglog("amule-ec:log");
 
 /** The daemon's accumulated log, as returned by EC_OP_GET_LOG / EC_OP_LOG. */
 export class Log implements ECFetchable {
-
    public lines: readonly string[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -28,9 +27,7 @@ export class Log implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_LOG) {
-         throw new Error(
-            `Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const textTag = reply.find(ECTagNames.EC_TAG_STRING);
       const text = textTag instanceof ECStringTag ? textTag.value : "";
@@ -53,9 +50,7 @@ export class Log implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("reset: log cleared");
    }
@@ -88,9 +83,7 @@ export class Log implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("addLine: %s", text);
    }
@@ -113,9 +106,7 @@ export class Log implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_LOG) {
-         throw new Error(
-            `Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const textTag = reply.find(ECTagNames.EC_TAG_STRING);
       const text = textTag instanceof ECStringTag ? textTag.value.trim() : "";
@@ -126,7 +117,6 @@ export class Log implements ECFetchable {
 
 /** The daemon's accumulated debug log, as returned by EC_OP_GET_DEBUGLOG / EC_OP_DEBUGLOG - structurally identical to Log. */
 export class DebugLog implements ECFetchable {
-
    public lines: readonly string[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -143,9 +133,7 @@ export class DebugLog implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_DEBUGLOG) {
-         throw new Error(
-            `Expected EC_OP_DEBUGLOG, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_DEBUGLOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const textTag = reply.find(ECTagNames.EC_TAG_STRING);
       const text = textTag instanceof ECStringTag ? textTag.value : "";
@@ -169,9 +157,7 @@ export class DebugLog implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("DebugLog.reset: debug log cleared");
    }
@@ -204,9 +190,7 @@ export class DebugLog implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("DebugLog.addLine: %s", text);
    }

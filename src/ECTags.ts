@@ -9,7 +9,6 @@ const debug = debuglog("amule-ec:tags");
  * Base class of all EC tags.
  */
 export abstract class ECTag {
-
    public readonly name: number;
    public readonly children: readonly ECTag[];
 
@@ -84,21 +83,12 @@ export abstract class ECTag {
       let childrenBuffer: Buffer = RESULT_EMPTY;
       if (hasChildren) {
          childCountBuffer = encodeCount(this.children.length, caps);
-         childrenBuffer = Buffer.concat(
-            this.children.map((child) => child.encode(caps)),
-         );
+         childrenBuffer = Buffer.concat(this.children.map((child) => child.encode(caps)));
       }
       const dataBuffer = this.encodeOwnData(caps);
       const tagLen = childrenBuffer.length + dataBuffer.length;
       const lenBuffer = encodeTagLen(tagLen, caps);
-      return Buffer.concat([
-         nameBuffer,
-         typeBuffer,
-         lenBuffer,
-         childCountBuffer,
-         childrenBuffer,
-         dataBuffer,
-      ]);
+      return Buffer.concat([nameBuffer, typeBuffer, lenBuffer, childCountBuffer, childrenBuffer, dataBuffer]);
    }
 
    private encodeOwnData(caps: ECCapabilities): Buffer {
@@ -119,9 +109,7 @@ export abstract class ECTag {
          case ECTagType.DOUBLE:
             // Floating point values are transported as their string
             // representation, always using '.' as the decimal separator.
-            return encodeCString(
-               (this as unknown as ECDoubleTag).value.toString(),
-            );
+            return encodeCString((this as unknown as ECDoubleTag).value.toString());
          case ECTagType.HASH16:
             return Buffer.from((this as unknown as ECHash16Tag).value);
          case ECTagType.IPV4: {
@@ -142,26 +130,16 @@ export abstract class ECTag {
  * Base class for integer tags.
  */
 abstract class ECIntegerTag extends ECTag {
-
    public readonly value: bigint;
 
-   protected constructor(
-      name: number,
-      value: bigint,
-      children: readonly ECTag[] = [],
-   ) {
+   protected constructor(name: number, value: bigint, children: readonly ECTag[] = []) {
       super(name, children);
       this.value = value;
    }
 }
 
 export class ECUInt8Tag extends ECIntegerTag {
-
-   public constructor(
-      name: number,
-      value: number,
-      children: readonly ECTag[] = [],
-   ) {
+   public constructor(name: number, value: number, children: readonly ECTag[] = []) {
       if (!Number.isInteger(value) || value < 0 || value > 0xff) {
          throw new RangeError("UINT8 value out of range.");
       }
@@ -174,12 +152,7 @@ export class ECUInt8Tag extends ECIntegerTag {
 }
 
 export class ECUInt16Tag extends ECIntegerTag {
-
-   public constructor(
-      name: number,
-      value: number,
-      children: readonly ECTag[] = [],
-   ) {
+   public constructor(name: number, value: number, children: readonly ECTag[] = []) {
       if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
          throw new RangeError("UINT16 value out of range.");
       }
@@ -192,12 +165,7 @@ export class ECUInt16Tag extends ECIntegerTag {
 }
 
 export class ECUInt32Tag extends ECIntegerTag {
-
-   public constructor(
-      name: number,
-      value: number,
-      children: readonly ECTag[] = [],
-   ) {
+   public constructor(name: number, value: number, children: readonly ECTag[] = []) {
       if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
          throw new RangeError("UINT32 value out of range.");
       }
@@ -210,12 +178,7 @@ export class ECUInt32Tag extends ECIntegerTag {
 }
 
 export class ECUInt64Tag extends ECIntegerTag {
-
-   public constructor(
-      name: number,
-      value: bigint,
-      children: readonly ECTag[] = [],
-   ) {
+   public constructor(name: number, value: bigint, children: readonly ECTag[] = []) {
       if (value < 0n || value > 0xffffffffffffffffn) {
          throw new RangeError("UINT64 value out of range.");
       }
@@ -228,14 +191,9 @@ export class ECUInt64Tag extends ECIntegerTag {
 }
 
 class ECUInt128Tag extends ECTag {
-
    public readonly value: bigint;
 
-   public constructor(
-      name: number,
-      value: bigint,
-      children: readonly ECTag[] = [],
-   ) {
+   public constructor(name: number, value: bigint, children: readonly ECTag[] = []) {
       super(name, children);
       if (value < 0n || value >= 1n << 128n) {
          throw new RangeError("UINT128 value out of range.");
@@ -249,7 +207,6 @@ class ECUInt128Tag extends ECTag {
 }
 
 export class ECStringTag extends ECTag {
-
    public constructor(
       name: number,
       public readonly value: string,
@@ -264,7 +221,6 @@ export class ECStringTag extends ECTag {
 }
 
 export class ECDoubleTag extends ECTag {
-
    public constructor(
       name: number,
       public readonly value: number,
@@ -279,7 +235,6 @@ export class ECDoubleTag extends ECTag {
 }
 
 export class ECHash16Tag extends ECTag {
-
    public constructor(
       name: number,
       public readonly value: Uint8Array,
@@ -297,7 +252,6 @@ export class ECHash16Tag extends ECTag {
 }
 
 export class ECIPv4Tag extends ECTag {
-
    public constructor(
       name: number,
       public readonly address: Uint8Array,
@@ -319,7 +273,6 @@ export class ECIPv4Tag extends ECTag {
 }
 
 export class ECCustomTag extends ECTag {
-
    public constructor(
       name: number,
       public readonly value: Uint8Array,
@@ -363,7 +316,6 @@ const RESULT_EMPTY = Buffer.alloc(0);
  * to manually recount bytes in a raw hex dump.
  */
 class ECDecodeError extends Error {
-
    private static hexAround(buffer: Buffer, offset: number, radius = 12): string {
       const start = Math.max(0, offset - radius);
       const end = Math.min(buffer.length, offset + radius);
@@ -443,10 +395,7 @@ function utf8EncodeNumber(value: bigint): Buffer {
    return Buffer.concat([Buffer.from([0xff, raw.length]), raw]);
 }
 
-function utf8DecodeNumber(
-   buffer: Buffer,
-   offset: number,
-): { value: bigint; bytesRead: number } {
+function utf8DecodeNumber(buffer: Buffer, offset: number): { value: bigint; bytesRead: number } {
    const first = buffer[offset];
    if (first === undefined) {
       throw new RangeError("Buffer underrun while decoding a UTF8 number.");
@@ -454,9 +403,7 @@ function utf8DecodeNumber(
    if (first === 0xff) {
       const len = buffer[offset + 1];
       if (len === undefined) {
-         throw new RangeError(
-            "Buffer underrun while decoding a UTF8 number's escape length.",
-         );
+         throw new RangeError("Buffer underrun while decoding a UTF8 number's escape length.");
       }
       const raw = buffer.subarray(offset + 2, offset + 2 + len);
       return { value: readBigUIntBE(Buffer.from(raw)), bytesRead: 2 + len };
@@ -487,22 +434,11 @@ function utf8DecodeNumber(
    return { value, bytesRead: n };
 }
 
-function encodeUint(
-   value: bigint,
-   width: number,
-   caps: ECCapabilities,
-): Buffer {
-   return caps.utf8Numbers
-      ? utf8EncodeNumber(value)
-      : writeBigUIntBE(value, width);
+function encodeUint(value: bigint, width: number, caps: ECCapabilities): Buffer {
+   return caps.utf8Numbers ? utf8EncodeNumber(value) : writeBigUIntBE(value, width);
 }
 
-function decodeUint(
-   buffer: Buffer,
-   offset: number,
-   width: number,
-   caps: ECCapabilities,
-): { value: bigint; bytesRead: number } {
+function decodeUint(buffer: Buffer, offset: number, width: number, caps: ECCapabilities): { value: bigint; bytesRead: number } {
    if (caps.utf8Numbers) {
       return utf8DecodeNumber(buffer, offset);
    }
@@ -511,11 +447,7 @@ function decodeUint(
 }
 
 /** Encodes a TAGNAME field: (actual_code << 1) | has_children. */
-function encodeTagName(
-   name: number,
-   hasChildren: boolean,
-   caps: ECCapabilities,
-): Buffer {
+function encodeTagName(name: number, hasChildren: boolean, caps: ECCapabilities): Buffer {
    const raw = BigInt((name << 1) | (hasChildren ? 1 : 0));
    return encodeUint(raw, 2, caps);
 }
@@ -535,11 +467,7 @@ function encodeTagLen(length: number, caps: ECCapabilities): Buffer {
    return encodeUint(BigInt(length), 4, caps);
 }
 
-function decodeTagLen(
-   buffer: Buffer,
-   offset: number,
-   caps: ECCapabilities,
-): { length: number; bytesRead: number } {
+function decodeTagLen(buffer: Buffer, offset: number, caps: ECCapabilities): { length: number; bytesRead: number } {
    const { value, bytesRead } = decodeUint(buffer, offset, 4, caps);
    return { length: Number(value), bytesRead };
 }
@@ -552,9 +480,7 @@ function decodeTagLen(
 export function encodeCount(count: number, caps: ECCapabilities): Buffer {
    if (count >= 0xffff) {
       if (!caps.largeTagCount) {
-         throw new RangeError(
-            "Tag count exceeds 0xFFFE and EC_FLAG_LARGE_TAG_COUNT is not enabled.",
-         );
+         throw new RangeError("Tag count exceeds 0xFFFE and EC_FLAG_LARGE_TAG_COUNT is not enabled.");
       }
       const sentinel = encodeUint(0xffffn, 2, caps);
       const extended = encodeUint(BigInt(count), 4, caps);
@@ -563,24 +489,10 @@ export function encodeCount(count: number, caps: ECCapabilities): Buffer {
    return encodeUint(BigInt(count), 2, caps);
 }
 
-function decodeCount(
-   buffer: Buffer,
-   offset: number,
-   caps: ECCapabilities,
-): { count: number; bytesRead: number } {
-   const { value: raw, bytesRead: sentinelBytes } = decodeUint(
-      buffer,
-      offset,
-      2,
-      caps,
-   );
+function decodeCount(buffer: Buffer, offset: number, caps: ECCapabilities): { count: number; bytesRead: number } {
+   const { value: raw, bytesRead: sentinelBytes } = decodeUint(buffer, offset, 2, caps);
    if (caps.largeTagCount && raw === 0xffffn) {
-      const { value: extended, bytesRead: extendedBytes } = decodeUint(
-         buffer,
-         offset + sentinelBytes,
-         4,
-         caps,
-      );
+      const { value: extended, bytesRead: extendedBytes } = decodeUint(buffer, offset + sentinelBytes, 4, caps);
       return {
          count: Number(extended),
          bytesRead: sentinelBytes + extendedBytes,
@@ -624,7 +536,6 @@ function decodeCString(data: Buffer): string {
  * field ended), so something has to own it; this is that something.
  */
 export class ECTagDecoder {
-
    private offset = 0;
 
    public constructor(
@@ -636,20 +547,14 @@ export class ECTagDecoder {
    public readByte(): number {
       const byte = this.buffer[this.offset];
       if (byte === undefined) {
-         throw new RangeError(
-            `Buffer underrun: no byte to read at offset ${this.offset} (length ${this.buffer.length}).`,
-         );
+         throw new RangeError(`Buffer underrun: no byte to read at offset ${this.offset} (length ${this.buffer.length}).`);
       }
       this.offset += 1;
       return byte;
    }
 
    public readCount(): number {
-      const { count, bytesRead } = decodeCount(
-         this.buffer,
-         this.offset,
-         this.caps,
-      );
+      const { count, bytesRead } = decodeCount(this.buffer, this.offset, this.caps);
       this.offset += bytesRead;
       return count;
    }
@@ -663,58 +568,27 @@ export class ECTagDecoder {
       return readBigUIntBE(data);
    }
 
-   private tagFactory(
-      name: number,
-      type: ECTagType,
-      data: Buffer,
-      children: ECTag[],
-   ): ECTag {
+   private tagFactory(name: number, type: ECTagType, data: Buffer, children: ECTag[]): ECTag {
       switch (type) {
          case ECTagType.UINT8:
-            return new ECUInt8Tag(
-               name,
-               Number(this.readBigUIntOrUtf8(data)),
-               children,
-            );
+            return new ECUInt8Tag(name, Number(this.readBigUIntOrUtf8(data)), children);
          case ECTagType.UINT16:
-            return new ECUInt16Tag(
-               name,
-               Number(this.readBigUIntOrUtf8(data)),
-               children,
-            );
+            return new ECUInt16Tag(name, Number(this.readBigUIntOrUtf8(data)), children);
          case ECTagType.UINT32:
-            return new ECUInt32Tag(
-               name,
-               Number(this.readBigUIntOrUtf8(data)),
-               children,
-            );
+            return new ECUInt32Tag(name, Number(this.readBigUIntOrUtf8(data)), children);
          case ECTagType.UINT64:
-            return new ECUInt64Tag(
-               name,
-               this.readBigUIntOrUtf8(data),
-               children,
-            );
+            return new ECUInt64Tag(name, this.readBigUIntOrUtf8(data), children);
          case ECTagType.UINT128:
-            return new ECUInt128Tag(
-               name,
-               this.readBigUIntOrUtf8(data),
-               children,
-            );
+            return new ECUInt128Tag(name, this.readBigUIntOrUtf8(data), children);
          case ECTagType.STRING:
             return new ECStringTag(name, decodeCString(data), children);
          case ECTagType.DOUBLE:
-            return new ECDoubleTag(
-               name,
-               parseFloat(decodeCString(data)),
-               children,
-            );
+            return new ECDoubleTag(name, parseFloat(decodeCString(data)), children);
          case ECTagType.HASH16:
             return new ECHash16Tag(name, new Uint8Array(data), children);
          case ECTagType.IPV4: {
             if (data.length < 6) {
-               throw new RangeError(
-                  `IPV4 tag data must be at least 6 bytes (4 for address + 2 for port), got ${data.length}.`,
-               );
+               throw new RangeError(`IPV4 tag data must be at least 6 bytes (4 for address + 2 for port), got ${data.length}.`);
             }
             const address = new Uint8Array(data.subarray(0, 4));
             const port = data.readUInt16BE(4);
@@ -737,46 +611,24 @@ export class ECTagDecoder {
     */
    public readTag(path: number[] = []): ECTag {
       if (this.offset >= this.buffer.length) {
-         throw new ECDecodeError(
-            "Ran out of bytes while expecting a tag header (TAGNAME).",
-            path,
-            this.offset,
-            this.buffer,
-         );
+         throw new ECDecodeError("Ran out of bytes while expecting a tag header (TAGNAME).", path, this.offset, this.buffer);
       }
-      const {
-         name,
-         hasChildren,
-         bytesRead: nameBytes,
-      } = decodeTagName(this.buffer, this.offset, this.caps);
-      debug("tag: %s, hasChildren: %s", ECTagNames[name] ?? ("0x" + name.toString(16)), hasChildren);
+      const { name, hasChildren, bytesRead: nameBytes } = decodeTagName(this.buffer, this.offset, this.caps);
+      debug("tag: %s, hasChildren: %s", ECTagNames[name] ?? "0x" + name.toString(16), hasChildren);
       this.offset += nameBytes;
       const here = [...path, name];
       if (this.offset >= this.buffer.length) {
-         throw new ECDecodeError(
-            "Ran out of bytes while expecting TAGTYPE.",
-            here,
-            this.offset,
-            this.buffer,
-         );
+         throw new ECDecodeError("Ran out of bytes while expecting TAGTYPE.", here, this.offset, this.buffer);
       }
       const type = this.buffer[this.offset] as ECTagType;
       this.offset += 1;
-      const { length: tagLen, bytesRead: lenBytes } = decodeTagLen(
-         this.buffer,
-         this.offset,
-         this.caps,
-      );
+      const { length: tagLen, bytesRead: lenBytes } = decodeTagLen(this.buffer, this.offset, this.caps);
       this.offset += lenBytes;
       let childCountBytes = 0;
       let childrenBytes = 0;
       const children: ECTag[] = [];
       if (hasChildren) {
-         const { count, bytesRead } = decodeCount(
-            this.buffer,
-            this.offset,
-            this.caps,
-         );
+         const { count, bytesRead } = decodeCount(this.buffer, this.offset, this.caps);
          childCountBytes = bytesRead;
          this.offset += childCountBytes;
          for (let i = 0; i < count; i++) {
@@ -788,7 +640,7 @@ export class ECTagDecoder {
       const ownDataLen = tagLen - childrenBytes;
       debug(
          "%s: type=%s, tagLen=%d, childCountBytes=%d, childrenBytes=%d, ownDataLen=%d, cursorBeforeOwnData=%d",
-         ECTagNames[name] ?? ("0x" + name.toString(16)),
+         ECTagNames[name] ?? "0x" + name.toString(16),
          ECTagType[type],
          tagLen,
          childCountBytes,
@@ -812,9 +664,7 @@ export class ECTagDecoder {
             this.buffer,
          );
       }
-      const data = Buffer.from(
-         this.buffer.subarray(this.offset, this.offset + ownDataLen),
-      );
+      const data = Buffer.from(this.buffer.subarray(this.offset, this.offset + ownDataLen));
       let tag: ECTag;
       try {
          tag = this.tagFactory(name, type, data, children);
@@ -854,10 +704,7 @@ export class ECTagDecoder {
  */
 export function packIPv4ToUint32(ip: string): number {
    const octets = ip.split(".").map(Number);
-   if (
-      octets.length !== 4 ||
-      octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
-   ) {
+   if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
       throw new RangeError(`Invalid IPv4 address: "${ip}".`);
    }
    const [a, b, c, d] = octets as [number, number, number, number];

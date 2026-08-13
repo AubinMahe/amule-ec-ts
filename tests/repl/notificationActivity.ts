@@ -38,8 +38,6 @@ export class NotificationActivity {
       this.sharedFileUpdates = 0;
       this.statusChanged = false;
 
-      return parts.length > 0
-         ? `Updates available: ${parts.join(", ")}`
-         : undefined;
+      return parts.length > 0 ? `Updates available: ${parts.join(", ")}` : undefined;
    }
 }

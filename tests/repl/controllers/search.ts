@@ -6,7 +6,6 @@ const SEARCH_POLL_INTERVAL_MS = 250;
 
 /** search/search stop/search more, plus download (of search results) - owns the current search session. */
 export class SearchController {
-
    private currentSearch?: ec.SearchSession;
 
    public constructor(private readonly search: ec.Search) {}

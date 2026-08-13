@@ -9,7 +9,6 @@ const debug = debuglog("amule-ec:daemon");
 
 /** Daemon-wide commands that don't belong to any single resource (ed2k/Kad networks, downloads, ...). */
 export class Daemon {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -84,16 +83,11 @@ export class Daemon {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : "Failed to trigger a version check.";
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to trigger a version check.";
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("checkVersion: requested");
    }

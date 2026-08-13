@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 import { printUploadClients } from "../views/uploads.js";
 
 export class UploadsController {
-
    public constructor(private readonly uploads: ec.Uploads) {}
 
    public async show(): Promise<void> {

@@ -77,7 +77,6 @@ export enum ECDownloadPriority {
  * no ECID at all.
  */
 export class DownloadFile {
-
    public readonly hash: string | undefined;
    public readonly name: string | undefined;
    public readonly sizeFull: bigint | undefined;
@@ -144,8 +143,7 @@ export class DownloadFile {
    public static fromTag(tag: ECTag): DownloadFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
-      const hashTag =
-         childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
+      const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
       const removed = tag.children.length === 0 && ownHashTag !== undefined;
       return new DownloadFile({
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
@@ -183,8 +181,7 @@ export class DownloadFile {
          stopped: update.stopped,
          sourcesXfer: update.sourcesXfer ?? this.sourcesXfer,
          comments: update.comments ?? this.comments,
-         kadCommentSearching:
-            update.kadCommentSearching ?? this.kadCommentSearching,
+         kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
       });
    }
 
@@ -242,10 +239,7 @@ export class DownloadFile {
    public get statusText(): string {
       if (this.status === undefined) return "Unknown";
       const status: ECPartFileStatus = Number(this.status);
-      if (
-         status === ECPartFileStatus.PS_HASHING ||
-         status === ECPartFileStatus.PS_WAITING_FOR_HASH
-      ) {
+      if (status === ECPartFileStatus.PS_HASHING || status === ECPartFileStatus.PS_WAITING_FOR_HASH) {
          return "Hashing";
       }
       if (status === ECPartFileStatus.PS_ALLOCATING) {
@@ -280,7 +274,6 @@ export class DownloadFile {
 
 /** The download queue, as returned by EC_OP_GET_DLOAD_QUEUE / EC_OP_DLOAD_QUEUE. */
 export class Downloads implements ECFetchable {
-
    public files: readonly DownloadFile[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -312,18 +305,11 @@ export class Downloads implements ECFetchable {
 
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_DLOAD_QUEUE);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_CMD,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) {
-         throw new Error(
-            `Expected EC_OP_DLOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_DLOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       this.files = reply.tags
          .filter((tag) => {
@@ -349,26 +335,16 @@ export class Downloads implements ECFetchable {
     */
    public async cancel(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_DELETE);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_PARTFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to cancel ${hash}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to cancel ${hash}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("cancel: hash=%s", hash);
    }
@@ -396,29 +372,17 @@ export class Downloads implements ECFetchable {
     */
    public async rename(hash: string, newName: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_RENAME_FILE);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_KNOWNFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
-      request.add(
-         new ECStringTag(ECTagNames.EC_TAG_PARTFILE_NAME, newName),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
+      request.add(new ECStringTag(ECTagNames.EC_TAG_PARTFILE_NAME, newName));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to rename ${hash}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to rename ${hash}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("rename: hash=%s, newName=%s", hash, newName);
    }
@@ -437,60 +401,36 @@ export class Downloads implements ECFetchable {
     * found: ...") if the hash doesn't match a download in progress,
     * EC_OP_NOOP otherwise.
     */
-   private async sendPartFileCommand(
-      opcode: ECOpcode,
-      hash: string,
-      failureMessage: string,
-   ): Promise<void> {
+   private async sendPartFileCommand(opcode: ECOpcode, hash: string, failureMessage: string): Promise<void> {
       const request = new ECPacket(opcode);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_PARTFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag ? reasonTag.value : failureMessage;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : failureMessage;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
    }
 
    /** Pauses a download, identified by its MD4 hash - EC_OP_PARTFILE_PAUSE. See sendPartFileCommand()'s doc. */
    public async pause(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_PAUSE,
-         hash,
-         `Failed to pause ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_PAUSE, hash, `Failed to pause ${hash}.`);
       debug("pause: hash=%s", hash);
    }
 
    /** Resumes a paused download, identified by its MD4 hash - EC_OP_PARTFILE_RESUME. See sendPartFileCommand()'s doc. */
    public async resume(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_RESUME,
-         hash,
-         `Failed to resume ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_RESUME, hash, `Failed to resume ${hash}.`);
       debug("resume: hash=%s", hash);
    }
 
    /** Stops a download, identified by its MD4 hash - EC_OP_PARTFILE_STOP. See sendPartFileCommand()'s doc. */
    public async stop(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_STOP,
-         hash,
-         `Failed to stop ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_STOP, hash, `Failed to stop ${hash}.`);
       debug("stop: hash=%s", hash);
    }
 
@@ -506,11 +446,7 @@ export class Downloads implements ECFetchable {
     * children. GUI-only upstream (no amulecmd equivalent).
     */
    public async swapA4AFThis(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS,
-         hash,
-         `Failed to swap A4AF for ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS, hash, `Failed to swap A4AF for ${hash}.`);
       debug("swapA4AFThis: hash=%s", hash);
    }
 
@@ -522,11 +458,7 @@ export class Downloads implements ECFetchable {
     * Same request/reply shape as swapA4AFThis().
     */
    public async swapA4AFThisAuto(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS_AUTO,
-         hash,
-         `Failed to swap A4AF (auto) for ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_THIS_AUTO, hash, `Failed to swap A4AF (auto) for ${hash}.`);
       debug("swapA4AFThisAuto: hash=%s", hash);
    }
 
@@ -538,11 +470,7 @@ export class Downloads implements ECFetchable {
     * Same request/reply shape as swapA4AFThis().
     */
    public async swapA4AFOthers(hash: string): Promise<void> {
-      await this.sendPartFileCommand(
-         ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_OTHERS,
-         hash,
-         `Failed to swap A4AF (others) for ${hash}.`,
-      );
+      await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_SWAP_A4AF_OTHERS, hash, `Failed to swap A4AF (others) for ${hash}.`);
       debug("swapA4AFOthers: hash=%s", hash);
    }
 
@@ -570,16 +498,11 @@ export class Downloads implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to set category for ${hash}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set category for ${hash}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("setCategory: hash=%s, categoryIndex=%d", hash, categoryIndex);
    }
@@ -600,10 +523,7 @@ export class Downloads implements ECFetchable {
     * SetDownPriority(). Replies EC_OP_FAILED/EC_OP_NOOP exactly like
     * pause()/resume()/stop().
     */
-   public async prioritySet(
-      hash: string,
-      priority: ECDownloadPriority,
-   ): Promise<void> {
+   public async prioritySet(hash: string, priority: ECDownloadPriority): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_PRIO_SET);
       request.add(
          new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
@@ -614,16 +534,11 @@ export class Downloads implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to set priority for ${hash}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set priority for ${hash}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("prioritySet: hash=%s, priority=%s", hash, ECDownloadPriority[priority]);
    }
@@ -648,16 +563,11 @@ export class Downloads implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to add link ${link}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to add link ${link}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("addLink: link=%s", link);
    }
@@ -683,9 +593,7 @@ export class Downloads implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("clearCompleted: %d ecid(s)", ecids.length);
    }
@@ -701,7 +609,6 @@ export class Downloads implements ECFetchable {
  * feed every notification packet through apply() in between to stay live.
  */
 export class DownloadTracker {
-
    private readonly filesByEcid = new Map<bigint, DownloadFile>();
 
    public get files(): readonly DownloadFile[] {
@@ -737,8 +644,7 @@ export class DownloadTracker {
          return update;
       }
       if (update.ecid === undefined) return update;
-      const merged =
-         this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
+      const merged = this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
       this.filesByEcid.set(update.ecid, merged);
       return merged;
    }

@@ -46,7 +46,6 @@ export enum ECStatValueType {
  * live/session figure and `companion` is the cumulative one.
  */
 export class StatValue {
-
    public readonly type: ECStatValueType | undefined;
    public readonly intValue: bigint | undefined;
    public readonly doubleValue: number | undefined;
@@ -104,7 +103,6 @@ export class StatValue {
  * position in the tree.
  */
 export class StatNode {
-
    public readonly label: string;
    public readonly nodeId: bigint;
    public readonly key: string | undefined;
@@ -195,22 +193,17 @@ export class StatNode {
  * behaves the same as 255, not "more unlimited".
  */
 export class StatsTree {
-
    public root: StatNode | undefined;
 
    public constructor(public readonly connection: ECConnection) {}
 
    public async fetch(maxChildrenPerNode = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_STATSTREE);
-      request.add(
-         new ECUInt8Tag(ECTagNames.EC_TAG_STATTREE_CAPPING, maxChildrenPerNode),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_STATTREE_CAPPING, maxChildrenPerNode));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_STATSTREE) {
-         throw new Error(
-            `Expected EC_OP_STATSTREE, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STATSTREE, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const rootTag = reply.find(ECTagNames.EC_TAG_STATTREE_NODE);
       this.root = rootTag ? StatNode.fromTag(rootTag) : undefined;

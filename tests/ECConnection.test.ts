@@ -7,10 +7,7 @@ const PASSWORD_HASH = hexHash("a");
 const SALT = 0x1234_5678_9abc_def0n;
 
 async function connectPeer(server: FakeEcServer): Promise<{ connection: ec.ECConnection; peer: FakeEcPeer }> {
-   const [connection, peer] = await Promise.all([
-      ec.ECConnection.connect("127.0.0.1", server.port),
-      server.nextPeer(),
-   ]);
+   const [connection, peer] = await Promise.all([ec.ECConnection.connect("127.0.0.1", server.port), server.nextPeer()]);
    return { connection, peer };
 }
 
@@ -39,10 +36,7 @@ describe("ECConnection.authenticateWithHash", () => {
    it("completes the 3-step handshake and sends a correctly salted password hash", async () => {
       const { connection, peer } = await connectPeer(server);
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_PROTOCOL_VERSION)).to.equal(true);
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CLIENT_NAME)).to.equal(true);
@@ -53,10 +47,7 @@ describe("ECConnection.authenticateWithHash", () => {
       const { connection, peer } = await connectPeer(server);
       connection.localCapabilities.notify = true;
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(true);
    });
@@ -65,10 +56,7 @@ describe("ECConnection.authenticateWithHash", () => {
       const { connection, peer } = await connectPeer(server);
       connection.localCapabilities.multiSearch = true;
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(true);
    });
@@ -76,10 +64,7 @@ describe("ECConnection.authenticateWithHash", () => {
    it("always adds EC_TAG_CAN_SHAREDDIRS_CONFIG, unlike every other capability, with no local flag to set", async () => {
       const { connection, peer } = await connectPeer(server);
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG)).to.equal(true);
    });
@@ -89,10 +74,14 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
       peer.writePacket(
-         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG, new Uint8Array())),
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG, new Uint8Array()),
+         ),
       );
       await authPromise;
 
@@ -102,10 +91,7 @@ describe("ECConnection.authenticateWithHash", () => {
    it("always adds EC_TAG_CAN_SEARCH_LIST, unlike every other capability, with no local flag to set", async () => {
       const { connection, peer } = await connectPeer(server);
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_SEARCH_LIST)).to.equal(true);
    });
@@ -115,7 +101,9 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
       peer.writePacket(
          new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_SEARCH_LIST, new Uint8Array())),
@@ -128,10 +116,7 @@ describe("ECConnection.authenticateWithHash", () => {
    it("always adds EC_TAG_CAN_PARTIAL_UPDATE, unlike every other capability, with no local flag to set", async () => {
       const { connection, peer } = await connectPeer(server);
 
-      const [, authRequest] = await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(peer),
-      ]);
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
 
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE)).to.equal(true);
    });
@@ -141,10 +126,14 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
       peer.writePacket(
-         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE, new Uint8Array())),
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE, new Uint8Array()),
+         ),
       );
       await authPromise;
 
@@ -157,10 +146,14 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
       peer.writePacket(
-         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH, new Uint8Array())),
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH, new Uint8Array()),
+         ),
       );
       await authPromise;
 
@@ -172,10 +165,14 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
       peer.writePacket(
-         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT, new Uint8Array())),
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT, new Uint8Array()),
+         ),
       );
       await authPromise;
 
@@ -187,9 +184,13 @@ describe("ECConnection.authenticateWithHash", () => {
 
       const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_FAIL).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid password.")));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_FAIL).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid password.")),
+      );
 
       await expectRejection(authPromise, /Invalid password\./);
    });
@@ -231,7 +232,9 @@ describe("ECConnection.send/receive", () => {
       connection.localCapabilities.zlib = true;
       connection.localCapabilities.preferNoZlib = false;
 
-      await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "compressed")));
+      await connection.send(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "compressed")),
+      );
       const received = await peer.readPacket();
 
       expect((received.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal("compressed");
@@ -293,14 +296,8 @@ describe("ECConnection disconnect/reconnect", () => {
       firstPeer.socket.destroy();
       await disconnected;
 
-      const [, secondPeer] = await Promise.all([
-         connection.reconnect("127.0.0.1", server.port),
-         server.nextPeer(),
-      ]);
-      await Promise.all([
-         connection.authenticateWithHash(PASSWORD_HASH),
-         acceptAuthentication(secondPeer),
-      ]);
+      const [, secondPeer] = await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
+      await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(secondPeer)]);
 
       // Proves the new socket is genuinely wired for both directions, not just authenticated.
       await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -322,10 +319,10 @@ describe("ECConnection disconnect/reconnect", () => {
 
    it(
       "does not emit 'disconnected' when close() caused the closure - " +
-      "regression test: this used to fire ECEngine's reconnect loop on every " +
-      "deliberate shutdown, leaking an unclosed reconnected socket that kept " +
-      "the process running forever (17 orphaned tests/repl/main.ts processes " +
-      "found still running from earlier in one real session)",
+         "regression test: this used to fire ECEngine's reconnect loop on every " +
+         "deliberate shutdown, leaking an unclosed reconnected socket that kept " +
+         "the process running forever (17 orphaned tests/repl/main.ts processes " +
+         "found still running from earlier in one real session)",
       async () => {
          const { connection, peer } = await connectPeer(server);
          let disconnectedFired = false;

@@ -5,16 +5,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECPreferencesSelection } from "./ECPreferencesSelection.js";
-import {
-   ECTag,
-   ECUInt8Tag,
-   ECUInt16Tag,
-   ECUInt32Tag,
-   ECUInt64Tag,
-   ECStringTag,
-   ECCustomTag,
-   ECHash16Tag,
-} from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECUInt16Tag, ECUInt32Tag, ECUInt64Tag, ECStringTag, ECCustomTag, ECHash16Tag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:preferences");
 
@@ -398,7 +389,6 @@ export interface IP2CountryPrefs {
 
 /** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
 export class Category {
-
    public constructor(
       public readonly index: number,
       public readonly title: string,
@@ -443,25 +433,19 @@ export class Category {
  *    unchanged" - i.e. every set*() call fully replaces its section.
  */
 export class Preferences {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
     * Sends EC_OP_GET_PREFERENCES selecting a single section and returns
     * that section's own tag (with its children) from the reply.
     */
-   private async fetchSection(
-      selection: ECPreferencesSelection,
-      sectionTagName: number,
-   ): Promise<ECTag | undefined> {
+   private async fetchSection(selection: ECPreferencesSelection, sectionTagName: number): Promise<ECTag | undefined> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_PREFERENCES);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SELECT_PREFS, selection));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SET_PREFERENCES) {
-         throw new Error(
-            `Expected EC_OP_SET_PREFERENCES, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SET_PREFERENCES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       return reply.find(sectionTagName);
    }
@@ -472,46 +456,32 @@ export class Preferences {
     */
    private async applySection(section: ECTag): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SET_PREFERENCES);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_UPDATE,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_UPDATE));
       request.add(section);
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
    }
 
    /** Fetches the MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER. */
    public async getMessageFilter(): Promise<MessageFilterPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.MESSAGEFILTER,
-         ECTagNames.EC_TAG_PREFS_MESSAGEFILTER,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.MESSAGEFILTER, ECTagNames.EC_TAG_PREFS_MESSAGEFILTER);
       if (!section) {
          throw new Error("Daemon did not return the MESSAGEFILTER section.");
       }
-      const has = (name: number): boolean =>
-         section.findChild(name) !== undefined;
+      const has = (name: number): boolean => section.findChild(name) !== undefined;
       const prefs: MessageFilterPrefs = {
          enabled: has(ECTagNames.EC_TAG_MSGFILTER_ENABLED),
          filterAll: has(ECTagNames.EC_TAG_MSGFILTER_ALL),
          friendsOnly: has(ECTagNames.EC_TAG_MSGFILTER_FRIENDS),
          secureOnly: has(ECTagNames.EC_TAG_MSGFILTER_SECURE),
          byKeyword: has(ECTagNames.EC_TAG_MSGFILTER_BY_KEYWORD),
-         keywords:
-            section.childString(ECTagNames.EC_TAG_MSGFILTER_KEYWORDS) ?? "",
+         keywords: section.childString(ECTagNames.EC_TAG_MSGFILTER_KEYWORDS) ?? "",
          showInLog: has(ECTagNames.EC_TAG_MSGFILTER_SHOW_IN_LOG),
          filterComments: has(ECTagNames.EC_TAG_MSGFILTER_FILTER_COMMENTS),
-         commentKeywords:
-            section.childString(ECTagNames.EC_TAG_MSGFILTER_COMMENT_KEYWORDS) ??
-            "",
+         commentKeywords: section.childString(ECTagNames.EC_TAG_MSGFILTER_COMMENT_KEYWORDS) ?? "",
       };
       debug("getMessageFilter: %o", prefs);
       return prefs;
@@ -519,47 +489,29 @@ export class Preferences {
 
    /** Replaces the whole MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER. */
    public async setMessageFilter(prefs: MessageFilterPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_MESSAGEFILTER,
-         new Uint8Array(),
-         [
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_ENABLED, prefs.enabled),
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_ALL, prefs.filterAll),
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_FRIENDS, prefs.friendsOnly),
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_SECURE, prefs.secureOnly),
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_BY_KEYWORD, prefs.byKeyword),
-            new ECStringTag(
-               ECTagNames.EC_TAG_MSGFILTER_KEYWORDS,
-               prefs.keywords,
-            ),
-            ...flag(ECTagNames.EC_TAG_MSGFILTER_SHOW_IN_LOG, prefs.showInLog),
-            ...flag(
-               ECTagNames.EC_TAG_MSGFILTER_FILTER_COMMENTS,
-               prefs.filterComments,
-            ),
-            new ECStringTag(
-               ECTagNames.EC_TAG_MSGFILTER_COMMENT_KEYWORDS,
-               prefs.commentKeywords,
-            ),
-         ],
-      );
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_MESSAGEFILTER, new Uint8Array(), [
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_ENABLED, prefs.enabled),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_ALL, prefs.filterAll),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_FRIENDS, prefs.friendsOnly),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_SECURE, prefs.secureOnly),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_BY_KEYWORD, prefs.byKeyword),
+         new ECStringTag(ECTagNames.EC_TAG_MSGFILTER_KEYWORDS, prefs.keywords),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_SHOW_IN_LOG, prefs.showInLog),
+         ...flag(ECTagNames.EC_TAG_MSGFILTER_FILTER_COMMENTS, prefs.filterComments),
+         new ECStringTag(ECTagNames.EC_TAG_MSGFILTER_COMMENT_KEYWORDS, prefs.commentKeywords),
+      ]);
       await this.applySection(section);
       debug("setMessageFilter: applied");
    }
 
    /** Fetches the CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
    public async getConnections(): Promise<ConnectionsPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.CONNECTIONS,
-         ECTagNames.EC_TAG_PREFS_CONNECTIONS,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.CONNECTIONS, ECTagNames.EC_TAG_PREFS_CONNECTIONS);
       if (!section) {
          throw new Error("Daemon did not return the CONNECTIONS section.");
       }
-      const has = (name: number): boolean =>
-         section.findChild(name) !== undefined;
+      const has = (name: number): boolean => section.findChild(name) !== undefined;
       const num = (name: number): number => Number(section.childInt(name) ?? 0n);
       const str = (name: number): string => section.childString(name) ?? "";
       const prefs: ConnectionsPrefs = {
@@ -597,84 +549,45 @@ export class Preferences {
 
    /** Replaces the whole CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
    public async setConnections(prefs: ConnectionsPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_CONNECTIONS,
-         new Uint8Array(),
-         [
-            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_UL_CAP, prefs.maxGraphUploadRate),
-            new ECUInt32Tag(
-               ECTagNames.EC_TAG_CONN_DL_CAP,
-               prefs.maxGraphDownloadRate,
-            ),
-            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_UL, prefs.maxUpload),
-            new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_DL, prefs.maxDownload),
-            new ECUInt32Tag(
-               ECTagNames.EC_TAG_CONN_SLOT_ALLOCATION,
-               prefs.slotAllocation,
-            ),
-            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_TCP_PORT, prefs.tcpPort),
-            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_UDP_PORT, prefs.udpPort),
-            ...flag(ECTagNames.EC_TAG_CONN_UDP_DISABLE, prefs.udpDisabled),
-            new ECUInt16Tag(
-               ECTagNames.EC_TAG_CONN_MAX_FILE_SOURCES,
-               prefs.maxSourcesPerFile,
-            ),
-            new ECUInt16Tag(ECTagNames.EC_TAG_CONN_MAX_CONN, prefs.maxConnections),
-            ...flag(ECTagNames.EC_TAG_CONN_AUTOCONNECT, prefs.autoConnect),
-            ...flag(ECTagNames.EC_TAG_CONN_RECONNECT, prefs.reconnect),
-            ...flag(ECTagNames.EC_TAG_NETWORK_ED2K, prefs.networkEd2k),
-            ...flag(ECTagNames.EC_TAG_NETWORK_KADEMLIA, prefs.networkKademlia),
-            new ECStringTag(
-               ECTagNames.EC_TAG_CONN_BIND_ADDRESS,
-               prefs.bindAddress,
-            ),
-            new ECStringTag(
-               ECTagNames.EC_TAG_CONN_BIND_INTERFACE,
-               prefs.bindInterface,
-            ),
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_PROXY_ENABLE,
-               prefs.proxy.enabled ? 1 : 0,
-            ),
-            new ECUInt32Tag(ECTagNames.EC_TAG_PROXY_TYPE, prefs.proxy.type),
-            new ECStringTag(ECTagNames.EC_TAG_PROXY_HOST, prefs.proxy.host),
-            new ECUInt16Tag(ECTagNames.EC_TAG_PROXY_PORT, prefs.proxy.port),
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_PROXY_AUTH,
-               prefs.proxy.enablePassword ? 1 : 0,
-            ),
-            new ECStringTag(ECTagNames.EC_TAG_PROXY_USER, prefs.proxy.userName),
-            new ECStringTag(
-               ECTagNames.EC_TAG_PROXY_PASSWORD,
-               prefs.proxy.password,
-            ),
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_CONN_UPNP_ENABLED,
-               prefs.upnpEnabled ? 1 : 0,
-            ),
-            new ECUInt16Tag(
-               ECTagNames.EC_TAG_CONN_UPNP_TCP_PORT,
-               prefs.upnpTcpPort,
-            ),
-         ],
-      );
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_CONNECTIONS, new Uint8Array(), [
+         new ECUInt32Tag(ECTagNames.EC_TAG_CONN_UL_CAP, prefs.maxGraphUploadRate),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CONN_DL_CAP, prefs.maxGraphDownloadRate),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_UL, prefs.maxUpload),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CONN_MAX_DL, prefs.maxDownload),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CONN_SLOT_ALLOCATION, prefs.slotAllocation),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CONN_TCP_PORT, prefs.tcpPort),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CONN_UDP_PORT, prefs.udpPort),
+         ...flag(ECTagNames.EC_TAG_CONN_UDP_DISABLE, prefs.udpDisabled),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CONN_MAX_FILE_SOURCES, prefs.maxSourcesPerFile),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CONN_MAX_CONN, prefs.maxConnections),
+         ...flag(ECTagNames.EC_TAG_CONN_AUTOCONNECT, prefs.autoConnect),
+         ...flag(ECTagNames.EC_TAG_CONN_RECONNECT, prefs.reconnect),
+         ...flag(ECTagNames.EC_TAG_NETWORK_ED2K, prefs.networkEd2k),
+         ...flag(ECTagNames.EC_TAG_NETWORK_KADEMLIA, prefs.networkKademlia),
+         new ECStringTag(ECTagNames.EC_TAG_CONN_BIND_ADDRESS, prefs.bindAddress),
+         new ECStringTag(ECTagNames.EC_TAG_CONN_BIND_INTERFACE, prefs.bindInterface),
+         new ECUInt8Tag(ECTagNames.EC_TAG_PROXY_ENABLE, prefs.proxy.enabled ? 1 : 0),
+         new ECUInt32Tag(ECTagNames.EC_TAG_PROXY_TYPE, prefs.proxy.type),
+         new ECStringTag(ECTagNames.EC_TAG_PROXY_HOST, prefs.proxy.host),
+         new ECUInt16Tag(ECTagNames.EC_TAG_PROXY_PORT, prefs.proxy.port),
+         new ECUInt8Tag(ECTagNames.EC_TAG_PROXY_AUTH, prefs.proxy.enablePassword ? 1 : 0),
+         new ECStringTag(ECTagNames.EC_TAG_PROXY_USER, prefs.proxy.userName),
+         new ECStringTag(ECTagNames.EC_TAG_PROXY_PASSWORD, prefs.proxy.password),
+         new ECUInt8Tag(ECTagNames.EC_TAG_CONN_UPNP_ENABLED, prefs.upnpEnabled ? 1 : 0),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CONN_UPNP_TCP_PORT, prefs.upnpTcpPort),
+      ]);
       await this.applySection(section);
       debug("setConnections: applied");
    }
 
    /** Fetches the FILES section - EC_TAG_PREFS_FILES. */
    public async getFiles(): Promise<FilesPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.FILES,
-         ECTagNames.EC_TAG_PREFS_FILES,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.FILES, ECTagNames.EC_TAG_PREFS_FILES);
       if (!section) {
          throw new Error("Daemon did not return the FILES section.");
       }
-      const has = (name: number): boolean =>
-         section.findChild(name) !== undefined;
+      const has = (name: number): boolean => section.findChild(name) !== undefined;
       const prefs: FilesPrefs = {
          ichEnabled: has(ECTagNames.EC_TAG_FILES_ICH_ENABLED),
          aichTrust: has(ECTagNames.EC_TAG_FILES_AICH_TRUST),
@@ -690,13 +603,10 @@ export class Preferences {
          mmapSupported: has(ECTagNames.EC_TAG_FILES_MMAP_SUPPORTED),
          mmapEnabled: has(ECTagNames.EC_TAG_FILES_MMAP_ENABLED),
          checkFreeSpace: has(ECTagNames.EC_TAG_FILES_CHECK_FREE_SPACE),
-         minFreeDiskSpaceMb: Number(
-            section.childInt(ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE) ?? 0n,
-         ),
+         minFreeDiskSpaceMb: Number(section.childInt(ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE) ?? 0n),
          createFilesNormal: has(ECTagNames.EC_TAG_FILES_CREATE_NORMAL),
          mediaMetadataEnabled: has(ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED),
-         mediaMetadataFfprobePath:
-            section.childString(ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH) ?? "",
+         mediaMetadataFfprobePath: section.childString(ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH) ?? "",
          startNextFileAlpha: has(ECTagNames.EC_TAG_FILES_START_NEXT_ALPHA),
       };
       debug("getFiles: %o", prefs);
@@ -705,54 +615,26 @@ export class Preferences {
 
    /** Replaces the whole FILES section - EC_TAG_PREFS_FILES. */
    public async setFiles(prefs: FilesPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_FILES, new Uint8Array(), [
          ...flag(ECTagNames.EC_TAG_FILES_ICH_ENABLED, prefs.ichEnabled),
          ...flag(ECTagNames.EC_TAG_FILES_AICH_TRUST, prefs.aichTrust),
          ...flag(ECTagNames.EC_TAG_FILES_NEW_PAUSED, prefs.newFilesPaused),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_NEW_AUTO_DL_PRIO,
-            prefs.newAutoDownloadPriority,
-         ),
+         ...flag(ECTagNames.EC_TAG_FILES_NEW_AUTO_DL_PRIO, prefs.newAutoDownloadPriority),
          ...flag(ECTagNames.EC_TAG_FILES_PREVIEW_PRIO, prefs.previewPrio),
          ...flag(ECTagNames.EC_TAG_FILES_ENDGAME, prefs.endgame),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_NEW_AUTO_UL_PRIO,
-            prefs.newAutoUploadPriority,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_START_NEXT_PAUSED,
-            prefs.startNextFilePaused,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_RESUME_SAME_CAT,
-            prefs.resumeSameCategory,
-         ),
+         ...flag(ECTagNames.EC_TAG_FILES_NEW_AUTO_UL_PRIO, prefs.newAutoUploadPriority),
+         ...flag(ECTagNames.EC_TAG_FILES_START_NEXT_PAUSED, prefs.startNextFilePaused),
+         ...flag(ECTagNames.EC_TAG_FILES_RESUME_SAME_CAT, prefs.resumeSameCategory),
          ...flag(ECTagNames.EC_TAG_FILES_SAVE_SOURCES, prefs.saveSources),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_ALLOC_FULL_SIZE,
-            prefs.allocFullFileSize,
-         ),
+         ...flag(ECTagNames.EC_TAG_FILES_ALLOC_FULL_SIZE, prefs.allocFullFileSize),
          ...flag(ECTagNames.EC_TAG_FILES_MMAP_ENABLED, prefs.mmapEnabled),
          ...flag(ECTagNames.EC_TAG_FILES_CHECK_FREE_SPACE, prefs.checkFreeSpace),
-         new ECUInt32Tag(
-            ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE,
-            prefs.minFreeDiskSpaceMb,
-         ),
+         new ECUInt32Tag(ECTagNames.EC_TAG_FILES_MIN_FREE_SPACE, prefs.minFreeDiskSpaceMb),
          ...flag(ECTagNames.EC_TAG_FILES_CREATE_NORMAL, prefs.createFilesNormal),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED,
-            prefs.mediaMetadataEnabled,
-         ),
-         new ECStringTag(
-            ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH,
-            prefs.mediaMetadataFfprobePath,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_FILES_START_NEXT_ALPHA,
-            prefs.startNextFileAlpha,
-         ),
+         ...flag(ECTagNames.EC_TAG_FILES_MEDIA_METADATA_ENABLED, prefs.mediaMetadataEnabled),
+         new ECStringTag(ECTagNames.EC_TAG_FILES_MEDIA_FFPROBE_PATH, prefs.mediaMetadataFfprobePath),
+         ...flag(ECTagNames.EC_TAG_FILES_START_NEXT_ALPHA, prefs.startNextFileAlpha),
       ]);
       await this.applySection(section);
       debug("setFiles: applied");
@@ -760,38 +642,20 @@ export class Preferences {
 
    /** Fetches the DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
    public async getDirectories(): Promise<DirectoriesPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.DIRECTORIES,
-         ECTagNames.EC_TAG_PREFS_DIRECTORIES,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.DIRECTORIES, ECTagNames.EC_TAG_PREFS_DIRECTORIES);
       if (!section) {
          throw new Error("Daemon did not return the DIRECTORIES section.");
       }
       const sharedTag = section.findChild(ECTagNames.EC_TAG_DIRECTORIES_SHARED);
       const prefs: DirectoriesPrefs = {
-         incomingDir:
-            section.childString(ECTagNames.EC_TAG_DIRECTORIES_INCOMING) ?? "",
+         incomingDir: section.childString(ECTagNames.EC_TAG_DIRECTORIES_INCOMING) ?? "",
          tempDir: section.childString(ECTagNames.EC_TAG_DIRECTORIES_TEMP) ?? "",
-         sharedDirs: (sharedTag?.children ?? []).map((child) =>
-            child instanceof ECStringTag ? child.value : "",
-         ),
-         shareHiddenFiles:
-            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN) !==
-            undefined,
-         autoRescanSharedDirs:
-            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN) !==
-            undefined,
-         followSymlinksInShares:
-            section.findChild(ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS) !==
-            undefined,
-         excludeSharePatterns:
-            section.childString(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS) ??
-            "",
-         excludeSharePatternsUseRegex:
-            Number(
-               section.childInt(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX) ??
-                  0n,
-            ) !== 0,
+         sharedDirs: (sharedTag?.children ?? []).map((child) => (child instanceof ECStringTag ? child.value : "")),
+         shareHiddenFiles: section.findChild(ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN) !== undefined,
+         autoRescanSharedDirs: section.findChild(ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN) !== undefined,
+         followSymlinksInShares: section.findChild(ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS) !== undefined,
+         excludeSharePatterns: section.childString(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS) ?? "",
+         excludeSharePatternsUseRegex: Number(section.childInt(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX) ?? 0n) !== 0,
       };
       debug("getDirectories: %o", prefs);
       return prefs;
@@ -799,69 +663,39 @@ export class Preferences {
 
    /** Replaces the whole DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
    public async setDirectories(prefs: DirectoriesPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_DIRECTORIES,
-         new Uint8Array(),
-         [
-            new ECStringTag(
-               ECTagNames.EC_TAG_DIRECTORIES_INCOMING,
-               prefs.incomingDir,
-            ),
-            new ECStringTag(ECTagNames.EC_TAG_DIRECTORIES_TEMP, prefs.tempDir),
-            new ECUInt32Tag(
-               ECTagNames.EC_TAG_DIRECTORIES_SHARED,
-               prefs.sharedDirs.length,
-               prefs.sharedDirs.map(
-                  (path) => new ECStringTag(ECTagNames.EC_TAG_STRING, path),
-               ),
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN,
-               prefs.shareHiddenFiles,
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN,
-               prefs.autoRescanSharedDirs,
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS,
-               prefs.followSymlinksInShares,
-            ),
-            new ECStringTag(
-               ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS,
-               prefs.excludeSharePatterns,
-            ),
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX,
-               prefs.excludeSharePatternsUseRegex ? 1 : 0,
-            ),
-         ],
-      );
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_DIRECTORIES, new Uint8Array(), [
+         new ECStringTag(ECTagNames.EC_TAG_DIRECTORIES_INCOMING, prefs.incomingDir),
+         new ECStringTag(ECTagNames.EC_TAG_DIRECTORIES_TEMP, prefs.tempDir),
+         new ECUInt32Tag(
+            ECTagNames.EC_TAG_DIRECTORIES_SHARED,
+            prefs.sharedDirs.length,
+            prefs.sharedDirs.map((path) => new ECStringTag(ECTagNames.EC_TAG_STRING, path)),
+         ),
+         ...flag(ECTagNames.EC_TAG_DIRECTORIES_SHARE_HIDDEN, prefs.shareHiddenFiles),
+         ...flag(ECTagNames.EC_TAG_DIRECTORIES_AUTO_RESCAN, prefs.autoRescanSharedDirs),
+         ...flag(ECTagNames.EC_TAG_DIRECTORIES_FOLLOW_SYMLINKS, prefs.followSymlinksInShares),
+         new ECStringTag(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_PATTERNS, prefs.excludeSharePatterns),
+         new ECUInt8Tag(ECTagNames.EC_TAG_DIRECTORIES_EXCLUDE_REGEX, prefs.excludeSharePatternsUseRegex ? 1 : 0),
+      ]);
       await this.applySection(section);
       debug("setDirectories: applied");
    }
 
    /** Fetches the SECURITY section - EC_TAG_PREFS_SECURITY. */
    public async getSecurity(): Promise<SecurityPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.SECURITY,
-         ECTagNames.EC_TAG_PREFS_SECURITY,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.SECURITY, ECTagNames.EC_TAG_PREFS_SECURITY);
       if (!section) {
          throw new Error("Daemon did not return the SECURITY section.");
       }
-      const has = (name: number): boolean =>
-         section.findChild(name) !== undefined;
+      const has = (name: number): boolean => section.findChild(name) !== undefined;
       const num = (name: number): number => Number(section.childInt(name) ?? 0n);
       const prefs: SecurityPrefs = {
          canSeeShares: num(ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES),
          ipFilterClients: has(ECTagNames.EC_TAG_IPFILTER_CLIENTS),
          ipFilterServers: has(ECTagNames.EC_TAG_IPFILTER_SERVERS),
          ipFilterAutoUpdate: has(ECTagNames.EC_TAG_IPFILTER_AUTO_UPDATE),
-         ipFilterUpdateUrl:
-            section.childString(ECTagNames.EC_TAG_IPFILTER_UPDATE_URL) ?? "",
+         ipFilterUpdateUrl: section.childString(ECTagNames.EC_TAG_IPFILTER_UPDATE_URL) ?? "",
          ipFilterLevel: num(ECTagNames.EC_TAG_IPFILTER_LEVEL),
          filterLanIps: has(ECTagNames.EC_TAG_IPFILTER_FILTER_LAN),
          secureIdentEnabled: has(ECTagNames.EC_TAG_SECURITY_USE_SECIDENT),
@@ -877,68 +711,36 @@ export class Preferences {
 
    /** Replaces the whole SECURITY section - EC_TAG_PREFS_SECURITY. */
    public async setSecurity(prefs: SecurityPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_SECURITY,
-         new Uint8Array(),
-         [
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES,
-               prefs.canSeeShares,
-            ),
-            ...flag(ECTagNames.EC_TAG_IPFILTER_CLIENTS, prefs.ipFilterClients),
-            ...flag(ECTagNames.EC_TAG_IPFILTER_SERVERS, prefs.ipFilterServers),
-            ...flag(
-               ECTagNames.EC_TAG_IPFILTER_AUTO_UPDATE,
-               prefs.ipFilterAutoUpdate,
-            ),
-            new ECStringTag(
-               ECTagNames.EC_TAG_IPFILTER_UPDATE_URL,
-               prefs.ipFilterUpdateUrl,
-            ),
-            new ECUInt8Tag(ECTagNames.EC_TAG_IPFILTER_LEVEL, prefs.ipFilterLevel),
-            ...flag(ECTagNames.EC_TAG_IPFILTER_FILTER_LAN, prefs.filterLanIps),
-            ...flag(
-               ECTagNames.EC_TAG_SECURITY_USE_SECIDENT,
-               prefs.secureIdentEnabled,
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_SUPPORTED,
-               prefs.obfuscationSupported,
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUESTED,
-               prefs.obfuscationRequested,
-            ),
-            ...flag(
-               ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUIRED,
-               prefs.obfuscationRequired,
-            ),
-            ...flag(ECTagNames.EC_TAG_IPFILTER_PARANOID, prefs.ipFilterParanoid),
-            ...flag(ECTagNames.EC_TAG_IPFILTER_SYSTEM, prefs.ipFilterSystem),
-         ],
-      );
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SECURITY, new Uint8Array(), [
+         new ECUInt8Tag(ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES, prefs.canSeeShares),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_CLIENTS, prefs.ipFilterClients),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_SERVERS, prefs.ipFilterServers),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_AUTO_UPDATE, prefs.ipFilterAutoUpdate),
+         new ECStringTag(ECTagNames.EC_TAG_IPFILTER_UPDATE_URL, prefs.ipFilterUpdateUrl),
+         new ECUInt8Tag(ECTagNames.EC_TAG_IPFILTER_LEVEL, prefs.ipFilterLevel),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_FILTER_LAN, prefs.filterLanIps),
+         ...flag(ECTagNames.EC_TAG_SECURITY_USE_SECIDENT, prefs.secureIdentEnabled),
+         ...flag(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_SUPPORTED, prefs.obfuscationSupported),
+         ...flag(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUESTED, prefs.obfuscationRequested),
+         ...flag(ECTagNames.EC_TAG_SECURITY_OBFUSCATION_REQUIRED, prefs.obfuscationRequired),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_PARANOID, prefs.ipFilterParanoid),
+         ...flag(ECTagNames.EC_TAG_IPFILTER_SYSTEM, prefs.ipFilterSystem),
+      ]);
       await this.applySection(section);
       debug("setSecurity: applied");
    }
 
    /** Fetches the ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
    public async getOnlineSig(): Promise<OnlineSigPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.ONLINESIG,
-         ECTagNames.EC_TAG_PREFS_ONLINESIG,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.ONLINESIG, ECTagNames.EC_TAG_PREFS_ONLINESIG);
       if (!section) {
          throw new Error("Daemon did not return the ONLINESIG section.");
       }
       const prefs: OnlineSigPrefs = {
          enabled: section.findChild(ECTagNames.EC_TAG_ONLINESIG_ENABLED) !== undefined,
-         directory:
-            section.childString(ECTagNames.EC_TAG_ONLINESIG_DIRECTORY) ?? "",
-         updateIntervalSeconds: Number(
-            section.childInt(ECTagNames.EC_TAG_ONLINESIG_UPDATE) ?? 0n,
-         ),
+         directory: section.childString(ECTagNames.EC_TAG_ONLINESIG_DIRECTORY) ?? "",
+         updateIntervalSeconds: Number(section.childInt(ECTagNames.EC_TAG_ONLINESIG_UPDATE) ?? 0n),
       };
       debug("getOnlineSig: %o", prefs);
       return prefs;
@@ -946,48 +748,25 @@ export class Preferences {
 
    /** Replaces the whole ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
    public async setOnlineSig(prefs: OnlineSigPrefs): Promise<void> {
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_ONLINESIG,
-         new Uint8Array(),
-         [
-            ...(prefs.enabled
-               ? [
-                    new ECCustomTag(
-                       ECTagNames.EC_TAG_ONLINESIG_ENABLED,
-                       new Uint8Array(),
-                    ),
-                 ]
-               : []),
-            new ECStringTag(
-               ECTagNames.EC_TAG_ONLINESIG_DIRECTORY,
-               prefs.directory,
-            ),
-            new ECUInt16Tag(
-               ECTagNames.EC_TAG_ONLINESIG_UPDATE,
-               prefs.updateIntervalSeconds,
-            ),
-         ],
-      );
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_ONLINESIG, new Uint8Array(), [
+         ...(prefs.enabled ? [new ECCustomTag(ECTagNames.EC_TAG_ONLINESIG_ENABLED, new Uint8Array())] : []),
+         new ECStringTag(ECTagNames.EC_TAG_ONLINESIG_DIRECTORY, prefs.directory),
+         new ECUInt16Tag(ECTagNames.EC_TAG_ONLINESIG_UPDATE, prefs.updateIntervalSeconds),
+      ]);
       await this.applySection(section);
       debug("setOnlineSig: applied");
    }
 
    /** Fetches the SERVERS section - EC_TAG_PREFS_SERVERS. */
    public async getServers(): Promise<ServersPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.SERVERS,
-         ECTagNames.EC_TAG_PREFS_SERVERS,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.SERVERS, ECTagNames.EC_TAG_PREFS_SERVERS);
       if (!section) {
          throw new Error("Daemon did not return the SERVERS section.");
       }
-      const has = (name: number): boolean =>
-         section.findChild(name) !== undefined;
+      const has = (name: number): boolean => section.findChild(name) !== undefined;
       const prefs: ServersPrefs = {
          removeDeadServers: has(ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD),
-         deadServerRetries: Number(
-            section.childInt(ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES) ?? 0n,
-         ),
+         deadServerRetries: Number(section.childInt(ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES) ?? 0n),
          autoUpdateServerList: has(ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE),
          addServersFromServer: has(ECTagNames.EC_TAG_SERVERS_ADD_FROM_SERVER),
          addServersFromClient: has(ECTagNames.EC_TAG_SERVERS_ADD_FROM_CLIENT),
@@ -1004,40 +783,18 @@ export class Preferences {
 
    /** Replaces the whole SERVERS section - EC_TAG_PREFS_SERVERS. */
    public async setServers(prefs: ServersPrefs): Promise<void> {
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SERVERS, new Uint8Array(), [
          ...flag(ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD, prefs.removeDeadServers),
-         new ECUInt16Tag(
-            ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES,
-            prefs.deadServerRetries,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE,
-            prefs.autoUpdateServerList,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_ADD_FROM_SERVER,
-            prefs.addServersFromServer,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_ADD_FROM_CLIENT,
-            prefs.addServersFromClient,
-         ),
+         new ECUInt16Tag(ECTagNames.EC_TAG_SERVERS_DEAD_SERVER_RETRIES, prefs.deadServerRetries),
+         ...flag(ECTagNames.EC_TAG_SERVERS_AUTO_UPDATE, prefs.autoUpdateServerList),
+         ...flag(ECTagNames.EC_TAG_SERVERS_ADD_FROM_SERVER, prefs.addServersFromServer),
+         ...flag(ECTagNames.EC_TAG_SERVERS_ADD_FROM_CLIENT, prefs.addServersFromClient),
          ...flag(ECTagNames.EC_TAG_SERVERS_USE_SCORE_SYSTEM, prefs.useScoreSystem),
          ...flag(ECTagNames.EC_TAG_SERVERS_SMART_ID_CHECK, prefs.smartIdCheck),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_SAFE_SERVER_CONNECT,
-            prefs.safeServerConnect,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_AUTOCONN_STATIC_ONLY,
-            prefs.autoConnectStaticOnly,
-         ),
-         ...flag(
-            ECTagNames.EC_TAG_SERVERS_MANUAL_HIGH_PRIO,
-            prefs.manualHighPriority,
-         ),
+         ...flag(ECTagNames.EC_TAG_SERVERS_SAFE_SERVER_CONNECT, prefs.safeServerConnect),
+         ...flag(ECTagNames.EC_TAG_SERVERS_AUTOCONN_STATIC_ONLY, prefs.autoConnectStaticOnly),
+         ...flag(ECTagNames.EC_TAG_SERVERS_MANUAL_HIGH_PRIO, prefs.manualHighPriority),
          new ECStringTag(ECTagNames.EC_TAG_SERVERS_UPDATE_URL, prefs.updateUrl),
       ]);
       await this.applySection(section);
@@ -1046,16 +803,12 @@ export class Preferences {
 
    /** Fetches the KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
    public async getKademlia(): Promise<KademliaPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.KADEMLIA,
-         ECTagNames.EC_TAG_PREFS_KADEMLIA,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.KADEMLIA, ECTagNames.EC_TAG_PREFS_KADEMLIA);
       if (!section) {
          throw new Error("Daemon did not return the KADEMLIA section.");
       }
       const prefs: KademliaPrefs = {
-         nodesUpdateUrl:
-            section.childString(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL) ?? "",
+         nodesUpdateUrl: section.childString(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL) ?? "",
       };
       debug("getKademlia: %o", prefs);
       return prefs;
@@ -1063,48 +816,27 @@ export class Preferences {
 
    /** Replaces the whole KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
    public async setKademlia(prefs: KademliaPrefs): Promise<void> {
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_KADEMLIA,
-         new Uint8Array(),
-         [new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, prefs.nodesUpdateUrl)],
-      );
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_KADEMLIA, new Uint8Array(), [
+         new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, prefs.nodesUpdateUrl),
+      ]);
       await this.applySection(section);
       debug("setKademlia: applied");
    }
 
    /** Fetches the GENERAL section - EC_TAG_PREFS_GENERAL. */
    public async getGeneral(): Promise<GeneralPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.GENERAL,
-         ECTagNames.EC_TAG_PREFS_GENERAL,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.GENERAL, ECTagNames.EC_TAG_PREFS_GENERAL);
       if (!section) {
          throw new Error("Daemon did not return the GENERAL section.");
       }
       const hashTag = section.findChild(ECTagNames.EC_TAG_USER_HASH);
       const prefs: GeneralPrefs = {
          userNick: section.childString(ECTagNames.EC_TAG_USER_NICK) ?? "",
-         userHash:
-            hashTag instanceof ECHash16Tag
-               ? Buffer.from(hashTag.value).toString("hex")
-               : "",
+         userHash: hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : "",
          userHost: section.childString(ECTagNames.EC_TAG_USER_HOST) ?? "",
-         checkNewVersion:
-            Number(
-               section.childInt(ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION) ??
-                  0n,
-            ) !== 0,
-         versionCheckAvailable:
-            Number(
-               section.childInt(
-                  ECTagNames.EC_TAG_GENERAL_VERSION_CHECK_AVAILABLE,
-               ) ?? 0n,
-            ) !== 0,
-         upnpAvailable:
-            Number(
-               section.childInt(ECTagNames.EC_TAG_GENERAL_UPNP_AVAILABLE) ??
-                  0n,
-            ) !== 0,
+         checkNewVersion: Number(section.childInt(ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION) ?? 0n) !== 0,
+         versionCheckAvailable: Number(section.childInt(ECTagNames.EC_TAG_GENERAL_VERSION_CHECK_AVAILABLE) ?? 0n) !== 0,
+         upnpAvailable: Number(section.childInt(ECTagNames.EC_TAG_GENERAL_UPNP_AVAILABLE) ?? 0n) !== 0,
       };
       debug("getGeneral: %o", prefs);
       return prefs;
@@ -1112,84 +844,45 @@ export class Preferences {
 
    /** Replaces the whole GENERAL section - EC_TAG_PREFS_GENERAL. */
    public async setGeneral(prefs: GeneralPrefs): Promise<void> {
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_GENERAL,
-         new Uint8Array(),
-         [
-            new ECStringTag(ECTagNames.EC_TAG_USER_NICK, prefs.userNick),
-            new ECHash16Tag(
-               ECTagNames.EC_TAG_USER_HASH,
-               new Uint8Array(Buffer.from(prefs.userHash, "hex")),
-            ),
-            new ECStringTag(ECTagNames.EC_TAG_USER_HOST, prefs.userHost),
-            new ECUInt8Tag(
-               ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION,
-               prefs.checkNewVersion ? 1 : 0,
-            ),
-         ],
-      );
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_GENERAL, new Uint8Array(), [
+         new ECStringTag(ECTagNames.EC_TAG_USER_NICK, prefs.userNick),
+         new ECHash16Tag(ECTagNames.EC_TAG_USER_HASH, new Uint8Array(Buffer.from(prefs.userHash, "hex"))),
+         new ECStringTag(ECTagNames.EC_TAG_USER_HOST, prefs.userHost),
+         new ECUInt8Tag(ECTagNames.EC_TAG_GENERAL_CHECK_NEW_VERSION, prefs.checkNewVersion ? 1 : 0),
+      ]);
       await this.applySection(section);
       debug("setGeneral: applied");
    }
 
    /** Fetches the REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL. */
    public async getRemoteControls(): Promise<RemoteControlsPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.REMOTECONTROLS,
-         ECTagNames.EC_TAG_PREFS_REMOTECTRL,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.REMOTECONTROLS, ECTagNames.EC_TAG_PREFS_REMOTECTRL);
       if (!section) {
          throw new Error("Daemon did not return the REMOTECONTROLS section.");
       }
       const hashOf = (tag: ECTag | undefined): string | undefined => {
          const hashChild = tag?.findChild(ECTagNames.EC_TAG_PASSWD_HASH);
-         return hashChild instanceof ECHash16Tag
-            ? Buffer.from(hashChild.value).toString("hex")
-            : undefined;
+         return hashChild instanceof ECHash16Tag ? Buffer.from(hashChild.value).toString("hex") : undefined;
       };
-      const webserverGuestTag = section.findChild(
-         ECTagNames.EC_TAG_WEBSERVER_GUEST,
-      );
-      const amuleApiAdminTag = section.findChild(
-         ECTagNames.EC_TAG_AMULEAPI_PASSWD,
-      );
-      const amuleApiGuestTag = section.findChild(
-         ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
-      );
-      const webserverPasswordTag = section.findChild(
-         ECTagNames.EC_TAG_PASSWD_HASH,
-      );
+      const webserverGuestTag = section.findChild(ECTagNames.EC_TAG_WEBSERVER_GUEST);
+      const amuleApiAdminTag = section.findChild(ECTagNames.EC_TAG_AMULEAPI_PASSWD);
+      const amuleApiGuestTag = section.findChild(ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD);
+      const webserverPasswordTag = section.findChild(ECTagNames.EC_TAG_PASSWD_HASH);
       const prefs: RemoteControlsPrefs = {
-         webserverPort: Number(
-            section.childInt(ECTagNames.EC_TAG_WEBSERVER_PORT) ?? 0n,
-         ),
-         webserverAutorun:
-            section.findChild(ECTagNames.EC_TAG_WEBSERVER_AUTORUN) !==
-            undefined,
+         webserverPort: Number(section.childInt(ECTagNames.EC_TAG_WEBSERVER_PORT) ?? 0n),
+         webserverAutorun: section.findChild(ECTagNames.EC_TAG_WEBSERVER_AUTORUN) !== undefined,
          webserverPasswordHash:
-            webserverPasswordTag instanceof ECHash16Tag
-               ? Buffer.from(webserverPasswordTag.value).toString("hex")
-               : undefined,
+            webserverPasswordTag instanceof ECHash16Tag ? Buffer.from(webserverPasswordTag.value).toString("hex") : undefined,
          webserverGuest: {
             enabled: webserverGuestTag !== undefined,
             passwordHash: hashOf(webserverGuestTag),
          },
-         webserverUseGzip:
-            section.findChild(ECTagNames.EC_TAG_WEBSERVER_USEGZIP) !==
-            undefined,
-         webserverRefreshSeconds: Number(
-            section.childInt(ECTagNames.EC_TAG_WEBSERVER_REFRESH) ?? 0n,
-         ),
-         webserverTemplate:
-            section.childString(ECTagNames.EC_TAG_WEBSERVER_TEMPLATE) ?? "",
-         amuleApiPort: Number(
-            section.childInt(ECTagNames.EC_TAG_AMULEAPI_PORT) ?? 0n,
-         ),
-         amuleApiAutorun:
-            section.findChild(ECTagNames.EC_TAG_AMULEAPI_AUTORUN) !==
-            undefined,
-         amuleApiBindAddress:
-            section.childString(ECTagNames.EC_TAG_AMULEAPI_BIND) ?? "",
+         webserverUseGzip: section.findChild(ECTagNames.EC_TAG_WEBSERVER_USEGZIP) !== undefined,
+         webserverRefreshSeconds: Number(section.childInt(ECTagNames.EC_TAG_WEBSERVER_REFRESH) ?? 0n),
+         webserverTemplate: section.childString(ECTagNames.EC_TAG_WEBSERVER_TEMPLATE) ?? "",
+         amuleApiPort: Number(section.childInt(ECTagNames.EC_TAG_AMULEAPI_PORT) ?? 0n),
+         amuleApiAutorun: section.findChild(ECTagNames.EC_TAG_AMULEAPI_AUTORUN) !== undefined,
+         amuleApiBindAddress: section.childString(ECTagNames.EC_TAG_AMULEAPI_BIND) ?? "",
          amuleApiAdmin: {
             enabled: amuleApiAdminTag !== undefined,
             passwordHash: hashOf(amuleApiAdminTag),
@@ -1210,74 +903,38 @@ export class Preferences {
             return [];
          }
          const children = value.passwordHash
-            ? [
-                 new ECHash16Tag(
-                    ECTagNames.EC_TAG_PASSWD_HASH,
-                    new Uint8Array(Buffer.from(value.passwordHash, "hex")),
-                 ),
-              ]
+            ? [new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, new Uint8Array(Buffer.from(value.passwordHash, "hex")))]
             : [];
          return [new ECCustomTag(name, new Uint8Array(), children)];
       };
-      const flag = (name: number, value: boolean): ECTag[] =>
-         value ? [new ECCustomTag(name, new Uint8Array())] : [];
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_REMOTECTRL,
-         new Uint8Array(),
-         [
-            new ECUInt16Tag(
-               ECTagNames.EC_TAG_WEBSERVER_PORT,
-               prefs.webserverPort,
-            ),
-            ...flag(ECTagNames.EC_TAG_WEBSERVER_AUTORUN, prefs.webserverAutorun),
-            ...(prefs.webserverPasswordHash
-               ? [
-                    new ECHash16Tag(
-                       ECTagNames.EC_TAG_PASSWD_HASH,
-                       new Uint8Array(
-                          Buffer.from(prefs.webserverPasswordHash, "hex"),
-                       ),
-                    ),
-                 ]
-               : []),
-            ...account(ECTagNames.EC_TAG_WEBSERVER_GUEST, prefs.webserverGuest),
-            ...flag(ECTagNames.EC_TAG_WEBSERVER_USEGZIP, prefs.webserverUseGzip),
-            new ECUInt32Tag(
-               ECTagNames.EC_TAG_WEBSERVER_REFRESH,
-               prefs.webserverRefreshSeconds,
-            ),
-            new ECStringTag(
-               ECTagNames.EC_TAG_WEBSERVER_TEMPLATE,
-               prefs.webserverTemplate,
-            ),
-            new ECUInt16Tag(ECTagNames.EC_TAG_AMULEAPI_PORT, prefs.amuleApiPort),
-            ...flag(ECTagNames.EC_TAG_AMULEAPI_AUTORUN, prefs.amuleApiAutorun),
-            new ECStringTag(
-               ECTagNames.EC_TAG_AMULEAPI_BIND,
-               prefs.amuleApiBindAddress,
-            ),
-            ...account(ECTagNames.EC_TAG_AMULEAPI_PASSWD, prefs.amuleApiAdmin),
-            ...account(
-               ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD,
-               prefs.amuleApiGuest,
-            ),
-         ],
-      );
+      const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_REMOTECTRL, new Uint8Array(), [
+         new ECUInt16Tag(ECTagNames.EC_TAG_WEBSERVER_PORT, prefs.webserverPort),
+         ...flag(ECTagNames.EC_TAG_WEBSERVER_AUTORUN, prefs.webserverAutorun),
+         ...(prefs.webserverPasswordHash
+            ? [new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, new Uint8Array(Buffer.from(prefs.webserverPasswordHash, "hex")))]
+            : []),
+         ...account(ECTagNames.EC_TAG_WEBSERVER_GUEST, prefs.webserverGuest),
+         ...flag(ECTagNames.EC_TAG_WEBSERVER_USEGZIP, prefs.webserverUseGzip),
+         new ECUInt32Tag(ECTagNames.EC_TAG_WEBSERVER_REFRESH, prefs.webserverRefreshSeconds),
+         new ECStringTag(ECTagNames.EC_TAG_WEBSERVER_TEMPLATE, prefs.webserverTemplate),
+         new ECUInt16Tag(ECTagNames.EC_TAG_AMULEAPI_PORT, prefs.amuleApiPort),
+         ...flag(ECTagNames.EC_TAG_AMULEAPI_AUTORUN, prefs.amuleApiAutorun),
+         new ECStringTag(ECTagNames.EC_TAG_AMULEAPI_BIND, prefs.amuleApiBindAddress),
+         ...account(ECTagNames.EC_TAG_AMULEAPI_PASSWD, prefs.amuleApiAdmin),
+         ...account(ECTagNames.EC_TAG_AMULEAPI_GUEST_PASSWD, prefs.amuleApiGuest),
+      ]);
       await this.applySection(section);
       debug("setRemoteControls: applied");
    }
 
    /** Fetches the IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY. */
    public async getIP2Country(): Promise<IP2CountryPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.IP2COUNTRY,
-         ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.IP2COUNTRY, ECTagNames.EC_TAG_PREFS_IP2COUNTRY);
       if (!section) {
          throw new Error("Daemon did not return the IP2COUNTRY section.");
       }
-      const bool = (name: number): boolean =>
-         Number(section.childInt(name) ?? 0n) !== 0;
+      const bool = (name: number): boolean => Number(section.childInt(name) ?? 0n) !== 0;
       const boolOrUndefined = (name: number): boolean | undefined => {
          const value = section.childInt(name);
          return value === undefined ? undefined : Number(value) !== 0;
@@ -1285,25 +942,15 @@ export class Preferences {
       const prefs: IP2CountryPrefs = {
          supported: bool(ECTagNames.EC_TAG_IP2COUNTRY_SUPPORTED),
          enabled: bool(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED),
-         source: Number(
-            section.childInt(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE) ?? 0n,
-         ),
-         customUrl:
-            section.childString(ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL) ?? "",
-         maxMindLicense:
-            section.childString(
-               ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
-            ) ?? "",
+         source: Number(section.childInt(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE) ?? 0n),
+         customUrl: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL) ?? "",
+         maxMindLicense: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE) ?? "",
          autoUpdate: bool(ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE),
-         loadedSource: section.childString(
-            ECTagNames.EC_TAG_IP2COUNTRY_LOADED_SOURCE,
-         ),
+         loadedSource: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_LOADED_SOURCE),
          databasePath: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_DB_PATH),
          databaseLoaded: boolOrUndefined(ECTagNames.EC_TAG_IP2COUNTRY_DB_LOADED),
          downloading: boolOrUndefined(ECTagNames.EC_TAG_IP2COUNTRY_DOWNLOADING),
-         lastResult: section.childString(
-            ECTagNames.EC_TAG_IP2COUNTRY_LAST_RESULT,
-         ),
+         lastResult: section.childString(ECTagNames.EC_TAG_IP2COUNTRY_LAST_RESULT),
          updateNow: false,
       };
       debug("getIP2Country: %o", prefs);
@@ -1315,39 +962,21 @@ export class Preferences {
       const children: ECTag[] = [
          new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, prefs.enabled ? 1 : 0),
          new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE, prefs.source),
-         new ECStringTag(
-            ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL,
-            prefs.customUrl,
-         ),
-         new ECStringTag(
-            ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE,
-            prefs.maxMindLicense,
-         ),
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE,
-            prefs.autoUpdate ? 1 : 0,
-         ),
+         new ECStringTag(ECTagNames.EC_TAG_IP2COUNTRY_CUSTOM_URL, prefs.customUrl),
+         new ECStringTag(ECTagNames.EC_TAG_IP2COUNTRY_MAXMIND_LICENSE, prefs.maxMindLicense),
+         new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_AUTO_UPDATE, prefs.autoUpdate ? 1 : 0),
       ];
       if (prefs.updateNow) {
-         children.push(
-            new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_UPDATE_NOW, 1),
-         );
+         children.push(new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_UPDATE_NOW, 1));
       }
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_IP2COUNTRY,
-         new Uint8Array(),
-         children,
-      );
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_IP2COUNTRY, new Uint8Array(), children);
       await this.applySection(section);
       debug("setIP2Country: applied");
    }
 
    /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
    public async getCoreTweaks(): Promise<CoreTweaksPrefs> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.CORETWEAKS,
-         ECTagNames.EC_TAG_PREFS_CORETWEAKS,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.CORETWEAKS, ECTagNames.EC_TAG_PREFS_CORETWEAKS);
       if (!section) {
          throw new Error("Daemon did not return the CORETWEAKS section.");
       }
@@ -1357,9 +986,7 @@ export class Preferences {
          verbose: section.findChild(ECTagNames.EC_TAG_CORETW_VERBOSE) !== undefined,
          fileBufferSize: num(ECTagNames.EC_TAG_CORETW_FILEBUFFER),
          uploadQueueSize: num(ECTagNames.EC_TAG_CORETW_UL_QUEUE),
-         serverKeepAliveTimeoutMs: num(
-            ECTagNames.EC_TAG_CORETW_SRV_KEEPALIVE_TIMEOUT,
-         ),
+         serverKeepAliveTimeoutMs: num(ECTagNames.EC_TAG_CORETW_SRV_KEEPALIVE_TIMEOUT),
          kadMaxSourceSearches: num(ECTagNames.EC_TAG_CORETW_KAD_MAX_SEARCHES),
          kadSourceReaskMs: num(ECTagNames.EC_TAG_CORETW_KAD_REASK_MS),
          sourceReaskMs: num(ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS),
@@ -1370,48 +997,19 @@ export class Preferences {
 
    /** Replaces the whole CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
    public async setCoreTweaks(prefs: CoreTweaksPrefs): Promise<void> {
-      const children: ECTag[] = [
-         new ECUInt16Tag(
-            ECTagNames.EC_TAG_CORETW_MAX_CONN_PER_FIVE,
-            prefs.maxConnPerFive,
-         ),
-      ];
+      const children: ECTag[] = [new ECUInt16Tag(ECTagNames.EC_TAG_CORETW_MAX_CONN_PER_FIVE, prefs.maxConnPerFive)];
       if (prefs.verbose) {
-         children.push(
-            new ECCustomTag(ECTagNames.EC_TAG_CORETW_VERBOSE, new Uint8Array()),
-         );
+         children.push(new ECCustomTag(ECTagNames.EC_TAG_CORETW_VERBOSE, new Uint8Array()));
       }
       children.push(
-         new ECUInt32Tag(
-            ECTagNames.EC_TAG_CORETW_FILEBUFFER,
-            prefs.fileBufferSize,
-         ),
-         new ECUInt32Tag(
-            ECTagNames.EC_TAG_CORETW_UL_QUEUE,
-            prefs.uploadQueueSize,
-         ),
-         new ECUInt64Tag(
-            ECTagNames.EC_TAG_CORETW_SRV_KEEPALIVE_TIMEOUT,
-            BigInt(prefs.serverKeepAliveTimeoutMs),
-         ),
-         new ECUInt16Tag(
-            ECTagNames.EC_TAG_CORETW_KAD_MAX_SEARCHES,
-            prefs.kadMaxSourceSearches,
-         ),
-         new ECUInt64Tag(
-            ECTagNames.EC_TAG_CORETW_KAD_REASK_MS,
-            BigInt(prefs.kadSourceReaskMs),
-         ),
-         new ECUInt64Tag(
-            ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS,
-            BigInt(prefs.sourceReaskMs),
-         ),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CORETW_FILEBUFFER, prefs.fileBufferSize),
+         new ECUInt32Tag(ECTagNames.EC_TAG_CORETW_UL_QUEUE, prefs.uploadQueueSize),
+         new ECUInt64Tag(ECTagNames.EC_TAG_CORETW_SRV_KEEPALIVE_TIMEOUT, BigInt(prefs.serverKeepAliveTimeoutMs)),
+         new ECUInt16Tag(ECTagNames.EC_TAG_CORETW_KAD_MAX_SEARCHES, prefs.kadMaxSourceSearches),
+         new ECUInt64Tag(ECTagNames.EC_TAG_CORETW_KAD_REASK_MS, BigInt(prefs.kadSourceReaskMs)),
+         new ECUInt64Tag(ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS, BigInt(prefs.sourceReaskMs)),
       );
-      const section = new ECCustomTag(
-         ECTagNames.EC_TAG_PREFS_CORETWEAKS,
-         new Uint8Array(),
-         children,
-      );
+      const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_CORETWEAKS, new Uint8Array(), children);
       await this.applySection(section);
       debug("setCoreTweaks: applied");
    }
@@ -1429,10 +1027,7 @@ export class Preferences {
     * (https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECSpecialTags.h#L244-L249).
     */
    public async listCategories(): Promise<Category[]> {
-      const section = await this.fetchSection(
-         ECPreferencesSelection.CATEGORIES,
-         ECTagNames.EC_TAG_PREFS_CATEGORIES,
-      );
+      const section = await this.fetchSection(ECPreferencesSelection.CATEGORIES, ECTagNames.EC_TAG_PREFS_CATEGORIES);
       if (!section) {
          return [];
       }

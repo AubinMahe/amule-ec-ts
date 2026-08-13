@@ -17,7 +17,6 @@ import {
 
 /** "show prefs <section>"/"prefs <section> ..."/"show categories" - all operate on ec.Preferences alone (the biggest feature class in the library, so also the biggest controller here). */
 export class PreferencesController {
-
    public constructor(private readonly preferences: ec.Preferences) {}
 
    private readonly showHandlers: Record<string, () => Promise<void>> = {
@@ -63,9 +62,7 @@ export class PreferencesController {
    public async showSection(subject: string): Promise<void> {
       const handler = this.showHandlers[subject];
       if (!handler) {
-         console.error(
-            `Usage: show prefs <${Object.keys(this.showHandlers).join("|")}>`,
-         );
+         console.error(`Usage: show prefs <${Object.keys(this.showHandlers).join("|")}>`);
          return;
       }
       await handler();
@@ -173,9 +170,7 @@ export class PreferencesController {
          ...current,
          autoUpdateServerList: onOff === "on",
       });
-      console.log(
-         `Server-list auto-update ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`Server-list auto-update ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 
    private async kademlia(args: string[]): Promise<void> {
@@ -201,9 +196,7 @@ export class PreferencesController {
          ...current,
          checkNewVersion: onOff === "on",
       });
-      console.log(
-         `Check-new-version preference ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`Check-new-version preference ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 
    private async remoteControls(args: string[]): Promise<void> {
@@ -233,9 +226,7 @@ export class PreferencesController {
          ...current,
          autoUpdate: onOff === "on",
       });
-      console.log(
-         `GeoIP auto-update ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`GeoIP auto-update ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 
    private async files(args: string[]): Promise<void> {
@@ -265,9 +256,7 @@ export class PreferencesController {
          ...current,
          autoRescanSharedDirs: onOff === "on",
       });
-      console.log(
-         `Shared-dirs auto-rescan ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`Shared-dirs auto-rescan ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 
    private async messageFilter(args: string[]): Promise<void> {
@@ -296,9 +285,7 @@ export class PreferencesController {
          ...current,
          reconnect: onOff === "on",
       });
-      console.log(
-         `ed2k auto-reconnect ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`ed2k auto-reconnect ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 
    private async coreTweaks(args: string[]): Promise<void> {
@@ -313,8 +300,6 @@ export class PreferencesController {
          ...current,
          verbose: onOff === "on",
       });
-      console.log(
-         `Core verbose logging ${onOff === "on" ? "enabled" : "disabled"}.`,
-      );
+      console.log(`Core verbose logging ${onOff === "on" ? "enabled" : "disabled"}.`);
    }
 }

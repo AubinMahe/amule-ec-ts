@@ -10,13 +10,7 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECFlags } from "./ECFlags.js";
 import { ECVersion } from "./ECVersion.js";
 import { TransmissionHeader } from "./Transmission.js";
-import {
-   ECUInt16Tag,
-   ECUInt64Tag,
-   ECStringTag,
-   ECHash16Tag,
-   ECCustomTag,
-} from "./ECTags.js";
+import { ECUInt16Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:connection");
 
@@ -64,7 +58,6 @@ interface PendingReceive {
  * into an automatic reconnect loop, see its doc.
  */
 export class ECConnection extends events.EventEmitter {
-
    /**
     * Payloads larger than this are always zlib-compressed when the zlib
     * capability is available, even if EC_TAG_PREFER_NO_ZLIB was set (the
@@ -139,10 +132,7 @@ export class ECConnection extends events.EventEmitter {
       });
    }
 
-   public static async connect(
-      host = "localhost",
-      port = 4712,
-   ): Promise<ECConnection> {
+   public static async connect(host = "localhost", port = 4712): Promise<ECConnection> {
       const socket = await ECConnection.connectSocket(host, port);
       const connection = new ECConnection(socket);
       connection.beginPump();
@@ -206,100 +196,39 @@ export class ECConnection extends events.EventEmitter {
     */
    public async authenticateWithHash(passwordHash: string): Promise<void> {
       const authRequest = new ECPacket(ECOpcode.EC_OP_AUTH_REQ);
-      authRequest.add(
-         new ECUInt16Tag(
-            ECTagNames.EC_TAG_PROTOCOL_VERSION,
-            ECVersion.PROTOCOL,
-         ),
-      );
-      authRequest.add(
-         new ECStringTag(
-            ECTagNames.EC_TAG_CLIENT_NAME,
-            ECVersion.CLIENT_NAME
-         ),
-      );
-      authRequest.add(
-         new ECStringTag(
-            ECTagNames.EC_TAG_CLIENT_VERSION,
-            ECVersion.CLIENT_VERSION,
-         ),
-      );
+      authRequest.add(new ECUInt16Tag(ECTagNames.EC_TAG_PROTOCOL_VERSION, ECVersion.PROTOCOL));
+      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_NAME, ECVersion.CLIENT_NAME));
+      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_VERSION, ECVersion.CLIENT_VERSION));
       if (this.localCapabilities.zlib) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_CAN_ZLIB,
-               new Uint8Array()
-            ),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_ZLIB, new Uint8Array()));
       }
       if (this.localCapabilities.utf8Numbers) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_CAN_UTF8_NUMBERS,
-               new Uint8Array(),
-            ),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_UTF8_NUMBERS, new Uint8Array()));
       }
       if (this.localCapabilities.notify) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_CAN_NOTIFY,
-               new Uint8Array()
-            ),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_NOTIFY, new Uint8Array()));
       }
       if (this.localCapabilities.largeTagCount) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT,
-               new Uint8Array(),
-            ),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT, new Uint8Array()));
       }
       if (this.localCapabilities.preferNoZlib) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_PREFER_NO_ZLIB,
-               new Uint8Array()),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_PREFER_NO_ZLIB, new Uint8Array()));
       }
       if (this.localCapabilities.multiSearch) {
-         authRequest.add(
-            new ECCustomTag(
-               ECTagNames.EC_TAG_CAN_MULTI_SEARCH,
-               new Uint8Array(),
-            ),
-         );
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_MULTI_SEARCH, new Uint8Array()));
       }
       // Unconditional, unlike every capability above - no client-side
       // preference exists to gate it on, see ECCapabilities.sharedDirsConfig's doc.
-      authRequest.add(
-         new ECCustomTag(
-            ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG,
-            new Uint8Array(),
-         ),
-      );
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG, new Uint8Array()));
       // Unconditional too - see ECCapabilities.searchList's doc.
-      authRequest.add(
-         new ECCustomTag(
-            ECTagNames.EC_TAG_CAN_SEARCH_LIST,
-            new Uint8Array(),
-         ),
-      );
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_SEARCH_LIST, new Uint8Array()));
       // Unconditional too - see ECCapabilities.partialUpdate's doc.
-      authRequest.add(
-         new ECCustomTag(
-            ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE,
-            new Uint8Array(),
-         ),
-      );
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE, new Uint8Array()));
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
       if (saltPacket.opcode !== ECOpcode.EC_OP_AUTH_SALT) {
-         throw new Error(
-            `Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`);
       }
       const saltTag = saltPacket.find(ECTagNames.EC_TAG_PASSWD_SALT);
       if (!saltTag || !(saltTag instanceof ECUInt64Tag)) {
@@ -311,61 +240,38 @@ export class ECConnection extends events.EventEmitter {
       const finalHash = md5Digest(passwordHash + saltHash);
       const saltedHash = new Uint8Array(finalHash);
       const authPasswd = new ECPacket(ECOpcode.EC_OP_AUTH_PASSWD);
-      authPasswd.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_PASSWD_HASH,
-            saltedHash
-         ),
-      );
+      authPasswd.add(new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, saltedHash));
       await this.send(authPasswd);
       const reply = await this.receive();
       if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : "EC authentication failed.";
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
-         throw new Error(
-            `Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`,
-         );
+         throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
       }
       // The client must not use a capability unless the server echoed it.
       this.remoteCapabilities.largeTagCount =
-         this.localCapabilities.largeTagCount &&
-         reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
-      this.remoteCapabilities.multiSearch =
-         this.localCapabilities.multiSearch &&
-         reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
+         this.localCapabilities.largeTagCount && reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
+      this.remoteCapabilities.multiSearch = this.localCapabilities.multiSearch && reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
       // Unconditional request above, so no ANDing with a local flag here -
       // see ECCapabilities.sharedDirsConfig's doc.
-      this.remoteCapabilities.sharedDirsConfig = reply.has(
-         ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG,
-      );
+      this.remoteCapabilities.sharedDirsConfig = reply.has(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG);
       // Unconditional request above too - see ECCapabilities.searchList's doc.
       this.remoteCapabilities.searchList = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_LIST);
       // Unconditional request above too - see ECCapabilities.partialUpdate's doc.
-      this.remoteCapabilities.partialUpdate = reply.has(
-         ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE,
-      );
+      this.remoteCapabilities.partialUpdate = reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
    }
 
    public async send(packet: ECPacket): Promise<void> {
       let body = packet.encode(this.localCapabilities);
       const oversized = body.length > ECConnection.ZLIB_OVERSIZED_THRESHOLD;
-      const compress =
-         this.localCapabilities.zlib &&
-         (oversized || !this.localCapabilities.preferNoZlib);
+      const compress = this.localCapabilities.zlib && (oversized || !this.localCapabilities.preferNoZlib);
       if (compress) {
          body = zlib.deflateSync(body);
       }
-      const flags = ECFlags.create(
-         compress,
-         this.localCapabilities.utf8Numbers,
-         this.localCapabilities.largeTagCount,
-      );
+      const flags = ECFlags.create(compress, this.localCapabilities.utf8Numbers, this.localCapabilities.largeTagCount);
       const header = new TransmissionHeader(flags, body.length);
       await new Promise<void>((resolve, reject) => {
          this.socket.write(Buffer.concat([header.encode(), body]), (error) => {
@@ -383,9 +289,7 @@ export class ECConnection extends events.EventEmitter {
     */
    public receive(): Promise<ECPacket> {
       if (this.closed) {
-         return Promise.reject(
-            this.closeError ?? new Error("EC connection closed."),
-         );
+         return Promise.reject(this.closeError ?? new Error("EC connection closed."));
       }
       return new Promise<ECPacket>((resolve, reject) => {
          this.pendingReceives.push({ resolve, reject });
@@ -426,8 +330,7 @@ export class ECConnection extends events.EventEmitter {
             this.dispatchPacket(packet);
          }
       } catch (error) {
-         const reason =
-            error instanceof Error ? error : new Error(String(error));
+         const reason = error instanceof Error ? error : new Error(String(error));
          while (this.pendingReceives.length > 0) {
             this.pendingReceives.shift()?.reject(reason);
          }
@@ -506,9 +409,7 @@ export class ECConnection extends events.EventEmitter {
    private readBytes(length: number): Promise<Buffer> {
       if (length === 0) return Promise.resolve(Buffer.alloc(0));
       if (this.closed) {
-         return Promise.reject(
-            this.closeError ?? new Error("EC connection closed."),
-         );
+         return Promise.reject(this.closeError ?? new Error("EC connection closed."));
       }
       return new Promise<Buffer>((resolve, reject) => {
          this.pendingReads.push({ length, resolve, reject });

@@ -6,7 +6,6 @@ import { ECTag, ECTagDecoder, encodeCount } from "./ECTags.js";
 const debug = debuglog("amule-ec:packet");
 
 export class ECPacket {
-
    public readonly opcode: ECOpcode;
    public readonly tags: ECTag[] = [];
 
@@ -39,9 +38,7 @@ export class ECPacket {
    public encode(capabilities: ECCapabilities): Buffer {
       const opcodeBuffer = Buffer.from([this.opcode]);
       const countBuffer = encodeCount(this.tags.length, capabilities);
-      const tagsBuffer = Buffer.concat(
-         this.tags.map((tag) => tag.encode(capabilities)),
-      );
+      const tagsBuffer = Buffer.concat(this.tags.map((tag) => tag.encode(capabilities)));
       return Buffer.concat([opcodeBuffer, countBuffer, tagsBuffer]);
    }
 
@@ -51,10 +48,7 @@ export class ECPacket {
     * that was actually used for this buffer (typically derived from the
     * transmission-layer flags of the packet that carried it).
     */
-   public static decode(
-      buffer: Uint8Array,
-      capabilities: ECCapabilities,
-   ): ECPacket {
+   public static decode(buffer: Uint8Array, capabilities: ECCapabilities): ECPacket {
       const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
       const decoder = new ECTagDecoder(data, capabilities);
       const opcode: ECOpcode = decoder.readByte();

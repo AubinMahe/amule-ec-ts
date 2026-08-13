@@ -42,7 +42,6 @@ const HIGHEST_LOWID_ED2K_KAD = 16_777_216n;
  * (and serverName) alone rather than blanking them out.
  */
 export class Status implements ECFetchable {
-
    public uploadSpeed: bigint | undefined;
    public downloadSpeed: bigint | undefined;
    public uploadSpeedLimit: bigint | undefined;
@@ -85,37 +84,20 @@ export class Status implements ECFetchable {
    /** Sends EC_OP_STAT_REQ and EC_OP_GET_CONNSTATE and merges both into this snapshot. */
    public async fetch(): Promise<void> {
       const statsRequest = new ECPacket(ECOpcode.EC_OP_STAT_REQ);
-      statsRequest.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_CMD,
-         ),
-      );
+      statsRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
       await this.connection.send(statsRequest);
       const statsReply = await this.connection.receive();
       if (statsReply.opcode !== ECOpcode.EC_OP_STATS) {
-         throw new Error(
-            `Expected EC_OP_STATS, received opcode 0x${statsReply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STATS, received opcode 0x${statsReply.opcode.toString(16)}.`);
       }
       const connStateRequest = new ECPacket(ECOpcode.EC_OP_GET_CONNSTATE);
-      connStateRequest.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_CMD,
-         ),
-      );
+      connStateRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
       await this.connection.send(connStateRequest);
       const connStateReply = await this.connection.receive();
       if (connStateReply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
-         throw new Error(
-            `Expected EC_OP_MISC_DATA, received opcode 0x${connStateReply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${connStateReply.opcode.toString(16)}.`);
       }
-      this.applySnapshot(
-         statsReply,
-         connStateReply.find(ECTagNames.EC_TAG_CONNSTATE),
-      );
+      this.applySnapshot(statsReply, connStateReply.find(ECTagNames.EC_TAG_CONNSTATE));
       debug(
          "fetch: ed2kConnected=%s, kadConnected=%s, downloadSpeed=%s",
          this.ed2kConnected,
@@ -135,11 +117,7 @@ export class Status implements ECFetchable {
       const connStateTag = packet.find(ECTagNames.EC_TAG_CONNSTATE);
       if (!connStateTag) return false;
       this.applySnapshot(undefined, connStateTag);
-      debug(
-         "applyNotification: ed2kConnected=%s, kadConnected=%s",
-         this.ed2kConnected,
-         this.kadConnected,
-      );
+      debug("applyNotification: ed2kConnected=%s, kadConnected=%s", this.ed2kConnected, this.kadConnected);
       return true;
    }
 
@@ -148,44 +126,19 @@ export class Status implements ECFetchable {
     * the rest of this snapshot untouched - see class doc on why
     * applyNotification() only ever supplies connStateTag.
     */
-   private applySnapshot(
-      statsPacket: ECPacket | undefined,
-      connStateTag: ECTag | undefined,
-   ): void {
+   private applySnapshot(statsPacket: ECPacket | undefined, connStateTag: ECTag | undefined): void {
       if (statsPacket) {
-         this.uploadSpeed = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_UL_SPEED,
-         )?.intValue;
-         this.downloadSpeed = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_DL_SPEED,
-         )?.intValue;
-         this.uploadSpeedLimit = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_UL_SPEED_LIMIT,
-         )?.intValue;
-         this.downloadSpeedLimit = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_DL_SPEED_LIMIT,
-         )?.intValue;
-         this.uploadQueueLength = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_UL_QUEUE_LEN,
-         )?.intValue;
-         this.totalSourceCount = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_TOTAL_SRC_COUNT,
-         )?.intValue;
-         this.ed2kUsers = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_ED2K_USERS,
-         )?.intValue;
-         this.kadUsers = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_KAD_USERS,
-         )?.intValue;
-         this.ed2kFiles = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_ED2K_FILES,
-         )?.intValue;
-         this.kadFiles = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_KAD_FILES,
-         )?.intValue;
-         this.kadNodes = statsPacket.find(
-            ECTagNames.EC_TAG_STATS_KAD_NODES,
-         )?.intValue;
+         this.uploadSpeed = statsPacket.find(ECTagNames.EC_TAG_STATS_UL_SPEED)?.intValue;
+         this.downloadSpeed = statsPacket.find(ECTagNames.EC_TAG_STATS_DL_SPEED)?.intValue;
+         this.uploadSpeedLimit = statsPacket.find(ECTagNames.EC_TAG_STATS_UL_SPEED_LIMIT)?.intValue;
+         this.downloadSpeedLimit = statsPacket.find(ECTagNames.EC_TAG_STATS_DL_SPEED_LIMIT)?.intValue;
+         this.uploadQueueLength = statsPacket.find(ECTagNames.EC_TAG_STATS_UL_QUEUE_LEN)?.intValue;
+         this.totalSourceCount = statsPacket.find(ECTagNames.EC_TAG_STATS_TOTAL_SRC_COUNT)?.intValue;
+         this.ed2kUsers = statsPacket.find(ECTagNames.EC_TAG_STATS_ED2K_USERS)?.intValue;
+         this.kadUsers = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_USERS)?.intValue;
+         this.ed2kFiles = statsPacket.find(ECTagNames.EC_TAG_STATS_ED2K_FILES)?.intValue;
+         this.kadFiles = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_FILES)?.intValue;
+         this.kadNodes = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_NODES)?.intValue;
       }
       if (!connStateTag) return;
       const bitmask = connStateTag.intValue ?? 0n;
@@ -195,19 +148,12 @@ export class Status implements ECFetchable {
       this.kadFirewalled = (bitmask & 0x08n) !== 0n;
       this.kadRunning = (bitmask & 0x10n) !== 0n;
       this.ed2kId = connStateTag.findChild(ECTagNames.EC_TAG_ED2K_ID)?.intValue;
-      this.hasLowId =
-         this.ed2kId !== undefined
-            ? this.ed2kId < HIGHEST_LOWID_ED2K_KAD
-            : undefined;
+      this.hasLowId = this.ed2kId !== undefined ? this.ed2kId < HIGHEST_LOWID_ED2K_KAD : undefined;
       const serverTag = connStateTag.findChild(ECTagNames.EC_TAG_SERVER);
       if (serverTag) {
          this.serverName = serverTag.childString(ECTagNames.EC_TAG_SERVER_NAME);
-         this.serverIp =
-            serverTag instanceof ECIPv4Tag
-               ? serverTag.address.join(".")
-               : undefined;
-         this.serverPort =
-            serverTag instanceof ECIPv4Tag ? serverTag.port : undefined;
+         this.serverIp = serverTag instanceof ECIPv4Tag ? serverTag.address.join(".") : undefined;
+         this.serverPort = serverTag instanceof ECIPv4Tag ? serverTag.port : undefined;
       }
    }
 }

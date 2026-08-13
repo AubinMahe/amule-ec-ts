@@ -1,7 +1,6 @@
 import * as ec from "../../../src/index.js";
 
 export class IPFilterController {
-
    public constructor(private readonly ipFilter: ec.IPFilter) {}
 
    public async dispatch(args: string[]): Promise<void> {

@@ -3,14 +3,7 @@ import { ECConnection } from "./ECConnection.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
-import {
-   ECTag,
-   ECUInt32Tag,
-   ECUInt64Tag,
-   ECStringTag,
-   ECHash16Tag,
-   ECCustomTag,
-} from "./ECTags.js";
+import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag } from "./ECTags.js";
 import { FileComment, parseFileComments, parseKadCommentSearching } from "./SharedFiles.js";
 
 const debug = debuglog("amule-ec:search");
@@ -90,7 +83,6 @@ export class KnownSearch {
  * identical whether or not the search is addressed by EC_TAG_SEARCH_ID.
  */
 export class SearchResult {
-
    public readonly ecid: bigint;
    public readonly hash: string;
    public readonly name: string;
@@ -104,14 +96,10 @@ export class SearchResult {
    public constructor(tag: ECTag) {
       this.ecid = tag.intValue ?? 0n;
       const hashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
-      this.hash =
-         hashTag instanceof ECHash16Tag
-            ? Buffer.from(hashTag.value).toString("hex")
-            : "";
+      this.hash = hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : "";
       this.name = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME) ?? "";
       this.sizeFull = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL) ?? 0n;
-      this.sources =
-         tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
+      this.sources = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
       this.comments = parseFileComments(tag) ?? [];
       this.kadCommentSearching = parseKadCommentSearching(tag) ?? false;
    }
@@ -153,7 +141,6 @@ export class SearchResult {
  * connection at a time.
  */
 export class SearchSession {
-
    public results: readonly SearchResult[] = [];
 
    public constructor(
@@ -187,9 +174,7 @@ export class SearchSession {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
-         throw new Error(
-            `Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("stop: id=%s, close=%s", this.id, close);
    }
@@ -211,20 +196,14 @@ export class SearchSession {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_PROGRESS) {
-         throw new Error(
-            `Expected EC_OP_SEARCH_PROGRESS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SEARCH_PROGRESS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       if (reply.has(ECTagNames.EC_TAG_SEARCH_EXPIRED)) {
-         throw new Error(
-            `Search ${this.id} has expired (evicted from the daemon's search ring, or unknown).`,
-         );
+         throw new Error(`Search ${this.id} has expired (evicted from the daemon's search ring, or unknown).`);
       }
       const stateTag = reply.find(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE);
       const kindTag = reply.find(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND);
-      const percentTag = reply.find(
-         ECTagNames.EC_TAG_SEARCH_LIFECYCLE_PERCENT,
-      );
+      const percentTag = reply.find(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_PERCENT);
       const countTag = reply.find(ECTagNames.EC_TAG_SEARCH_RESULT_COUNT);
       const progress: ECSearchProgress = {
          state: Number(stateTag?.intValue ?? 0n),
@@ -259,14 +238,10 @@ export class SearchSession {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_RESULTS) {
-         throw new Error(
-            `Expected EC_OP_SEARCH_RESULTS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SEARCH_RESULTS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       if (reply.has(ECTagNames.EC_TAG_SEARCH_EXPIRED)) {
-         throw new Error(
-            `Search ${this.id} has expired (evicted from the daemon's search ring, or unknown).`,
-         );
+         throw new Error(`Search ${this.id} has expired (evicted from the daemon's search ring, or unknown).`);
       }
       this.results = reply.tags
          .filter((tag) => {
@@ -292,7 +267,6 @@ export class SearchSession {
  * (Get_EC_Response_Search_Results_Download).
  */
 export class Search {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -316,74 +290,29 @@ export class Search {
     * the legacy fallback.
     */
    public async start(params: ECSearchParams): Promise<SearchSession> {
-      const searchTag = new ECUInt32Tag(
-         ECTagNames.EC_TAG_SEARCH_TYPE,
-         params.type ?? ECSearchType.GLOBAL,
-         [
-            new ECStringTag(ECTagNames.EC_TAG_SEARCH_NAME, params.keywords),
-            new ECStringTag(
-               ECTagNames.EC_TAG_SEARCH_FILE_TYPE,
-               params.fileType ?? "",
-            ),
-            ...(params.extension
-               ? [
-                    new ECStringTag(
-                       ECTagNames.EC_TAG_SEARCH_EXTENSION,
-                       params.extension,
-                    ),
-                 ]
-               : []),
-            ...(params.availability
-               ? [
-                    new ECUInt32Tag(
-                       ECTagNames.EC_TAG_SEARCH_AVAILABILITY,
-                       params.availability,
-                    ),
-                 ]
-               : []),
-            ...(params.minSize
-               ? [
-                    new ECUInt64Tag(
-                       ECTagNames.EC_TAG_SEARCH_MIN_SIZE,
-                       params.minSize,
-                    ),
-                 ]
-               : []),
-            ...(params.maxSize
-               ? [
-                    new ECUInt64Tag(
-                       ECTagNames.EC_TAG_SEARCH_MAX_SIZE,
-                       params.maxSize,
-                    ),
-                 ]
-               : []),
-         ],
-      );
+      const searchTag = new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_TYPE, params.type ?? ECSearchType.GLOBAL, [
+         new ECStringTag(ECTagNames.EC_TAG_SEARCH_NAME, params.keywords),
+         new ECStringTag(ECTagNames.EC_TAG_SEARCH_FILE_TYPE, params.fileType ?? ""),
+         ...(params.extension ? [new ECStringTag(ECTagNames.EC_TAG_SEARCH_EXTENSION, params.extension)] : []),
+         ...(params.availability ? [new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_AVAILABILITY, params.availability)] : []),
+         ...(params.minSize ? [new ECUInt64Tag(ECTagNames.EC_TAG_SEARCH_MIN_SIZE, params.minSize)] : []),
+         ...(params.maxSize ? [new ECUInt64Tag(ECTagNames.EC_TAG_SEARCH_MAX_SIZE, params.maxSize)] : []),
+      ]);
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_START);
       request.add(searchTag);
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : "Failed to start search.";
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to start search.";
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
-         throw new Error(
-            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const idTag = reply.find(ECTagNames.EC_TAG_SEARCH_ID);
       const id = idTag?.intValue;
-      debug(
-         "start: keywords=%s, fileType=%s, id=%s",
-         params.keywords,
-         params.fileType,
-         id,
-      );
+      debug("start: keywords=%s, fileType=%s, id=%s", params.keywords, params.fileType, id);
       return new SearchSession(this.connection, id);
    }
 
@@ -401,19 +330,15 @@ export class Search {
       const request = new ECPacket(ECOpcode.EC_OP_DOWNLOAD_SEARCH_RESULT);
       for (const hash of hashes) {
          request.add(
-            new ECHash16Tag(
-               ECTagNames.EC_TAG_PARTFILE,
-               new Uint8Array(Buffer.from(hash, "hex")),
-               [new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, 0)],
-            ),
+            new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
+               new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, 0),
+            ]),
          );
       }
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
-         throw new Error(
-            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("download: %d hash(es) requested", hashes.length);
    }
@@ -440,9 +365,7 @@ export class Search {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
-         throw new Error(
-            `Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("requestMore: searchId=%s", searchId);
    }
@@ -476,9 +399,7 @@ export class Search {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_LIST) {
-         throw new Error(
-            `Expected EC_OP_SEARCH_LIST, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SEARCH_LIST, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const searches = reply.tags
          .filter((tag) => {

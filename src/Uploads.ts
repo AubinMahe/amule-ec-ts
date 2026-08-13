@@ -24,7 +24,6 @@ const debug = debuglog("amule-ec:uploads");
  * (`client->GetUploadFile()`); it is left undefined otherwise.
  */
 export class UploadClient {
-
    public readonly hash: string;
    public readonly name: string;
    public readonly software: bigint | undefined;
@@ -38,12 +37,8 @@ export class UploadClient {
 
    public constructor(tag: ECTag) {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
-      this.hash =
-         hashTag instanceof ECHash16Tag
-            ? Buffer.from(hashTag.value).toString("hex")
-            : "(unknown hash)";
-      this.name =
-         tag.childString(ECTagNames.EC_TAG_CLIENT_NAME) ?? "(unknown name)";
+      this.hash = hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : "(unknown hash)";
+      this.name = tag.childString(ECTagNames.EC_TAG_CLIENT_NAME) ?? "(unknown name)";
       this.software = tag.childInt(ECTagNames.EC_TAG_CLIENT_SOFTWARE);
       this.speedUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UP_SPEED);
       this.sessionUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_SESSION);
@@ -56,25 +51,17 @@ export class UploadClient {
 
 /** The upload queue, as returned by EC_OP_GET_ULOAD_QUEUE / EC_OP_ULOAD_QUEUE. */
 export class Uploads implements ECFetchable {
-
    public clients: readonly UploadClient[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
 
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_ULOAD_QUEUE);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_CMD,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_ULOAD_QUEUE) {
-         throw new Error(
-            `Expected EC_OP_ULOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_ULOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       this.clients = reply.tags
          .filter((tag) => {
@@ -98,24 +85,14 @@ export class Uploads implements ECFetchable {
     * commands use). Silently no-ops if either doesn't resolve; always
     * replies EC_OP_NOOP.
     */
-   public async swapClientToAnotherFile(
-      clientEcid: bigint,
-      fileHash: string,
-   ): Promise<void> {
+   public async swapClientToAnotherFile(clientEcid: bigint, fileHash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)));
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_PARTFILE,
-            new Uint8Array(Buffer.from(fileHash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(fileHash, "hex"))));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("swapClientToAnotherFile: clientEcid=%s, fileHash=%s", clientEcid, fileHash);
    }

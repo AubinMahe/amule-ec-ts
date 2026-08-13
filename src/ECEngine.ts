@@ -92,8 +92,7 @@ async function reconnectLoop(
          console.log("amule-ec: reconnected to amuled.");
          armReconnect(connection, host, port, passwordHash, notify, multiSearch);
          return;
-      }
-      catch (error) {
+      } catch (error) {
          console.error("amule-ec: reconnect attempt failed, retrying...", error);
          delayMs = Math.min(delayMs * 2, RECONNECT_MAX_DELAY_MS);
       }
@@ -124,9 +123,7 @@ export const ECEngine = {
 
    get connection(): ECConnection {
       if (!instance) {
-         throw new Error(
-            "ECEngine.start() must complete before ECEngine.connection is used.",
-         );
+         throw new Error("ECEngine.start() must complete before ECEngine.connection is used.");
       }
       return instance;
    },

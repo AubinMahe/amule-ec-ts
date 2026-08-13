@@ -101,9 +101,7 @@ describe("ServerInfo.fromTag", () => {
    });
 
    it("decodes isStatic as false (not undefined) when EC_TAG_SERVER_STATIC is present but zero", () => {
-      const info = ec.ServerInfo.fromTag(
-         serverTag([192, 0, 2, 1], 4712, { name: "eMule Security", isStatic: false }),
-      );
+      const info = ec.ServerInfo.fromTag(serverTag([192, 0, 2, 1], 4712, { name: "eMule Security", isStatic: false }));
       expect(info?.isStatic).to.equal(false);
    });
 });
@@ -113,7 +111,9 @@ describe("Servers.fetch", () => {
       const fake = createFakeConnection();
       const servers = new ec.Servers(fake.connection);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SERVER_LIST);
-      reply.add(serverTag([192, 0, 2, 1], 4712, { name: "eMule Security", ping: 42, users: 1234, usersMax: 9000, files: 5_000_000 }));
+      reply.add(
+         serverTag([192, 0, 2, 1], 4712, { name: "eMule Security", ping: 42, users: 1234, usersMax: 9000, files: 5_000_000 }),
+      );
       reply.add(serverTag([198, 51, 100, 1], 4712, { name: "eMule Sunrise" }));
       fake.queueReply(reply);
 
@@ -144,7 +144,7 @@ describe("Servers.fetch", () => {
 });
 
 describe("Servers.connect", () => {
-   it("parses \"ip:port\" and sends it as an EC_TAG_SERVER IPV4 tag", async () => {
+   it('parses "ip:port" and sends it as an EC_TAG_SERVER IPV4 tag', async () => {
       const fake = createFakeConnection();
       const servers = new ec.Servers(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -169,7 +169,7 @@ describe("Servers.connect", () => {
 });
 
 describe("Servers.remove", () => {
-   it("parses \"ip:port\" and sends it as an EC_TAG_SERVER IPV4 tag", async () => {
+   it('parses "ip:port" and sends it as an EC_TAG_SERVER IPV4 tag', async () => {
       const fake = createFakeConnection();
       const servers = new ec.Servers(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -248,10 +248,7 @@ describe("Servers.updateFromUrl", () => {
       const servers = new ec.Servers(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
-      await expectRejection(
-         servers.updateFromUrl("http://example.com/server.met"),
-         /EC_OP_NOOP/,
-      );
+      await expectRejection(servers.updateFromUrl("http://example.com/server.met"), /EC_OP_NOOP/);
    });
 });
 
@@ -304,9 +301,7 @@ describe("Servers.setStaticPrio", () => {
       const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC)).to.be.undefined;
-      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)?.intValue).to.equal(
-         BigInt(ec.ServerPriority.SRV_PR_LOW),
-      );
+      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)?.intValue).to.equal(BigInt(ec.ServerPriority.SRV_PR_LOW));
    });
 
    it("throws a generic error on any unexpected opcode", async () => {

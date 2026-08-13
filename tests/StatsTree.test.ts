@@ -125,10 +125,7 @@ describe("StatsTree.fetch", () => {
       reply.add(
          new ec.ECStringTag(ec.ECTagNames.EC_TAG_STATTREE_NODE, "Sent", [
             new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STAT_NODE_VALUE, 123456n, [
-               new ec.ECUInt8Tag(
-                  ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE,
-                  ec.ECStatValueType.BYTES,
-               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE, ec.ECStatValueType.BYTES),
             ]),
          ]),
       );
@@ -149,15 +146,9 @@ describe("StatsTree.fetch", () => {
       reply.add(
          new ec.ECStringTag(ec.ECTagNames.EC_TAG_STATTREE_NODE, "Uploaded", [
             new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STAT_NODE_VALUE, 100n, [
-               new ec.ECUInt8Tag(
-                  ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE,
-                  ec.ECStatValueType.BYTES,
-               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE, ec.ECStatValueType.BYTES),
                new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STAT_NODE_VALUE, 5000n, [
-                  new ec.ECUInt8Tag(
-                     ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE,
-                     ec.ECStatValueType.BYTES,
-                  ),
+                  new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE, ec.ECStatValueType.BYTES),
                ]),
             ]),
          ]),
@@ -178,14 +169,8 @@ describe("StatsTree.fetch", () => {
       reply.add(
          new ec.ECStringTag(ec.ECTagNames.EC_TAG_STATTREE_NODE, "Ratio", [
             new ec.ECStringTag(ec.ECTagNames.EC_TAG_STAT_NODE_VALUE, "Not available", [
-               new ec.ECUInt8Tag(
-                  ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE,
-                  ec.ECStatValueType.STRING,
-               ),
-               new ec.ECStringTag(
-                  ec.ECTagNames.EC_TAG_STAT_VALUE_ENUM,
-                  "not_available",
-               ),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_STAT_VALUE_TYPE, ec.ECStatValueType.STRING),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STAT_VALUE_ENUM, "not_available"),
             ]),
             new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_STAT_NODE_RATIO, 1.5),
             new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_STAT_NODE_RATIO_TOTAL, 2.5),

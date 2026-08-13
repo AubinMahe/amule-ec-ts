@@ -8,9 +8,7 @@ export function printSharedFile(file: ec.SharedFile): void {
       return;
    }
 
-   console.log(
-      `${file.name ?? "(unknown name)"}  [${file.hash ?? "unknown hash"}]`,
-   );
+   console.log(`${file.name ?? "(unknown name)"}  [${file.hash ?? "unknown hash"}]`);
    console.log(
       `  size: ${formatSize(file.sizeFull)}  uploaded: ${formatSize(file.uploadedTotal)}` +
          `  @ ${formatSpeed(file.uploadSpeed)}  uploading to: ${file.uploadingCount ?? "?"}` +

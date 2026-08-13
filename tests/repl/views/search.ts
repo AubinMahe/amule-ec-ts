@@ -4,9 +4,7 @@ import { printFileComments } from "./downloads.js";
 
 export function printSearchResult(result: ec.SearchResult): void {
    console.log(`${result.name}  [${result.hash}]`);
-   console.log(
-      `  size: ${formatSize(result.sizeFull)}  sources: ${result.sources}`,
-   );
+   console.log(`  size: ${formatSize(result.sizeFull)}  sources: ${result.sources}`);
    printFileComments(result.comments, result.kadCommentSearching);
 }
 

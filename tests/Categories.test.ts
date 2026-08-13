@@ -13,18 +13,10 @@ describe("Categories.create", () => {
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CREATE_CATEGORY);
       const catTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CATEGORY);
       expect(catTag).to.be.instanceOf(ec.ECUInt32Tag);
-      expect(
-         (catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_TITLE) as ec.ECStringTag).value,
-      ).to.equal("Videos");
-      expect(
-         (catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_PATH) as ec.ECStringTag).value,
-      ).to.equal("/videos");
-      expect(
-         (catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COMMENT) as ec.ECStringTag).value,
-      ).to.equal("my videos");
-      expect(catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COLOR)?.intValue).to.equal(
-         0xff0000n,
-      );
+      expect((catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_TITLE) as ec.ECStringTag).value).to.equal("Videos");
+      expect((catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_PATH) as ec.ECStringTag).value).to.equal("/videos");
+      expect((catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COMMENT) as ec.ECStringTag).value).to.equal("my videos");
+      expect(catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COLOR)?.intValue).to.equal(0xff0000n);
       expect(catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_PRIO)?.intValue).to.equal(3n);
    });
 
@@ -36,9 +28,7 @@ describe("Categories.create", () => {
       await categories.create("Videos", "/videos");
 
       const catTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CATEGORY);
-      expect(
-         (catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COMMENT) as ec.ECStringTag).value,
-      ).to.equal("");
+      expect((catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COMMENT) as ec.ECStringTag).value).to.equal("");
       expect(catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_COLOR)?.intValue).to.equal(0n);
       expect(catTag?.findChild(ec.ECTagNames.EC_TAG_CATEGORY_PRIO)?.intValue).to.equal(0n);
    });
@@ -51,10 +41,7 @@ describe("Categories.create", () => {
       failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CATEGORY_PATH, "/home/user/Incoming"));
       fake.queueReply(failure);
 
-      await expectRejection(
-         categories.create("Videos", "/videos"),
-         /index #1.*using "\/home\/user\/Incoming" instead/,
-      );
+      await expectRejection(categories.create("Videos", "/videos"), /index #1.*using "\/home\/user\/Incoming" instead/);
    });
 });
 
@@ -79,10 +66,7 @@ describe("Categories.update", () => {
       failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CATEGORY_PATH, "/old/music/path"));
       fake.queueReply(failure);
 
-      await expectRejection(
-         categories.update(2, "Music", "/music"),
-         /index #2.*using "\/old\/music\/path" instead/,
-      );
+      await expectRejection(categories.update(2, "Music", "/music"), /index #2.*using "\/old\/music\/path" instead/);
    });
 });
 

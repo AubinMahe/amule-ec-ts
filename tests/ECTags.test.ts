@@ -11,10 +11,7 @@ function roundTrip(tag: ec.ECTag): ec.ECTag {
 
 describe("ECTag encode/decode round-trip", () => {
    it("round-trips a leaf UINT8 tag with no children", () => {
-      const tag = new ec.ECUInt8Tag(
-         ec.ECTagNames.EC_TAG_DETAIL_LEVEL,
-         ec.ECDetailLevel.EC_DETAIL_CMD,
-      );
+      const tag = new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_DETAIL_LEVEL, ec.ECDetailLevel.EC_DETAIL_CMD);
       const decoded = roundTrip(tag);
       expect(decoded).to.be.instanceOf(ec.ECUInt8Tag);
       expect(decoded.name).to.equal(ec.ECTagNames.EC_TAG_DETAIL_LEVEL);
@@ -37,11 +34,7 @@ describe("ECTag encode/decode round-trip", () => {
    });
 
    it("round-trips an IPV4 tag (address + port as own data)", () => {
-      const tag = new ec.ECIPv4Tag(
-         ec.ECTagNames.EC_TAG_SERVER,
-         new Uint8Array([1, 2, 3, 4]),
-         4712,
-      );
+      const tag = new ec.ECIPv4Tag(ec.ECTagNames.EC_TAG_SERVER, new Uint8Array([1, 2, 3, 4]), 4712);
       const decoded = roundTrip(tag) as ec.ECIPv4Tag;
       expect(Array.from(decoded.address)).to.deep.equal([1, 2, 3, 4]);
       expect(decoded.port).to.equal(4712);
@@ -58,8 +51,8 @@ describe("ECTag encode/decode round-trip", () => {
 
    it(
       "round-trips a tag that carries BOTH own data and children - " +
-      "regression test for the TAGLEN bug that closed the EC connection " +
-      "the first time a search was run",
+         "regression test for the TAGLEN bug that closed the EC connection " +
+         "the first time a search was run",
       () => {
          // Mirrors ec/Search.ts's EC_TAG_SEARCH_TYPE composite request tag:
          // own data is an integer, with string children. This is the first
@@ -85,8 +78,8 @@ describe("ECTag encode/decode round-trip", () => {
 
    it(
       "round-trips a packet with a composite tag followed by a sibling tag - " +
-      "catches TAGLEN corruption that misaligns whatever comes next, which " +
-      "is the actual failure mode a single tag's own round-trip can miss",
+         "catches TAGLEN corruption that misaligns whatever comes next, which " +
+         "is the actual failure mode a single tag's own round-trip can miss",
       () => {
          const packet = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_START);
          packet.add(

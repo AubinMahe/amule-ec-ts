@@ -62,10 +62,7 @@ describe("Friends.addByHash", () => {
       const friends = new ec.Friends(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
-      await expectRejection(
-         friends.addByHash(hexHash("a"), "192.0.2.1", 4662, "Alice"),
-         /EC_OP_NOOP/,
-      );
+      await expectRejection(friends.addByHash(hexHash("a"), "192.0.2.1", 4662, "Alice"), /EC_OP_NOOP/);
    });
 });
 

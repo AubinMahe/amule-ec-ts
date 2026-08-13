@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 
 /** Download-category CRUD (EC_OP_CREATE/UPDATE/DELETE_CATEGORY) - listing lives on PreferencesController since there's no GET_CATEGORIES opcode. */
 export class CategoriesController {
-
    public constructor(private readonly categories: ec.Categories) {}
 
    public async create(args: string[]): Promise<void> {
@@ -25,9 +24,7 @@ export class CategoriesController {
       const [indexText, title, path, comment, colorText, prioText] = args;
       const index = indexText ? Number(indexText) : NaN;
       if (Number.isNaN(index) || !title || !path) {
-         console.error(
-            "Usage: category update <index> <title> <path> [comment] [color] [prio]",
-         );
+         console.error("Usage: category update <index> <title> <path> [comment] [color] [prio]");
          return;
       }
       await this.categories.update(

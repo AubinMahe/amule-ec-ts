@@ -24,7 +24,6 @@ function stringTagValues(reply: ECPacket): readonly string[] {
  * and bootstrapping Kad from a known node.
  */
 export class Kad {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -44,14 +43,11 @@ export class Kad {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to start Kad.";
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to start Kad.";
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("start: Kad started");
    }
@@ -70,9 +66,7 @@ export class Kad {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("stop: Kad stopped");
    }
@@ -96,9 +90,7 @@ export class Kad {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("updateNodesFromUrl: url=%s", url);
    }
@@ -125,16 +117,11 @@ export class Kad {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to bootstrap from ${ip}:${port}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to bootstrap from ${ip}:${port}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("bootstrapFromIp: ip=%s, port=%d", ip, port);
    }
@@ -162,14 +149,11 @@ export class Kad {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to connect.";
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to connect.";
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
-         throw new Error(
-            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const messages = stringTagValues(reply);
       debug("connect: %s", messages.join(" | "));
@@ -197,9 +181,7 @@ export class Kad {
          return [];
       }
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
-         throw new Error(
-            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const messages = stringTagValues(reply);
       debug("disconnect: %s", messages.join(" | "));

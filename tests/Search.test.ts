@@ -3,9 +3,7 @@ import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 /** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
-function commentsTag(
-   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
-): ec.ECTag {
+function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {
       children.push(
@@ -27,21 +25,13 @@ function searchResultTag(fields: {
    kadCommentSearching?: boolean;
 }): ec.ECTag {
    const children: ec.ECTag[] = [
-      new ec.ECHash16Tag(
-         ec.ECTagNames.EC_TAG_PARTFILE_HASH,
-         new Uint8Array(Buffer.from(fields.hash, "hex")),
-      ),
+      new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT, fields.sources ?? 0n),
    ];
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
-      children.push(
-         new ec.ECUInt64Tag(
-            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
-            fields.kadCommentSearching ? 1n : 0n,
-         ),
-      );
+      children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCHFILE, fields.ecid, children);
 }
@@ -282,9 +272,7 @@ describe("SearchSession.fetch", () => {
             ecid: 1,
             hash: hexHash("a"),
             name: "Cars.avi",
-            comments: commentsTag([
-               { userName: "Alice", fileName: "Cars.avi", rating: ec.FileRating.EXCELLENT, comment: "Great" },
-            ]),
+            comments: commentsTag([{ userName: "Alice", fileName: "Cars.avi", rating: ec.FileRating.EXCELLENT, comment: "Great" }]),
             kadCommentSearching: true,
          }),
       );
@@ -395,10 +383,7 @@ describe("Search.list", () => {
          new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCH_ID, 1, [
             new ec.ECStringTag(ec.ECTagNames.EC_TAG_SEARCH_NAME, "Astérix"),
             new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND, ec.ECSearchType.KAD),
-            new ec.ECUInt8Tag(
-               ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE,
-               ec.ECSearchLifecycleState.RUNNING,
-            ),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE, ec.ECSearchLifecycleState.RUNNING),
          ]),
       );
       fake.queueReply(reply);
@@ -407,9 +392,7 @@ describe("Search.list", () => {
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SEARCH_LIST);
       expect(fake.sent[0]?.tags).to.have.lengthOf(0);
-      expect(searches).to.deep.equal([
-         new ec.KnownSearch(1n, "Astérix", ec.ECSearchType.KAD, ec.ECSearchLifecycleState.RUNNING),
-      ]);
+      expect(searches).to.deep.equal([new ec.KnownSearch(1n, "Astérix", ec.ECSearchType.KAD, ec.ECSearchLifecycleState.RUNNING)]);
    });
 
    it("resolves with an empty array when the daemon has nothing to list", async () => {

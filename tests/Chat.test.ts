@@ -4,9 +4,7 @@ import { createFakeConnection, expectRejection } from "./testUtils.js";
 
 /** Builds a synthetic EC_TAG_CHAT tag as Chat.fetch() sees it: own data is the "name|message" string, EC_TAG_CHAT_CLIENT_ID (uint64) is a child. */
 function chatTag(senderId: bigint, text: string): ec.ECTag {
-   return new ec.ECStringTag(ec.ECTagNames.EC_TAG_CHAT, text, [
-      new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CHAT_CLIENT_ID, senderId),
-   ]);
+   return new ec.ECStringTag(ec.ECTagNames.EC_TAG_CHAT, text, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CHAT_CLIENT_ID, senderId)]);
 }
 
 describe("ChatMessage.fromTag", () => {

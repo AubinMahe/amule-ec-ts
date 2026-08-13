@@ -9,7 +9,6 @@ const debug = debuglog("amule-ec:ipfilter");
 
 /** Reload/update of the daemon's IP filter - EC_OP_IPFILTER_RELOAD, EC_OP_IPFILTER_UPDATE. */
 export class IPFilter {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -27,9 +26,7 @@ export class IPFilter {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("reload: ip filter reloaded");
    }
@@ -52,9 +49,7 @@ export class IPFilter {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("updateFromUrl: %s", url || "(default)");
    }
