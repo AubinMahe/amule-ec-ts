@@ -12,6 +12,22 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-08-13
+
+### Changed
+
+- `Servers.setStaticPrio(ecid, { static?, prio? })` replaced by
+  `Servers.setStatic(ecid, isStatic)` and `Servers.setPriority(ecid, prio)` -
+  the combined options-object shape mirrored what the wire opcode
+  technically permits (either or both children in one packet), not how
+  anything actually calls it: `amule-remote-gui.cpp`'s own
+  `SetStaticServer()`/`SetServerPrio()` already issue them separately, one
+  child tag each. **Breaking**: replace
+  `servers.setStaticPrio(ecid, { static })` with
+  `servers.setStatic(ecid, static)`, and
+  `servers.setStaticPrio(ecid, { prio })` with
+  `servers.setPriority(ecid, prio)`.
+
 ## [2.15.0] - 2026-08-13
 
 ### Added
