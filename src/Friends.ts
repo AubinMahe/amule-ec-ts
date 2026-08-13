@@ -4,14 +4,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { SearchSession } from "./Search.js";
-import {
-   ECCustomTag,
-   ECUInt8Tag,
-   ECUInt32Tag,
-   ECStringTag,
-   ECHash16Tag,
-   packIPv4ToUint32,
-} from "./ECTags.js";
+import { ECCustomTag, ECUInt8Tag, ECUInt32Tag, ECStringTag, ECHash16Tag, packIPv4ToUint32 } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:friends");
 
@@ -40,7 +33,6 @@ const debug = debuglog("amule-ec:friends");
  * from some out-of-band source (e.g. the GUI's own display).
  */
 export class Friends {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -64,24 +56,17 @@ export class Friends {
    public async addByEcid(ecid: bigint): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_FRIEND);
       request.add(
-         new ECCustomTag(ECTagNames.EC_TAG_FRIEND_ADD, new Uint8Array(), [
-            new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(ecid)),
-         ]),
+         new ECCustomTag(ECTagNames.EC_TAG_FRIEND_ADD, new Uint8Array(), [new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(ecid))]),
       );
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to add friend by ECID ${ecid}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to add friend by ECID ${ecid}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("addByEcid: ecid=%s", ecid);
    }
@@ -102,19 +87,11 @@ export class Friends {
     * packIPv4ToUint32() doc, not the ECIPv4Tag convention
     * Servers.connect() uses. Always replies EC_OP_NOOP.
     */
-   public async addByHash(
-      hash: string,
-      ip: string,
-      port: number,
-      name: string,
-   ): Promise<void> {
+   public async addByHash(hash: string, ip: string, port: number, name: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_FRIEND);
       request.add(
          new ECCustomTag(ECTagNames.EC_TAG_FRIEND_ADD, new Uint8Array(), [
-            new ECHash16Tag(
-               ECTagNames.EC_TAG_FRIEND_HASH,
-               new Uint8Array(Buffer.from(hash, "hex")),
-            ),
+            new ECHash16Tag(ECTagNames.EC_TAG_FRIEND_HASH, new Uint8Array(Buffer.from(hash, "hex"))),
             new ECUInt32Tag(ECTagNames.EC_TAG_FRIEND_IP, packIPv4ToUint32(ip)),
             new ECUInt32Tag(ECTagNames.EC_TAG_FRIEND_PORT, port),
             new ECStringTag(ECTagNames.EC_TAG_FRIEND_NAME, name),
@@ -123,9 +100,7 @@ export class Friends {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("addByHash: hash=%s, ip=%s, port=%d, name=%s", hash, ip, port, name);
    }
@@ -154,9 +129,7 @@ export class Friends {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("remove: ecid=%s", ecid);
    }
@@ -192,16 +165,11 @@ export class Friends {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to set friend slot for ECID ${ecid}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set friend slot for ECID ${ecid}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("setFriendSlot: ecid=%s, enabled=%s", ecid, enabled);
    }
@@ -253,15 +221,11 @@ export class Friends {
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to browse shared files for client ECID ${clientEcid}.`;
+            reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to browse shared files for client ECID ${clientEcid}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
-         throw new Error(
-            `Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const idTag = reply.find(ECTagNames.EC_TAG_SEARCH_ID);
       const id = idTag?.intValue;

@@ -8,7 +8,6 @@ import * as ec from "../../../src/index.js";
  * Servers.
  */
 export class NetworkController {
-
    public constructor(
       private readonly kad: ec.Kad,
       private readonly servers: ec.Servers,

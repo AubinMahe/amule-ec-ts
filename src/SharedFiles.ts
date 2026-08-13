@@ -33,7 +33,6 @@ export enum FileRating {
  * `SharedFiles.searchKadNotes()` (any file type).
  */
 export class FileComment {
-
    public constructor(
       public readonly userName: string,
       public readonly fileName: string,
@@ -56,9 +55,7 @@ export class FileComment {
  * no such container at all - see FileComment callers for what that means
  * on each of the three file types.
  */
-export function parseFileComments(
-   fileTag: ECTag,
-): readonly FileComment[] | undefined {
+export function parseFileComments(fileTag: ECTag): readonly FileComment[] | undefined {
    const container = fileTag.findChild(ECTagNames.EC_TAG_PARTFILE_COMMENTS);
    if (!container) return undefined;
    const comments: FileComment[] = [];
@@ -86,9 +83,7 @@ export function parseFileComments(
  * `searchKadNotes()` lookup is currently in flight for this file.
  */
 export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
-   const value = fileTag.childInt(
-      ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
-   );
+   const value = fileTag.childInt(ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING);
    return value === undefined ? undefined : value !== 0n;
 }
 
@@ -113,7 +108,6 @@ export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
  * for both.
  */
 export class SharedFile {
-
    public readonly hash: string | undefined;
    public readonly name: string | undefined;
    public readonly sizeFull: bigint | undefined;
@@ -162,8 +156,7 @@ export class SharedFile {
    public static fromTag(tag: ECTag): SharedFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
-      const hashTag =
-         childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
+      const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
       const removed = tag.children.length === 0 && ownHashTag !== undefined;
       return new SharedFile({
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
@@ -171,9 +164,7 @@ export class SharedFile {
          sizeFull: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL),
          uploadedTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_XFERRED_ALL),
          uploadSpeed: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOAD_SPEED),
-         uploadingCount: tag.childInt(
-            ECTagNames.EC_TAG_KNOWNFILE_UPLOADING_COUNT,
-         ),
+         uploadingCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOADING_COUNT),
          requestsTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_REQ_COUNT_ALL),
          prio: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_PRIO),
          removed,
@@ -197,8 +188,7 @@ export class SharedFile {
          removed: update.removed,
          ecid: update.ecid ?? this.ecid,
          comments: update.comments ?? this.comments,
-         kadCommentSearching:
-            update.kadCommentSearching ?? this.kadCommentSearching,
+         kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
       });
    }
 }
@@ -237,7 +227,6 @@ export class SharedDirRejection {
 
 /** The shared file list, as returned by EC_OP_GET_SHARED_FILES / EC_OP_SHARED_FILES. */
 export class SharedFiles implements ECFetchable {
-
    public files: readonly SharedFile[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -257,9 +246,7 @@ export class SharedFiles implements ECFetchable {
     */
    public static parseNotification(packet: ECPacket): SharedFile | undefined {
       if (packet.opcode !== ECOpcode.EC_OP_SHARED_FILES) return undefined;
-      const tag =
-         packet.find(ECTagNames.EC_TAG_KNOWNFILE) ??
-         packet.find(ECTagNames.EC_TAG_PARTFILE);
+      const tag = packet.find(ECTagNames.EC_TAG_KNOWNFILE) ?? packet.find(ECTagNames.EC_TAG_PARTFILE);
       if (!tag) return undefined;
       const file = SharedFile.fromTag(tag);
       debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
@@ -268,18 +255,11 @@ export class SharedFiles implements ECFetchable {
 
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_SHARED_FILES);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_CMD,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SHARED_FILES) {
-         throw new Error(
-            `Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       this.files = reply.tags
          .filter((tag) => {
@@ -303,9 +283,7 @@ export class SharedFiles implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("reload: shared file list reloaded");
    }
@@ -324,10 +302,7 @@ export class SharedFiles implements ECFetchable {
     * skips any hash that isn't a currently shared file, no EC_OP_FAILED
     * case exists (unlike Downloads.prioritySet()).
     */
-   public async setPriority(
-      hash: string,
-      priority: ECDownloadPriority,
-   ): Promise<void> {
+   public async setPriority(hash: string, priority: ECDownloadPriority): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_SET_PRIO);
       request.add(
          new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
@@ -337,9 +312,7 @@ export class SharedFiles implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("setPriority: hash=%s, priority=%d", hash, priority);
    }
@@ -366,26 +339,15 @@ export class SharedFiles implements ECFetchable {
     * only, see `FileComment`'s doc) or anywhere else. There is no way to
     * read it back over EC, live-tested 2026-08-03.
     */
-   public async setComment(
-      hash: string,
-      comment: string,
-      rating: FileRating,
-   ): Promise<void> {
+   public async setComment(hash: string, comment: string, rating: FileRating): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SET_COMMENT);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_KNOWNFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       request.add(new ECStringTag(ECTagNames.EC_TAG_KNOWNFILE_COMMENT, comment));
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_KNOWNFILE_RATING, rating));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("setComment: hash=%s, rating=%s", hash, FileRating[rating]);
    }
@@ -408,18 +370,11 @@ export class SharedFiles implements ECFetchable {
     */
    public async searchKadNotes(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SEARCH_KAD_NOTES);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_KNOWNFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("searchKadNotes: hash=%s", hash);
    }
@@ -439,18 +394,11 @@ export class SharedFiles implements ECFetchable {
     */
    public async verifyLocalData(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_VERIFY_LOCAL_DATA);
-      request.add(
-         new ECHash16Tag(
-            ECTagNames.EC_TAG_KNOWNFILE,
-            new Uint8Array(Buffer.from(hash, "hex")),
-         ),
-      );
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("verifyLocalData: hash=%s", hash);
    }
@@ -488,9 +436,7 @@ export class SharedFiles implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_GET_SHARED_DIRS) {
-         throw new Error(
-            `Expected EC_OP_GET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_GET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const dirs = reply.tags
          .filter((tag) => {
@@ -526,9 +472,7 @@ export class SharedFiles implements ECFetchable {
     * daemon's shared-directory config on a build with partial/differing
     * support, not just tripping an assert.
     */
-   public async setSharedDirs(
-      dirs: readonly SharedDir[],
-   ): Promise<readonly SharedDirRejection[]> {
+   public async setSharedDirs(dirs: readonly SharedDir[]): Promise<readonly SharedDirRejection[]> {
       if (!this.connection.remoteCapabilities.sharedDirsConfig) {
          throw new Error(
             "The daemon did not confirm EC_TAG_CAN_SHAREDDIRS_CONFIG during authentication - " +
@@ -541,18 +485,14 @@ export class SharedFiles implements ECFetchable {
             new ECStringTag(
                ECTagNames.EC_TAG_SHAREDDIR,
                dir.path,
-               dir.recursive
-                  ? [new ECUInt8Tag(ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE, 1)]
-                  : [],
+               dir.recursive ? [new ECUInt8Tag(ECTagNames.EC_TAG_SHAREDDIR_RECURSIVE, 1)] : [],
             ),
          );
       }
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SET_SHARED_DIRS) {
-         throw new Error(
-            `Expected EC_OP_SET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const rejections = reply.tags
          .filter((tag) => {
@@ -561,9 +501,7 @@ export class SharedFiles implements ECFetchable {
          })
          .map((tag) => {
             const path = tag instanceof ECStringTag ? tag.value : "";
-            const reason: SharedDirRejectReason = Number(
-               tag.childInt(ECTagNames.EC_TAG_SHAREDDIR_ERROR) ?? 0n,
-            );
+            const reason: SharedDirRejectReason = Number(tag.childInt(ECTagNames.EC_TAG_SHAREDDIR_ERROR) ?? 0n);
             return new SharedDirRejection(path, reason);
          });
       debug("setSharedDirs: %d dir(s), %d rejected", dirs.length, rejections.length);
@@ -578,7 +516,6 @@ export class SharedFiles implements ECFetchable {
  * "(unknown name)". Mirrors DownloadTracker - see its class doc.
  */
 export class SharedFileTracker {
-
    private readonly filesByEcid = new Map<bigint, SharedFile>();
 
    public get files(): readonly SharedFile[] {
@@ -605,8 +542,7 @@ export class SharedFileTracker {
          return update;
       }
       if (update.ecid === undefined) return update;
-      const merged =
-         this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
+      const merged = this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
       this.filesByEcid.set(update.ecid, merged);
       return merged;
    }

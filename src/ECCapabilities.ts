@@ -1,5 +1,4 @@
 export class ECCapabilities {
-
    public zlib = false;
    public utf8Numbers = false;
    public notify = false;

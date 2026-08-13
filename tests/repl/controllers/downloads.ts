@@ -4,7 +4,6 @@ import { printDownloadFiles } from "../views/downloads.js";
 
 /** Download-queue commands (cancel/pause/resume/stop/priority/swap/setcat/addlink/clear) - all operate on ec.Downloads alone. */
 export class DownloadsController {
-
    public constructor(
       private readonly downloads: ec.Downloads,
       private readonly tracker: ec.DownloadTracker,
@@ -73,9 +72,7 @@ export class DownloadsController {
       const name = args[1]?.toLowerCase();
       const priority = name ? PRIORITY_NAMES[name] : undefined;
       if (!hash || priority === undefined) {
-         console.error(
-            `Usage: priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
-         );
+         console.error(`Usage: priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`);
          return;
       }
       await this.downloads.prioritySet(hash, priority);

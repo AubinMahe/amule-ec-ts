@@ -9,7 +9,6 @@ import * as ec from "../src/index.js";
  * simplified for a test double: only ever one pending read at a time.
  */
 class SocketReader {
-
    private buffer = Buffer.alloc(0);
    private waiting: { length: number; resolve: (buffer: Buffer) => void } | undefined;
 
@@ -77,14 +76,13 @@ export interface FakeEcServer {
    close(): Promise<void>;
 }
 
-function createNextPeer(
-   queuedPeers: FakeEcPeer[],
-   waitingResolvers: ((peer: FakeEcPeer) => void)[],
-): () => Promise<FakeEcPeer> {
+function createNextPeer(queuedPeers: FakeEcPeer[], waitingResolvers: ((peer: FakeEcPeer) => void)[]): () => Promise<FakeEcPeer> {
    return function nextPeer(): Promise<FakeEcPeer> {
       const queued = queuedPeers.shift();
       if (queued) return Promise.resolve(queued);
-      return new Promise((resolve) => { waitingResolvers.push(resolve); });
+      return new Promise((resolve) => {
+         waitingResolvers.push(resolve);
+      });
    };
 }
 
@@ -92,7 +90,9 @@ function createNextPeer(
 function createClose(server: net.Server, openSockets: Set<net.Socket>): () => Promise<void> {
    return function close(): Promise<void> {
       return new Promise((resolve) => {
-         server.close(() => { resolve(); });
+         server.close(() => {
+            resolve();
+         });
          for (const socket of openSockets) socket.destroy();
       });
    };
@@ -106,7 +106,9 @@ export function startFakeEcServer(): Promise<FakeEcServer> {
       const openSockets = new Set<net.Socket>();
       const server = net.createServer((socket) => {
          openSockets.add(socket);
-         socket.once("close", () => { openSockets.delete(socket); });
+         socket.once("close", () => {
+            openSockets.delete(socket);
+         });
          const peer = wrapPeer(socket);
          const waiter = waitingResolvers.shift();
          if (waiter) waiter(peer);
@@ -135,8 +137,13 @@ export function startFakeEcServer(): Promise<FakeEcServer> {
  */
 export function computeSaltedHash(passwordHash: string, salt: bigint): Uint8Array {
    const saltHex = salt.toString(16).toUpperCase();
-   // eslint-disable-next-line sonarjs/hashing -- MD5 is what the EC wire protocol itself mandates, see ECConnection.ts's md5Digest doc.
+   /* eslint-disable sonarjs/hashing -- MD5 is what the EC wire protocol itself mandates, see ECConnection.ts's md5Digest doc. */
    const saltHash = crypto.createHash("md5").update(saltHex, "utf8").digest("hex").toLowerCase();
-   // eslint-disable-next-line sonarjs/hashing -- ditto.
-   return new Uint8Array(crypto.createHash("md5").update(passwordHash + saltHash, "utf8").digest());
+   return new Uint8Array(
+      crypto
+         .createHash("md5")
+         .update(passwordHash + saltHash, "utf8")
+         .digest(),
+   );
+   /* eslint-enable sonarjs/hashing */
 }

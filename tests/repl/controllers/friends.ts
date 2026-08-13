@@ -5,7 +5,6 @@ import { printSearchResults } from "../views/search.js";
 const SEARCH_POLL_INTERVAL_MS = 250;
 
 export class FriendsController {
-
    public constructor(private readonly friends: ec.Friends) {}
 
    public async add(args: string[]): Promise<void> {

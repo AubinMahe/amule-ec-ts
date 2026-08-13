@@ -2,7 +2,6 @@ import * as ec from "../../../src/index.js";
 import { printStatus } from "../views/status.js";
 
 export class StatusController {
-
    public constructor(private readonly status: ec.Status) {}
 
    public async show(): Promise<void> {

@@ -24,7 +24,9 @@ describe("armReconnect", () => {
 
    async function acceptAuthentication(peer: FakeEcPeer): Promise<void> {
       await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       const authPasswd = await peer.readPacket();
       const hashTag = authPasswd.find(ec.ECTagNames.EC_TAG_PASSWD_HASH) as ec.ECHash16Tag;
       expect(Buffer.from(hashTag.value)).to.deep.equal(Buffer.from(computeSaltedHash(PASSWORD_HASH, SALT)));
@@ -33,10 +35,7 @@ describe("armReconnect", () => {
 
    it("reconnects and re-authenticates automatically once the connection drops", async function () {
       this.timeout(5_000);
-      const [connection, firstPeer] = await Promise.all([
-         ec.ECConnection.connect("127.0.0.1", server.port),
-         server.nextPeer(),
-      ]);
+      const [connection, firstPeer] = await Promise.all([ec.ECConnection.connect("127.0.0.1", server.port), server.nextPeer()]);
       await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(firstPeer)]);
 
       ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false, false);
@@ -48,7 +47,9 @@ describe("armReconnect", () => {
       // The client's own authenticateWithHash()/armReconnect() continuation runs a beat
       // after the server-side write above (real loopback I/O) - give it room to settle
       // before disarming, below, or the re-arm could land after removeAllListeners().
-      await new Promise<void>((resolve) => { setTimeout(resolve, 100); });
+      await new Promise<void>((resolve) => {
+         setTimeout(resolve, 100);
+      });
 
       // Proves the reconnected socket is genuinely wired for both directions, not just re-authenticated.
       await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -82,7 +83,9 @@ describe("ECEngine.start", () => {
 
    async function acceptAuthentication(peer: FakeEcPeer): Promise<ec.ECPacket> {
       const authRequest = await peer.readPacket();
-      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
       const authPasswd = await peer.readPacket();
       const hashTag = authPasswd.find(ec.ECTagNames.EC_TAG_PASSWD_HASH) as ec.ECHash16Tag;
       expect(Buffer.from(hashTag.value)).to.deep.equal(Buffer.from(computeSaltedHash(PASSWORD_HASH, SALT)));

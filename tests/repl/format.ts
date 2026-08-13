@@ -18,10 +18,7 @@ export function formatSpeed(bytesPerSecond: bigint | undefined): string {
    return `${formatSize(bytesPerSecond)}/s`;
 }
 
-export function formatPercent(
-   done: bigint | undefined,
-   full: bigint | undefined,
-): string {
+export function formatPercent(done: bigint | undefined, full: bigint | undefined): string {
    if (done === undefined || full === undefined || full === 0n) return "  ?%";
    const percent = (Number(done) / Number(full)) * 100;
    return `${percent.toFixed(1).padStart(5, " ")}%`;

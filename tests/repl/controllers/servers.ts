@@ -4,7 +4,6 @@ import { printServers } from "../views/servers.js";
 
 /** server disconnect/priority/remove/add/update, plus "show servers" - all operate on ec.Servers alone. */
 export class ServersController {
-
    public constructor(private readonly servers: ec.Servers) {}
 
    public async show(): Promise<void> {
@@ -22,9 +21,7 @@ export class ServersController {
          else if (lower in SERVER_PRIORITY_NAMES) options.prio = SERVER_PRIORITY_NAMES[lower];
       }
       if (!ecidText || (options.static === undefined && options.prio === undefined)) {
-         console.error(
-            `Usage: server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`,
-         );
+         console.error(`Usage: server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`);
          return;
       }
       await this.servers.setStaticPrio(BigInt(ecidText), options);
@@ -76,8 +73,6 @@ export class ServersController {
       if (sub === "remove") return this.remove(args.slice(1));
       if (sub === "add") return this.add(args.slice(1));
       if (sub === "update") return this.updateFromUrl(args.slice(1));
-      console.error(
-         "Usage: server <disconnect|priority ...|remove <ip:port>|add <ip:port> [name]|update <url>>",
-      );
+      console.error("Usage: server <disconnect|priority ...|remove <ip:port>|add <ip:port> [name]|update <url>>");
    }
 }

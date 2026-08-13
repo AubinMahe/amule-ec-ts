@@ -22,13 +22,10 @@ function formatKadState(status: ec.Status): string {
 
 export function printStatus(status: ec.Status): void {
    if (status.ed2kConnected !== undefined || status.kadConnected !== undefined) {
-      console.log(
-         `ed2k: ${formatEd2kState(status)}  kad: ${formatKadState(status)}`,
-      );
+      console.log(`ed2k: ${formatEd2kState(status)}  kad: ${formatKadState(status)}`);
    }
 
-   if (status.uploadSpeed === undefined && status.downloadSpeed === undefined)
-      return;
+   if (status.uploadSpeed === undefined && status.downloadSpeed === undefined) return;
 
    console.log(
       `up: ${formatSpeed(status.uploadSpeed)} (limit ${formatSpeed(status.uploadSpeedLimit)}, queue: ${status.uploadQueueLength ?? "?"})` +

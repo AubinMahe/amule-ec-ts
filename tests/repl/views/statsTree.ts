@@ -10,8 +10,7 @@ export function formatStatValue(value: ec.StatValue): string {
       base = value.doubleValue.toFixed(2);
    }
    const withEnum = value.enumToken ? `${base} [${value.enumToken}]` : base;
-   const withType =
-      value.type !== undefined ? `${withEnum} (${ec.ECStatValueType[value.type]})` : withEnum;
+   const withType = value.type !== undefined ? `${withEnum} (${ec.ECStatValueType[value.type]})` : withEnum;
    return value.companion ? `${withType} / ${formatStatValue(value.companion)}` : withType;
 }
 

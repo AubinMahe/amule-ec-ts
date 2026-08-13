@@ -98,10 +98,7 @@ describe("Kad.bootstrapFromIp", () => {
       failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Kad is disabled in preferences."));
       fake.queueReply(failure);
 
-      await expectRejection(
-         kad.bootstrapFromIp("192.0.2.1", 4672),
-         /Kad is disabled in preferences/,
-      );
+      await expectRejection(kad.bootstrapFromIp("192.0.2.1", 4672), /Kad is disabled in preferences/);
    });
 });
 

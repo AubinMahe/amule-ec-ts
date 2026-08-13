@@ -42,9 +42,7 @@ function readExternalConnectSettings(): ExternalConnectSettings {
       }
    }
    if (!passwordHash) {
-      throw new Error(
-         `No ECPassword found in [ExternalConnect] section of ${path}.`,
-      );
+      throw new Error(`No ECPassword found in [ExternalConnect] section of ${path}.`);
    }
    return { port, passwordHash };
 }
@@ -60,8 +58,7 @@ function parseArgs(argv: string[]): CliOptions {
    for (const arg of argv) {
       if (arg === "--notify") {
          options.notify = true;
-      }
-      else {
+      } else {
          console.error(`Unknown option: "${arg}"`);
          process.exit(1);
       }

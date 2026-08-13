@@ -1,7 +1,6 @@
 import { ECFlags } from "./ECFlags.js";
 
 export class TransmissionHeader {
-
    public static readonly SIZE = 8;
 
    public readonly flags: number;
@@ -23,15 +22,9 @@ export class TransmissionHeader {
 
    public static decode(buffer: Uint8Array): TransmissionHeader {
       if (buffer.byteLength < TransmissionHeader.SIZE) {
-         throw new RangeError(
-            `Transmission header requires ${TransmissionHeader.SIZE} bytes (${buffer.byteLength} provided).`,
-         );
+         throw new RangeError(`Transmission header requires ${TransmissionHeader.SIZE} bytes (${buffer.byteLength} provided).`);
       }
-      const view = Buffer.from(
-         buffer.buffer,
-         buffer.byteOffset,
-         buffer.byteLength,
-      );
+      const view = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
       return new TransmissionHeader(view.readUInt32BE(0), view.readUInt32BE(4));
    }
 

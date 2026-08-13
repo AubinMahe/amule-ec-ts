@@ -55,9 +55,7 @@ describe("Log.addLine", () => {
       await log.addLine("hello");
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_ADDLOGLINE);
-      expect((fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal(
-         "hello",
-      );
+      expect((fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal("hello");
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_LOG_TO_STATUS)).to.be.undefined;
    });
@@ -69,9 +67,7 @@ describe("Log.addLine", () => {
 
       await log.addLine("hello", true);
 
-      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_LOG_TO_STATUS)).to.be.instanceOf(
-         ec.ECCustomTag,
-      );
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_LOG_TO_STATUS)).to.be.instanceOf(ec.ECCustomTag);
    });
 
    it("throws a generic error on any unexpected opcode", async () => {
@@ -186,9 +182,7 @@ describe("DebugLog.addLine", () => {
       await log.addLine("debug hello");
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_ADDDEBUGLOGLINE);
-      expect((fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal(
-         "debug hello",
-      );
+      expect((fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal("debug hello");
    });
 
    it("throws a generic error on any unexpected opcode", async () => {

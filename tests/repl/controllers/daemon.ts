@@ -1,7 +1,6 @@
 import * as ec from "../../../src/index.js";
 
 export class DaemonController {
-
    public constructor(private readonly daemon: ec.Daemon) {}
 
    public async shutdown(): Promise<void> {

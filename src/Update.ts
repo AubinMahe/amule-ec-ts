@@ -27,9 +27,7 @@ const debug = debuglog("amule-ec:update");
  */
 function ipFromUint32(value: bigint): string {
    const n = Number(value) >>> 0;
-   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff].join(
-      ".",
-   );
+   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff].join(".");
 }
 
 function ipFromTag(tag: ECTag, name: number): string | undefined {
@@ -84,7 +82,6 @@ export enum ECIdentState {
  * `fileName` (this constructor never adds `EC_TAG_PARTFILE_NAME`).
  */
 export class ClientUpdate {
-
    public readonly ecid: bigint;
    public readonly name: string | undefined;
    public readonly hash: string | undefined;
@@ -177,10 +174,7 @@ export class ClientUpdate {
       return new ClientUpdate({
          ecid: tag.intValue ?? 0n,
          name: tag.childString(ECTagNames.EC_TAG_CLIENT_NAME),
-         hash:
-            hashTag instanceof ECHash16Tag
-               ? Buffer.from(hashTag.value).toString("hex")
-               : undefined,
+         hash: hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          userIdHybrid: tag.childInt(ECTagNames.EC_TAG_CLIENT_USER_ID),
          score: tag.childInt(ECTagNames.EC_TAG_CLIENT_SCORE),
          software: tag.childInt(ECTagNames.EC_TAG_CLIENT_SOFTWARE),
@@ -200,16 +194,10 @@ export class ClientUpdate {
          downloadTotal: tag.childInt(ECTagNames.EC_TAG_CLIENT_DOWNLOAD_TOTAL),
          uploadState: tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_STATE),
          downloadState: tag.childInt(ECTagNames.EC_TAG_CLIENT_DOWNLOAD_STATE),
-         identState: numberOrUndefined(
-            tag.childInt(ECTagNames.EC_TAG_CLIENT_IDENT_STATE),
-         ),
-         extProtocol: boolOrUndefined(
-            tag.childInt(ECTagNames.EC_TAG_CLIENT_EXT_PROTOCOL),
-         ),
+         identState: numberOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_IDENT_STATE)),
+         extProtocol: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_EXT_PROTOCOL)),
          waitingPosition: tag.childInt(ECTagNames.EC_TAG_CLIENT_WAITING_POSITION),
-         remoteQueueRank: tag.childInt(
-            ECTagNames.EC_TAG_CLIENT_REMOTE_QUEUE_RANK,
-         ),
+         remoteQueueRank: tag.childInt(ECTagNames.EC_TAG_CLIENT_REMOTE_QUEUE_RANK),
       });
    }
 
@@ -267,7 +255,6 @@ function boolOrUndefined(value: bigint | undefined): boolean | undefined {
  * instead of `ip:port`.
  */
 export class ServerUpdate {
-
    public readonly ecid: bigint;
    public readonly name: string | undefined;
    public readonly description: string | undefined;
@@ -324,13 +311,9 @@ export class ServerUpdate {
          ip: ipFromTag(tag, ECTagNames.EC_TAG_SERVER_IP),
          port: tag.childInt(ECTagNames.EC_TAG_SERVER_PORT),
          ping: tag.childInt(ECTagNames.EC_TAG_SERVER_PING),
-         priority: numberOrUndefined(
-            tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO),
-         ),
+         priority: numberOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO)),
          failedCount: tag.childInt(ECTagNames.EC_TAG_SERVER_FAILED),
-         isStatic: boolOrUndefined(
-            tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC),
-         ),
+         isStatic: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC)),
          users: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS),
          usersMax: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS_MAX),
          files: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES),
@@ -371,7 +354,6 @@ export class ServerUpdate {
  * since the last poll), not "offline".
  */
 export class FriendInfo {
-
    public readonly ecid: bigint;
    public readonly name: string | undefined;
    public readonly hash: string | undefined;
@@ -400,10 +382,7 @@ export class FriendInfo {
       return new FriendInfo({
          ecid: tag.intValue ?? 0n,
          name: tag.childString(ECTagNames.EC_TAG_FRIEND_NAME),
-         hash:
-            hashTag instanceof ECHash16Tag
-               ? Buffer.from(hashTag.value).toString("hex")
-               : undefined,
+         hash: hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          ip: ipFromTag(tag, ECTagNames.EC_TAG_FRIEND_IP),
          port: tag.childInt(ECTagNames.EC_TAG_FRIEND_PORT),
          linkedClientEcid: tag.childInt(ECTagNames.EC_TAG_FRIEND_CLIENT),
@@ -467,7 +446,6 @@ export class FriendInfo {
  * only sees whatever the first poll happens to include.
  */
 export class Update {
-
    private readonly sharedFilesByEcid = new Map<bigint, SharedFile>();
    private readonly downloadsByEcid = new Map<bigint, DownloadFile>();
    private readonly clientsByEcid = new Map<bigint, ClientUpdate>();
@@ -498,23 +476,14 @@ export class Update {
 
    public async fetch(): Promise<void> {
       if (!this.connection.remoteCapabilities.partialUpdate) {
-         throw new Error(
-            "Daemon did not confirm EC_TAG_CAN_PARTIAL_UPDATE; Update.fetch() requires it.",
-         );
+         throw new Error("Daemon did not confirm EC_TAG_CAN_PARTIAL_UPDATE; Update.fetch() requires it.");
       }
       const request = new ECPacket(ECOpcode.EC_OP_GET_UPDATE);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_INC_UPDATE,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_INC_UPDATE));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SHARED_FILES) {
-         throw new Error(
-            `Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       for (const tag of reply.tags) {
          this.applyTopLevelTag(tag);
@@ -566,9 +535,7 @@ export class Update {
       }
    }
 
-   private mergeInto<
-      T extends { ecid: bigint | undefined; mergedWith(update: T): T },
-   >(map: Map<bigint, T>, update: T): void {
+   private mergeInto<T extends { ecid: bigint | undefined; mergedWith(update: T): T }>(map: Map<bigint, T>, update: T): void {
       if (update.ecid === undefined) return;
       const merged = map.get(update.ecid)?.mergedWith(update) ?? update;
       map.set(update.ecid, merged);

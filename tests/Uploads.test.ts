@@ -13,12 +13,7 @@ function uploadClientTag(fields: {
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
-      children.push(
-         new ec.ECHash16Tag(
-            ec.ECTagNames.EC_TAG_CLIENT_HASH,
-            new Uint8Array(Buffer.from(fields.hash, "hex")),
-         ),
-      );
+      children.push(new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_CLIENT_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))));
    }
    if (fields.name !== undefined) {
       children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CLIENT_NAME, fields.name));
@@ -37,9 +32,7 @@ function uploadClientTag(fields: {
 
 describe("UploadClient", () => {
    it("reads hash/name/fileName/ecid from the tag", () => {
-      const client = new ec.UploadClient(
-         uploadClientTag({ ecid: 7, hash: hexHash("a"), name: "peer", fileName: "movie.avi" }),
-      );
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 7, hash: hexHash("a"), name: "peer", fileName: "movie.avi" }));
       expect(client.ecid).to.equal(7n);
       expect(client.hash).to.equal(hexHash("a"));
       expect(client.name).to.equal("peer");
@@ -67,9 +60,7 @@ describe("Uploads.fetch", () => {
       await uploads.fetch();
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_ULOAD_QUEUE);
-      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_DETAIL_LEVEL)?.intValue).to.equal(
-         BigInt(ec.ECDetailLevel.EC_DETAIL_CMD),
-      );
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_DETAIL_LEVEL)?.intValue).to.equal(BigInt(ec.ECDetailLevel.EC_DETAIL_CMD));
       expect(uploads.clients).to.have.lengthOf(2);
       expect(uploads.clients.map((c) => c.name)).to.deep.equal(["alice", "bob"]);
    });
@@ -103,9 +94,6 @@ describe("Uploads.swapClientToAnotherFile", () => {
       const uploads = new ec.Uploads(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
-      await expectRejection(
-         uploads.swapClientToAnotherFile(7n, hexHash("a")),
-         /EC_OP_NOOP/,
-      );
+      await expectRejection(uploads.swapClientToAnotherFile(7n, hexHash("a")), /EC_OP_NOOP/);
    });
 });

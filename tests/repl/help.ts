@@ -45,18 +45,12 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["pause <hash>", "pause a download"],
    ["resume <hash>", "resume a paused download"],
    ["stop <hash>", "stop a download"],
-   [
-      `priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
-      "set a download's priority",
-   ],
+   [`priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`, "set a download's priority"],
    ["addlink <ed2k-link>", "start a download from a link"],
    ["swap <this|auto|others> <hash>", "swap A4AF sources for a download"],
    ["setcat <hash> <category-index>", "assign a download to a category"],
    ["category create <title> <path> [comment] [color] [prio]", "create a download category"],
-   [
-      "category update <index> <title> <path> [comment] [color] [prio]",
-      "update a download category",
-   ],
+   ["category update <index> <title> <path> [comment] [color] [prio]", "update a download category"],
    ["category delete <index>", "delete a download category"],
    ["clear completed", "clear completed downloads"],
    ["kad start", "start the Kademlia network"],
@@ -73,10 +67,7 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["server update <url>", "update the known server list from a server.met URL"],
    ["show server log", "daemon's ed2k-connection log"],
    ["reset server log", "clear the ed2k-connection log"],
-   [
-      `sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
-      "set a shared file's upload priority",
-   ],
+   [`sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`, "set a shared file's upload priority"],
    ["show shareddirs", "list the daemon's shared directories"],
    ["shareddir add <path> [recursive]", "add a shared directory"],
    ["shareddir remove <path>", "remove a shared directory"],
@@ -89,72 +80,36 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["ipfilter reload", "reload the IP filter from its local file"],
    ["ipfilter update [url]", "update the IP filter from a URL (or the configured default)"],
    ["show prefs general", "general preferences (nick, user hash, version-check)"],
-   [
-      "prefs general checknewversion <on|off>",
-      "toggle the check-new-version preference (preserves other fields)",
-   ],
+   ["prefs general checknewversion <on|off>", "toggle the check-new-version preference (preserves other fields)"],
    ["show prefs messagefilter", "message filter preferences"],
    ["prefs messagefilter <on|off>", "enable/disable the message filter (preserves other fields)"],
    ["show prefs connections", "connection preferences"],
-   [
-      "prefs connections reconnect <on|off>",
-      "toggle ed2k auto-reconnect (preserves other fields)",
-   ],
+   ["prefs connections reconnect <on|off>", "toggle ed2k auto-reconnect (preserves other fields)"],
    ["show prefs files", "files preferences"],
-   [
-      "prefs files checkfreespace <on|off>",
-      "toggle the free-disk-space check (preserves other fields)",
-   ],
+   ["prefs files checkfreespace <on|off>", "toggle the free-disk-space check (preserves other fields)"],
    ["show prefs directories", "directories preferences"],
-   [
-      "prefs directories autorescan <on|off>",
-      "toggle auto-rescan of shared directories (preserves other fields)",
-   ],
+   ["prefs directories autorescan <on|off>", "toggle auto-rescan of shared directories (preserves other fields)"],
    ["show prefs security", "security/IP-filter preferences"],
-   [
-      "prefs security filterlan <on|off>",
-      "toggle filtering of LAN IPs (preserves other fields)",
-   ],
+   ["prefs security filterlan <on|off>", "toggle filtering of LAN IPs (preserves other fields)"],
    ["show prefs onlinesig", "online signature preferences"],
-   [
-      "prefs onlinesig <on|off>",
-      "enable/disable the online signature (preserves other fields)",
-   ],
+   ["prefs onlinesig <on|off>", "enable/disable the online signature (preserves other fields)"],
    ["show prefs servers", "server-list preferences"],
-   [
-      "prefs servers autoupdate <on|off>",
-      "toggle auto-update of the known server list (preserves other fields)",
-   ],
+   ["prefs servers autoupdate <on|off>", "toggle auto-update of the known server list (preserves other fields)"],
    ["show prefs kademlia", "Kademlia nodes.dat update URL"],
    ["prefs kademlia seturl <url>", "set the Kademlia nodes.dat update URL"],
-   [
-      "show prefs remotecontrols",
-      "webserver/amuleapi preferences (ports, autorun, gzip - password hashes never printed)",
-   ],
-   [
-      "prefs remotecontrols gzip <on|off>",
-      "toggle webserver gzip compression (preserves other fields, including passwords)",
-   ],
+   ["show prefs remotecontrols", "webserver/amuleapi preferences (ports, autorun, gzip - password hashes never printed)"],
+   ["prefs remotecontrols gzip <on|off>", "toggle webserver gzip compression (preserves other fields, including passwords)"],
    ["show prefs ip2country", "GeoIP preferences and live resolver status"],
-   [
-      "prefs ip2country autoupdate <on|off>",
-      "toggle automatic GeoIP database updates (preserves other fields)",
-   ],
+   ["prefs ip2country autoupdate <on|off>", "toggle automatic GeoIP database updates (preserves other fields)"],
    ["show prefs coretweaks", "core tweaks preferences"],
-   [
-      "prefs coretweaks verbose <on|off>",
-      "toggle core verbose logging (preserves other fields)",
-   ],
+   ["prefs coretweaks verbose <on|off>", "toggle core verbose logging (preserves other fields)"],
    ["show categories", "list download categories"],
-   [
-      "show update",
-      "poll the combined incremental-update feed (shared files/downloads/clients/servers/friends)",
-   ],
+   ["show update", "poll the combined incremental-update feed (shared files/downloads/clients/servers/friends)"],
    ["show statstree", "the daemon's full statistics tree"],
-   ["show statstree <key>", "just the subtree rooted at a given node key (e.g. \"uploads\")"],
+   ["show statstree <key>", 'just the subtree rooted at a given node key (e.g. "uploads")'],
    ["friend add <ecid>", "add a connected client as a friend"],
    ["friend add <hash> <ip> <port> <name>", "add a friend not currently connected"],
-   ["friend browse <client-ecid>", "browse a connected client's shared files (\"View Files\") - requires multi-search"],
+   ["friend browse <client-ecid>", 'browse a connected client\'s shared files ("View Files") - requires multi-search'],
    ["friend remove <ecid>", "remove a friend"],
    ["friend slot <ecid> <on|off>", "reserve/clear a friend's upload slot"],
    ["comment <hash> <rating 0-5> <text>", "set a shared file's comment/rating"],
@@ -167,7 +122,5 @@ const HELP_COMMAND_WIDTH = Math.max(...HELP_ENTRIES.map(([command]) => command.l
 
 export const HELP =
    "Commands:\n" +
-   HELP_ENTRIES.map(
-      ([command, description]) => `  ${command.padEnd(HELP_COMMAND_WIDTH)}  ${description}`,
-   ).join("\n") +
+   HELP_ENTRIES.map(([command, description]) => `  ${command.padEnd(HELP_COMMAND_WIDTH)}  ${description}`).join("\n") +
    "\n";

@@ -8,18 +8,9 @@ import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
  * ECSpecialCoreTags.cpp's CEC_PartFile_Tag at full detail (see Downloads.ts's
  * class doc) - not a removal shape (see downloadRemovalTag() below for that).
  */
-function downloadEntryTag(fields: {
-   ecid: number;
-   hash: string;
-   name: string;
-   sizeFull?: bigint;
-   sizeDone?: bigint;
-}): ec.ECTag {
+function downloadEntryTag(fields: { ecid: number; hash: string; name: string; sizeFull?: bigint; sizeDone?: bigint }): ec.ECTag {
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, fields.ecid, [
-      new ec.ECHash16Tag(
-         ec.ECTagNames.EC_TAG_PARTFILE_HASH,
-         new Uint8Array(Buffer.from(fields.hash, "hex")),
-      ),
+      new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_FULL, fields.sizeFull ?? 0n),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, fields.sizeDone ?? 0n),
@@ -28,16 +19,11 @@ function downloadEntryTag(fields: {
 
 /** A removal push notification's shape (see Downloads.ts's DownloadFile doc): own data IS the hash, no children. */
 function downloadRemovalTag(hash: string): ec.ECTag {
-   return new ec.ECHash16Tag(
-      ec.ECTagNames.EC_TAG_PARTFILE,
-      new Uint8Array(Buffer.from(hash, "hex")),
-   );
+   return new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")));
 }
 
 /** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
-function commentsTag(
-   entries: readonly { userName: string; fileName: string; rating: number; comment: string }[],
-): ec.ECTag {
+function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {
       children.push(
@@ -67,60 +53,41 @@ function partFileTag(fields: {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_PRIO, fields.prio));
    }
    if (fields.stopped !== undefined) {
-      children.push(
-         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_STOPPED, fields.stopped ? 1 : 0),
-      );
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_STOPPED, fields.stopped ? 1 : 0));
    }
    if (fields.sourcesXfer !== undefined) {
-      children.push(
-         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER, fields.sourcesXfer),
-      );
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER, fields.sourcesXfer));
    }
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
-      children.push(
-         new ec.ECUInt64Tag(
-            ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING,
-            fields.kadCommentSearching ? 1n : 0n,
-         ),
-      );
+      children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, children);
 }
 
 describe("DownloadFile.statusText", () => {
    it("reports 'Hashing' while hashing, regardless of stopped/sources", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ status: ec.ECPartFileStatus.PS_HASHING }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ status: ec.ECPartFileStatus.PS_HASHING }));
       expect(file.statusText).to.equal("Hashing");
    });
 
    it("reports 'Downloading' when a source is actively transferring", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ status: ec.ECPartFileStatus.PS_READY, sourcesXfer: 1 }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ status: ec.ECPartFileStatus.PS_READY, sourcesXfer: 1 }));
       expect(file.statusText).to.equal("Downloading");
    });
 
    it("reports 'Waiting' when connected but no source is transferring", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ status: ec.ECPartFileStatus.PS_READY, sourcesXfer: 0 }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ status: ec.ECPartFileStatus.PS_READY, sourcesXfer: 0 }));
       expect(file.statusText).to.equal("Waiting");
    });
 
    it("reports 'Stopped' when stopped and not yet complete", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ status: ec.ECPartFileStatus.PS_READY, stopped: true }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ status: ec.ECPartFileStatus.PS_READY, stopped: true }));
       expect(file.statusText).to.equal("Stopped");
    });
 
    it("does not let 'stopped' override an already-complete status", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ status: ec.ECPartFileStatus.PS_COMPLETE, stopped: true }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ status: ec.ECPartFileStatus.PS_COMPLETE, stopped: true }));
       expect(file.statusText).to.equal("Complete");
    });
 
@@ -132,16 +99,12 @@ describe("DownloadFile.statusText", () => {
 
 describe("DownloadFile.priorityText", () => {
    it("reports a plain priority level", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ prio: ec.ECDownloadPriority.PR_HIGH }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ prio: ec.ECDownloadPriority.PR_HIGH }));
       expect(file.priorityText).to.equal("High");
    });
 
    it("reports the auto-priority form (wire value +10) distinctly from the plain one", () => {
-      const file = ec.DownloadFile.fromTag(
-         partFileTag({ prio: ec.ECDownloadPriority.PR_HIGH + 10 }),
-      );
+      const file = ec.DownloadFile.fromTag(partFileTag({ prio: ec.ECDownloadPriority.PR_HIGH + 10 }));
       expect(file.priorityText).to.equal("Auto [Hi]");
    });
 
@@ -155,18 +118,14 @@ describe("DownloadFile comments/kadCommentSearching", () => {
    it("decodes comments and kadCommentSearching when present", () => {
       const file = ec.DownloadFile.fromTag(
          partFileTag({
-            comments: commentsTag([
-               { userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" },
-            ]),
+            comments: commentsTag([{ userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" }]),
             kadCommentSearching: true,
          }),
       );
 
       expect(file.kadCommentSearching).to.equal(true);
       expect(file.comments).to.have.lengthOf(1);
-      expect(file.comments?.[0]).to.deep.equal(
-         new ec.FileComment("Alice", "one.avi", ec.FileRating.GOOD, "Nice"),
-      );
+      expect(file.comments?.[0]).to.deep.equal(new ec.FileComment("Alice", "one.avi", ec.FileRating.GOOD, "Nice"));
    });
 
    it("leaves both undefined when absent", () => {
@@ -192,9 +151,7 @@ describe("Downloads.fetch", () => {
 
       expect(fake.sent).to.have.lengthOf(1);
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_DLOAD_QUEUE);
-      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_DETAIL_LEVEL)?.intValue).to.equal(
-         BigInt(ec.ECDetailLevel.EC_DETAIL_CMD),
-      );
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_DETAIL_LEVEL)?.intValue).to.equal(BigInt(ec.ECDetailLevel.EC_DETAIL_CMD));
       expect(downloads.files).to.have.lengthOf(2);
       expect(downloads.files[0]?.name).to.equal("one.avi");
       expect(downloads.files[1]?.name).to.equal("two.avi");
@@ -293,18 +250,14 @@ describe("Downloads.pause/resume/stop/swapA4AF*", () => {
             expect(fake.sent[0]?.opcode).to.equal(opcode);
             const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
             expect(hashTag).to.be.instanceOf(ec.ECHash16Tag);
-            expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(
-               hexHash("a"),
-            );
+            expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
          });
 
          it("throws the daemon's reason on EC_OP_FAILED", async () => {
             const fake = createFakeConnection();
             const downloads = new ec.Downloads(fake.connection);
             const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
-            failure.add(
-               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"),
-            );
+            failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"));
             fake.queueReply(failure);
 
             await expectRejection(downloads[method](hexHash("a")), /FileHash not found/);
@@ -347,10 +300,7 @@ describe("Downloads.prioritySet", () => {
       failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"));
       fake.queueReply(failure);
 
-      await expectRejection(
-         downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_HIGH),
-         /FileHash not found/,
-      );
+      await expectRejection(downloads.prioritySet(hexHash("a"), ec.ECDownloadPriority.PR_HIGH), /FileHash not found/);
    });
 });
 
@@ -390,18 +340,14 @@ describe("Downloads.addLink", () => {
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_ADD_LINK);
       const linkTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_STRING);
-      expect((linkTag as ec.ECStringTag).value).to.equal(
-         "ed2k://|file|foo.avi|123|" + hexHash("a") + "|/",
-      );
+      expect((linkTag as ec.ECStringTag).value).to.equal("ed2k://|file|foo.avi|123|" + hexHash("a") + "|/");
    });
 
    it("throws the daemon's reason on EC_OP_FAILED", async () => {
       const fake = createFakeConnection();
       const downloads = new ec.Downloads(fake.connection);
       const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
-      failure.add(
-         new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid link or already on list."),
-      );
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid link or already on list."));
       fake.queueReply(failure);
 
       await expectRejection(downloads.addLink("not-a-link"), /Invalid link/);
@@ -484,9 +430,7 @@ describe("DownloadTracker", () => {
 
       const update = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
       update.add(
-         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
-            new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n),
-         ]),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n)]),
       );
       const merged = tracker.apply(update);
 
@@ -514,10 +458,7 @@ describe("DownloadTracker", () => {
       const withComments = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
       withComments.add(
          new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
-            new ec.ECHash16Tag(
-               ec.ECTagNames.EC_TAG_PARTFILE_HASH,
-               new Uint8Array(Buffer.from(hexHash("a"), "hex")),
-            ),
+            new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(hexHash("a"), "hex"))),
             new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, "one.avi"),
             commentsTag([{ userName: "Alice", fileName: "one.avi", rating: ec.FileRating.GOOD, comment: "Nice" }]),
             new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, 1n),
@@ -527,9 +468,7 @@ describe("DownloadTracker", () => {
 
       const dirtyPush = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
       dirtyPush.add(
-         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
-            new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n),
-         ]),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n)]),
       );
       tracker.apply(dirtyPush);
 

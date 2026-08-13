@@ -2,9 +2,7 @@ import * as ec from "../../../src/index.js";
 
 export function printMessageFilterPrefs(prefs: ec.MessageFilterPrefs): void {
    console.log(`enabled: ${prefs.enabled}`);
-   console.log(
-      `  filterAll: ${prefs.filterAll}  friendsOnly: ${prefs.friendsOnly}  secureOnly: ${prefs.secureOnly}`,
-   );
+   console.log(`  filterAll: ${prefs.filterAll}  friendsOnly: ${prefs.friendsOnly}  secureOnly: ${prefs.secureOnly}`);
    console.log(`  byKeyword: ${prefs.byKeyword}  keywords: "${prefs.keywords}"`);
    console.log(
       `  showInLog: ${prefs.showInLog}  filterComments: ${prefs.filterComments}  commentKeywords: "${prefs.commentKeywords}"`,
@@ -18,15 +16,11 @@ export function printConnectionsPrefs(prefs: ec.ConnectionsPrefs): void {
    console.log(
       `  slotAllocation: ${prefs.slotAllocation}  tcpPort: ${prefs.tcpPort}  udpPort: ${prefs.udpPort}  udpDisabled: ${prefs.udpDisabled}`,
    );
-   console.log(
-      `  maxSourcesPerFile: ${prefs.maxSourcesPerFile}  maxConnections: ${prefs.maxConnections}`,
-   );
+   console.log(`  maxSourcesPerFile: ${prefs.maxSourcesPerFile}  maxConnections: ${prefs.maxConnections}`);
    console.log(
       `  autoConnect: ${prefs.autoConnect}  reconnect: ${prefs.reconnect}  networkEd2k: ${prefs.networkEd2k}  networkKademlia: ${prefs.networkKademlia}`,
    );
-   console.log(
-      `  bindAddress: "${prefs.bindAddress}"  bindInterface: "${prefs.bindInterface}"`,
-   );
+   console.log(`  bindAddress: "${prefs.bindAddress}"  bindInterface: "${prefs.bindInterface}"`);
    console.log(
       `  proxy: enabled=${prefs.proxy.enabled} type=${ec.ECProxyType[prefs.proxy.type]} host=${prefs.proxy.host} port=${prefs.proxy.port}`,
    );
@@ -34,9 +28,7 @@ export function printConnectionsPrefs(prefs: ec.ConnectionsPrefs): void {
 }
 
 export function printFilesPrefs(prefs: ec.FilesPrefs): void {
-   console.log(
-      `ichEnabled: ${prefs.ichEnabled}  aichTrust: ${prefs.aichTrust}  newFilesPaused: ${prefs.newFilesPaused}`,
-   );
+   console.log(`ichEnabled: ${prefs.ichEnabled}  aichTrust: ${prefs.aichTrust}  newFilesPaused: ${prefs.newFilesPaused}`);
    console.log(
       `  newAutoDownloadPriority: ${prefs.newAutoDownloadPriority}  newAutoUploadPriority: ${prefs.newAutoUploadPriority}  previewPrio: ${prefs.previewPrio}`,
    );
@@ -46,12 +38,8 @@ export function printFilesPrefs(prefs: ec.FilesPrefs): void {
    console.log(
       `  saveSources: ${prefs.saveSources}  allocFullFileSize: ${prefs.allocFullFileSize}  createFilesNormal: ${prefs.createFilesNormal}`,
    );
-   console.log(
-      `  mmapSupported: ${prefs.mmapSupported}  mmapEnabled: ${prefs.mmapEnabled}`,
-   );
-   console.log(
-      `  checkFreeSpace: ${prefs.checkFreeSpace}  minFreeDiskSpaceMb: ${prefs.minFreeDiskSpaceMb}`,
-   );
+   console.log(`  mmapSupported: ${prefs.mmapSupported}  mmapEnabled: ${prefs.mmapEnabled}`);
+   console.log(`  checkFreeSpace: ${prefs.checkFreeSpace}  minFreeDiskSpaceMb: ${prefs.minFreeDiskSpaceMb}`);
    console.log(
       `  mediaMetadataEnabled: ${prefs.mediaMetadataEnabled}  mediaMetadataFfprobePath: "${prefs.mediaMetadataFfprobePath}"`,
    );
@@ -70,9 +58,7 @@ export function printDirectoriesPrefs(prefs: ec.DirectoriesPrefs): void {
 }
 
 export function printSecurityPrefs(prefs: ec.SecurityPrefs): void {
-   console.log(
-      `canSeeShares: ${ec.ECVisibleShareAccess[prefs.canSeeShares]}  secureIdentEnabled: ${prefs.secureIdentEnabled}`,
-   );
+   console.log(`canSeeShares: ${ec.ECVisibleShareAccess[prefs.canSeeShares]}  secureIdentEnabled: ${prefs.secureIdentEnabled}`);
    console.log(
       `  ipFilterClients: ${prefs.ipFilterClients}  ipFilterServers: ${prefs.ipFilterServers}  ipFilterAutoUpdate: ${prefs.ipFilterAutoUpdate}`,
    );
@@ -82,9 +68,7 @@ export function printSecurityPrefs(prefs: ec.SecurityPrefs): void {
    console.log(
       `  obfuscationSupported: ${prefs.obfuscationSupported}  obfuscationRequested: ${prefs.obfuscationRequested}  obfuscationRequired: ${prefs.obfuscationRequired}`,
    );
-   console.log(
-      `  ipFilterParanoid: ${prefs.ipFilterParanoid}  ipFilterSystem: ${prefs.ipFilterSystem}`,
-   );
+   console.log(`  ipFilterParanoid: ${prefs.ipFilterParanoid}  ipFilterSystem: ${prefs.ipFilterSystem}`);
 }
 
 export function printOnlineSigPrefs(prefs: ec.OnlineSigPrefs): void {
@@ -97,15 +81,11 @@ export function printServersPrefs(prefs: ec.ServersPrefs): void {
    console.log(
       `removeDeadServers: ${prefs.removeDeadServers}  deadServerRetries: ${prefs.deadServerRetries}  autoUpdateServerList: ${prefs.autoUpdateServerList}`,
    );
-   console.log(
-      `  addServersFromServer: ${prefs.addServersFromServer}  addServersFromClient: ${prefs.addServersFromClient}`,
-   );
+   console.log(`  addServersFromServer: ${prefs.addServersFromServer}  addServersFromClient: ${prefs.addServersFromClient}`);
    console.log(
       `  useScoreSystem: ${prefs.useScoreSystem}  smartIdCheck: ${prefs.smartIdCheck}  safeServerConnect: ${prefs.safeServerConnect}`,
    );
-   console.log(
-      `  autoConnectStaticOnly: ${prefs.autoConnectStaticOnly}  manualHighPriority: ${prefs.manualHighPriority}`,
-   );
+   console.log(`  autoConnectStaticOnly: ${prefs.autoConnectStaticOnly}  manualHighPriority: ${prefs.manualHighPriority}`);
    console.log(`  updateUrl: "${prefs.updateUrl}"`);
 }
 
@@ -146,28 +126,18 @@ export function printIP2CountryPrefs(prefs: ec.IP2CountryPrefs): void {
    console.log(
       `supported: ${prefs.supported}  enabled: ${prefs.enabled}  source: ${ec.ECGeoIPSource[prefs.source]}  autoUpdate: ${prefs.autoUpdate}`,
    );
-   console.log(
-      `  customUrl: "${prefs.customUrl}"  maxMindLicense: ${prefs.maxMindLicense ? "(set)" : "(empty)"}`,
-   );
-   console.log(
-      `  loadedSource: ${prefs.loadedSource ?? "(n/a)"}  databasePath: ${prefs.databasePath ?? "(n/a)"}`,
-   );
+   console.log(`  customUrl: "${prefs.customUrl}"  maxMindLicense: ${prefs.maxMindLicense ? "(set)" : "(empty)"}`);
+   console.log(`  loadedSource: ${prefs.loadedSource ?? "(n/a)"}  databasePath: ${prefs.databasePath ?? "(n/a)"}`);
    console.log(
       `  databaseLoaded: ${prefs.databaseLoaded ?? "(n/a)"}  downloading: ${prefs.downloading ?? "(n/a)"}  lastResult: ${prefs.lastResult ?? "(n/a)"}`,
    );
 }
 
 export function printCoreTweaksPrefs(prefs: ec.CoreTweaksPrefs): void {
-   console.log(
-      `maxConnPerFive: ${prefs.maxConnPerFive}  verbose: ${prefs.verbose}`,
-   );
-   console.log(
-      `  fileBufferSize: ${prefs.fileBufferSize}B  uploadQueueSize: ${prefs.uploadQueueSize}`,
-   );
+   console.log(`maxConnPerFive: ${prefs.maxConnPerFive}  verbose: ${prefs.verbose}`);
+   console.log(`  fileBufferSize: ${prefs.fileBufferSize}B  uploadQueueSize: ${prefs.uploadQueueSize}`);
    console.log(
       `  serverKeepAliveTimeoutMs: ${prefs.serverKeepAliveTimeoutMs}  kadMaxSourceSearches: ${prefs.kadMaxSourceSearches}`,
    );
-   console.log(
-      `  kadSourceReaskMs: ${prefs.kadSourceReaskMs}  sourceReaskMs: ${prefs.sourceReaskMs}`,
-   );
+   console.log(`  kadSourceReaskMs: ${prefs.kadSourceReaskMs}  sourceReaskMs: ${prefs.sourceReaskMs}`);
 }

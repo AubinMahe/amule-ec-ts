@@ -53,7 +53,6 @@ export class StatsGraphPoint {
  * `scale=1`; `width` caps how many points come back per call.
  */
 export class StatsGraphs {
-
    public points: readonly StatsGraphPoint[] = [];
    /** Total bytes downloaded/uploaded this session, as of the last point in `points`. */
    public sessionDownloaded: bigint | undefined;
@@ -107,9 +106,7 @@ export class StatsGraphs {
          return;
       }
       if (reply.opcode !== ECOpcode.EC_OP_STATSGRAPHS) {
-         throw new Error(
-            `Expected EC_OP_STATSGRAPHS, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_STATSGRAPHS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const dataTag = reply.find(ECTagNames.EC_TAG_STATSGRAPH_DATA);
       const data = dataTag instanceof ECCustomTag ? readUInt32ArrayBE(dataTag.value) : [];

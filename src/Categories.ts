@@ -27,7 +27,6 @@ const debug = debuglog("amule-ec:categories");
  * (no "category" command in TextClient.cpp).
  */
 export class Categories {
-
    public constructor(public readonly connection: ECConnection) {}
 
    /**
@@ -107,13 +106,7 @@ export class Categories {
     * readFailure()'s doc) if `path` doesn't exist and can't be created - the
     * category is still created in that case, just with a fallback path.
     */
-   public async create(
-      title: string,
-      path: string,
-      comment = "",
-      color = 0,
-      prio = 0,
-   ): Promise<void> {
+   public async create(title: string, path: string, comment = "", color = 0, prio = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_CREATE_CATEGORY);
       request.add(Categories.buildCategoryTag(0, title, path, comment, color, prio));
       await this.connection.send(request);
@@ -122,9 +115,7 @@ export class Categories {
          throw Categories.readFailure(reply, "create", title);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("create: title=%s, path=%s", title, path);
    }
@@ -143,14 +134,7 @@ export class Categories {
     * doesn't exist and can't be created - the category's other fields are
     * still updated in that case, just leaving its previous path in place.
     */
-   public async update(
-      index: number,
-      title: string,
-      path: string,
-      comment = "",
-      color = 0,
-      prio = 0,
-   ): Promise<void> {
+   public async update(index: number, title: string, path: string, comment = "", color = 0, prio = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_UPDATE_CATEGORY);
       request.add(Categories.buildCategoryTag(index, title, path, comment, color, prio));
       await this.connection.send(request);
@@ -159,9 +143,7 @@ export class Categories {
          throw Categories.readFailure(reply, "update", title);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("update: index=%d, title=%s, path=%s", index, title, path);
    }
@@ -184,9 +166,7 @@ export class Categories {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("delete: index=%d", index);
    }

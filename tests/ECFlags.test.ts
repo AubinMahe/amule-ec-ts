@@ -56,16 +56,22 @@ describe("ECFlags enable/disable helpers", () => {
 
 describe("ECFlags.validate", () => {
    it("does not throw for a normally-constructed value", () => {
-      expect(() => { ec.ECFlags.validate(ec.ECFlags.create(true, true, true)); }).to.not.throw();
+      expect(() => {
+         ec.ECFlags.validate(ec.ECFlags.create(true, true, true));
+      }).to.not.throw();
    });
 
    it("rejects a value with no protocol marker", () => {
-      expect(() => { ec.ECFlags.validate(0); }).to.throw("Invalid EC protocol marker.");
+      expect(() => {
+         ec.ECFlags.validate(0);
+      }).to.throw("Invalid EC protocol marker.");
    });
 
    it("rejects a value with reserved bits set", () => {
       const withReservedBit = ec.ECFlags.create() | (1 << 10);
       expect(ec.ECFlags.hasValidMarker(withReservedBit)).to.equal(true);
-      expect(() => { ec.ECFlags.validate(withReservedBit); }).to.throw("Reserved EC flag bits are set.");
+      expect(() => {
+         ec.ECFlags.validate(withReservedBit);
+      }).to.throw("Reserved EC flag bits are set.");
    });
 });

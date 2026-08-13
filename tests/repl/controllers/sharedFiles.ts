@@ -4,7 +4,6 @@ import { printSharedFiles } from "../views/sharedFiles.js";
 
 /** Shared-file commands (verify/comment/kadnotes/sharedprio/shareddir), plus "show shared" - all operate on ec.SharedFiles alone. */
 export class SharedFilesController {
-
    public constructor(
       private readonly sharedFiles: ec.SharedFiles,
       private readonly tracker: ec.SharedFileTracker,
@@ -59,9 +58,7 @@ export class SharedFilesController {
       const name = args[1]?.toLowerCase();
       const priority = name ? PRIORITY_NAMES[name] : undefined;
       if (!hash || priority === undefined) {
-         console.error(
-            `Usage: sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`,
-         );
+         console.error(`Usage: sharedprio <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`);
          return;
       }
       await this.sharedFiles.setPriority(hash, priority);
@@ -82,10 +79,7 @@ export class SharedFilesController {
    /** Reports any rejections from setSharedDirs() - see SharedFiles.setSharedDirs()'s doc on why this isn't all-or-nothing. */
    private reportSharedDirRejections(rejections: readonly ec.SharedDirRejection[]): void {
       for (const rejection of rejections) {
-         const reasonText =
-            rejection.reason === ec.SharedDirRejectReason.UNREADABLE
-               ? "unreadable"
-               : "missing or not a directory";
+         const reasonText = rejection.reason === ec.SharedDirRejectReason.UNREADABLE ? "unreadable" : "missing or not a directory";
          console.error(`Rejected: ${rejection.path} (${reasonText}).`);
       }
    }

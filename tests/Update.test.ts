@@ -91,10 +91,7 @@ describe("Update.fetch", () => {
                new ec.ECStringTag(ec.ECTagNames.EC_TAG_CLIENT_NAME, "peer1"),
                // packIPv4ToUint32 uses the same "anti-host order" (LSB = first
                // octet) as this field's wire encoding - see ipFromUint32's doc.
-               new ec.ECUInt32Tag(
-                  ec.ECTagNames.EC_TAG_CLIENT_USER_IP,
-                  ec.packIPv4ToUint32("192.0.2.1"),
-               ),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_USER_IP, ec.packIPv4ToUint32("192.0.2.1")),
                new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_EXT_PROTOCOL, 1),
             ]),
          ]),
@@ -121,10 +118,7 @@ describe("Update.fetch", () => {
          new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SERVER, new Uint8Array(), [
             new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SERVER, 7, [
                new ec.ECStringTag(ec.ECTagNames.EC_TAG_SERVER_NAME, "eMule Security"),
-               new ec.ECUInt32Tag(
-                  ec.ECTagNames.EC_TAG_SERVER_IP,
-                  ec.packIPv4ToUint32("192.0.2.1"),
-               ),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SERVER_IP, ec.packIPv4ToUint32("192.0.2.1")),
                new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_SERVER_PORT, 4661),
             ]),
          ]),
@@ -189,9 +183,7 @@ describe("Update.fetch", () => {
       const secondReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
       secondReply.add(
          new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CLIENT, new Uint8Array(), [
-            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42, [
-               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_UP_SPEED, 200),
-            ]),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42, [new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_UP_SPEED, 200)]),
          ]),
       );
       fake.queueReply(secondReply);

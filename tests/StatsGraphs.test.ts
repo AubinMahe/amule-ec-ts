@@ -43,35 +43,22 @@ describe("StatsGraphs.fetch", () => {
       const fake = createFakeConnection();
       const statsGraphs = new ec.StatsGraphs(fake.connection);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_STATSGRAPHS);
-      reply.add(
-         new ec.ECCustomTag(
-            ec.ECTagNames.EC_TAG_STATSGRAPH_DATA,
-            packUInt32BE([1024, 2048, 5, 10, 4096, 8192, 7, 20]),
-         ),
-      );
-      reply.add(
-         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STATSGRAPH_DATA_CONN, packUInt32BE([2, 3, 4, 6])),
-      );
+      reply.add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STATSGRAPH_DATA, packUInt32BE([1024, 2048, 5, 10, 4096, 8192, 7, 20])));
+      reply.add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STATSGRAPH_DATA_CONN, packUInt32BE([2, 3, 4, 6])));
       fake.queueReply(reply);
 
       await statsGraphs.fetch();
 
       expect(statsGraphs.points).to.have.lengthOf(2);
-      expect(statsGraphs.points[0]).to.deep.equal(
-         new ec.StatsGraphPoint(1024n, 2048n, 5n, 10n, 2n, 3n),
-      );
-      expect(statsGraphs.points[1]).to.deep.equal(
-         new ec.StatsGraphPoint(4096n, 8192n, 7n, 20n, 4n, 6n),
-      );
+      expect(statsGraphs.points[0]).to.deep.equal(new ec.StatsGraphPoint(1024n, 2048n, 5n, 10n, 2n, 3n));
+      expect(statsGraphs.points[1]).to.deep.equal(new ec.StatsGraphPoint(4096n, 8192n, 7n, 20n, 4n, 6n));
    });
 
    it("leaves uploadingClients/downloadingClients undefined when EC_TAG_STATSGRAPH_DATA_CONN is absent", async () => {
       const fake = createFakeConnection();
       const statsGraphs = new ec.StatsGraphs(fake.connection);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_STATSGRAPHS);
-      reply.add(
-         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STATSGRAPH_DATA, packUInt32BE([1024, 2048, 5, 10])),
-      );
+      reply.add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STATSGRAPH_DATA, packUInt32BE([1024, 2048, 5, 10])));
       fake.queueReply(reply);
 
       await statsGraphs.fetch();

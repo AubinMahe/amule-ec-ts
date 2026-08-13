@@ -52,16 +52,11 @@ export function createFakeConnection(): FakeConnection {
  * in this project) - this is the vanilla try/catch pattern, factored out
  * since every service's error-path test needs it.
  */
-export async function expectRejection(
-   promise: Promise<unknown>,
-   matcher: RegExp | string,
-): Promise<void> {
+export async function expectRejection(promise: Promise<unknown>, matcher: RegExp | string): Promise<void> {
    try {
       await promise;
    } catch (error) {
-      expect((error as Error).message).to.match(
-         typeof matcher === "string" ? new RegExp(matcher) : matcher,
-      );
+      expect((error as Error).message).to.match(typeof matcher === "string" ? new RegExp(matcher) : matcher);
       return;
    }
    expect.fail("Expected the promise to reject, but it resolved.");

@@ -32,52 +32,54 @@ import { PreferencesController } from "./controllers/preferences.js";
  * it.
  */
 export class Repl {
-   private readonly downloadTracker   = new ec.DownloadTracker();
+   private readonly downloadTracker = new ec.DownloadTracker();
    private readonly sharedFileTracker = new ec.SharedFileTracker();
-   private readonly activity          = new NotificationActivity();
+   private readonly activity = new NotificationActivity();
 
-   private readonly downloadsController    : DownloadsController;
-   private readonly categoriesController   : CategoriesController;
-   private readonly searchController       : SearchController;
-   private readonly networkController      : NetworkController;
-   private readonly serversController      : ServersController;
-   private readonly uploadsController      : UploadsController;
-   private readonly sharedFilesController  : SharedFilesController;
-   private readonly daemonController       : DaemonController;
-   private readonly ipFilterController     : IPFilterController;
-   private readonly friendsController      : FriendsController;
-   private readonly logController          : LogController;
-   private readonly debugLogController     : DebugLogController;
-   private readonly serverLogController    : ServerLogController;
-   private readonly chatController         : ChatController;
-   private readonly statusController       : StatusController;
-   private readonly statsGraphsController  : StatsGraphsController;
-   private readonly updateController       : UpdateController;
-   private readonly statsTreeController    : StatsTreeController;
-   private readonly preferencesController  : PreferencesController;
+   private readonly downloadsController: DownloadsController;
+   private readonly categoriesController: CategoriesController;
+   private readonly searchController: SearchController;
+   private readonly networkController: NetworkController;
+   private readonly serversController: ServersController;
+   private readonly uploadsController: UploadsController;
+   private readonly sharedFilesController: SharedFilesController;
+   private readonly daemonController: DaemonController;
+   private readonly ipFilterController: IPFilterController;
+   private readonly friendsController: FriendsController;
+   private readonly logController: LogController;
+   private readonly debugLogController: DebugLogController;
+   private readonly serverLogController: ServerLogController;
+   private readonly chatController: ChatController;
+   private readonly statusController: StatusController;
+   private readonly statsGraphsController: StatsGraphsController;
+   private readonly updateController: UpdateController;
+   private readonly statsTreeController: StatsTreeController;
+   private readonly preferencesController: PreferencesController;
 
    public constructor(private readonly connection: ec.ECConnection) {
       const servers = new ec.Servers(connection);
-      this.downloadsController   = new DownloadsController(new ec.Downloads(connection), this.downloadTracker);
-      this.categoriesController  = new CategoriesController(new ec.Categories(connection));
-      this.searchController      = new SearchController(new ec.Search(connection));
-      this.networkController     = new NetworkController(new ec.Kad(connection), servers);
-      this.serversController     = new ServersController(servers);
-      this.uploadsController     = new UploadsController(new ec.Uploads(connection));
+      this.downloadsController = new DownloadsController(new ec.Downloads(connection), this.downloadTracker);
+      this.categoriesController = new CategoriesController(new ec.Categories(connection));
+      this.searchController = new SearchController(new ec.Search(connection));
+      this.networkController = new NetworkController(new ec.Kad(connection), servers);
+      this.serversController = new ServersController(servers);
+      this.uploadsController = new UploadsController(new ec.Uploads(connection));
       this.sharedFilesController = new SharedFilesController(new ec.SharedFiles(connection), this.sharedFileTracker);
-      this.daemonController      = new DaemonController(new ec.Daemon(connection));
-      this.ipFilterController    = new IPFilterController(new ec.IPFilter(connection));
-      this.friendsController     = new FriendsController(new ec.Friends(connection));
-      this.logController         = new LogController(new ec.Log(connection));
-      this.debugLogController    = new DebugLogController(new ec.DebugLog(connection));
-      this.serverLogController   = new ServerLogController(new ec.ServerLog(connection));
-      this.chatController        = new ChatController(new ec.Chat(connection));
-      this.statusController      = new StatusController(new ec.Status(connection));
+      this.daemonController = new DaemonController(new ec.Daemon(connection));
+      this.ipFilterController = new IPFilterController(new ec.IPFilter(connection));
+      this.friendsController = new FriendsController(new ec.Friends(connection));
+      this.logController = new LogController(new ec.Log(connection));
+      this.debugLogController = new DebugLogController(new ec.DebugLog(connection));
+      this.serverLogController = new ServerLogController(new ec.ServerLog(connection));
+      this.chatController = new ChatController(new ec.Chat(connection));
+      this.statusController = new StatusController(new ec.Status(connection));
       this.statsGraphsController = new StatsGraphsController(new ec.StatsGraphs(connection));
-      this.updateController      = new UpdateController(new ec.Update(connection));
-      this.statsTreeController   = new StatsTreeController(new ec.StatsTree(connection));
+      this.updateController = new UpdateController(new ec.Update(connection));
+      this.statsTreeController = new StatsTreeController(new ec.StatsTree(connection));
       this.preferencesController = new PreferencesController(new ec.Preferences(connection));
-      this.connection.onNotification((packet) => {this.applyNotification(packet)});
+      this.connection.onNotification((packet) => {
+         this.applyNotification(packet);
+      });
    }
 
    /** Functional: applies the notification to the relevant tracker. Returns nothing - see NotificationActivity for the presentation side. */
@@ -98,9 +100,7 @@ export class Repl {
       }
 
       if (this.connection.localCapabilities.notify) {
-         console.log(
-            `[ec] unhandled notification opcode 0x${packet.opcode.toString(16)}`,
-         );
+         console.log(`[ec] unhandled notification opcode 0x${packet.opcode.toString(16)}`);
       }
    }
 
@@ -165,12 +165,8 @@ export class Repl {
 
          case "info":
             console.log("Negotiated capabilities:");
-            console.log(
-               `  large tag count : ${this.connection.remoteCapabilities.largeTagCount}`,
-            );
-            console.log(
-               `  partial update  : ${this.connection.remoteCapabilities.partialUpdate}`,
-            );
+            console.log(`  large tag count : ${this.connection.remoteCapabilities.largeTagCount}`);
+            console.log(`  partial update  : ${this.connection.remoteCapabilities.partialUpdate}`);
             break;
 
          case "show dl":
@@ -280,8 +276,7 @@ export class Repl {
          if (next.done) break;
          const command = next.value.trim();
          if (command === "") continue;
-         if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit")
-            break;
+         if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit") break;
          try {
             await this.runCommand(command.split(/\s+/).filter(Boolean));
          } catch (error) {

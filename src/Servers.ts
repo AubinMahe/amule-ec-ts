@@ -52,7 +52,6 @@ function boolOrUndefined(value: bigint | undefined): boolean | undefined {
  * the identical EC_TAG_SERVER_PRIO/EC_TAG_SERVER_STATIC tags there.
  */
 export class ServerInfo {
-
    public readonly ip: string;
    public readonly port: number;
    public readonly name: string | undefined;
@@ -114,7 +113,6 @@ export class ServerInfo {
 
 /** The known server list, as returned by EC_OP_GET_SERVER_LIST / EC_OP_SERVER_LIST. */
 export class Servers implements ECFetchable {
-
    public servers: readonly ServerInfo[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -127,18 +125,11 @@ export class Servers implements ECFetchable {
     */
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_SERVER_LIST);
-      request.add(
-         new ECUInt8Tag(
-            ECTagNames.EC_TAG_DETAIL_LEVEL,
-            ECDetailLevel.EC_DETAIL_FULL,
-         ),
-      );
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_FULL));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SERVER_LIST) {
-         throw new Error(
-            `Expected EC_OP_SERVER_LIST, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SERVER_LIST, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       this.servers = reply.tags
          .filter((tag) => {
@@ -173,16 +164,11 @@ export class Servers implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to connect to ${ipPort}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to connect to ${ipPort}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("connect: %s", ipPort);
    }
@@ -211,16 +197,11 @@ export class Servers implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to remove ${ipPort}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to remove ${ipPort}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("remove: %s", ipPort);
    }
@@ -245,16 +226,11 @@ export class Servers implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason =
-            reasonTag instanceof ECStringTag
-               ? reasonTag.value
-               : `Failed to add ${ipPort}.`;
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to add ${ipPort}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("add: ipPort=%s, name=%s", ipPort, name);
    }
@@ -280,9 +256,7 @@ export class Servers implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("updateFromUrl: %s", url);
    }
@@ -302,9 +276,7 @@ export class Servers implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("disconnect");
    }
@@ -328,15 +300,10 @@ export class Servers implements ECFetchable {
     * Always replies EC_OP_NOOP, even if the ECID doesn't resolve to a
     * known server - no failure case exists.
     */
-   public async setStaticPrio(
-      ecid: bigint,
-      options: { static?: boolean; prio?: ServerPriority },
-   ): Promise<void> {
+   public async setStaticPrio(ecid: bigint, options: { static?: boolean; prio?: ServerPriority }): Promise<void> {
       const children: ECTag[] = [];
       if (options.static !== undefined) {
-         children.push(
-            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, options.static ? 1 : 0),
-         );
+         children.push(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, options.static ? 1 : 0));
       }
       if (options.prio !== undefined) {
          children.push(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, options.prio));
@@ -346,9 +313,7 @@ export class Servers implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug(
          "setStaticPrio: ecid=%s, static=%s, prio=%s",
@@ -365,7 +330,6 @@ export class Servers implements ECFetchable {
  * Servers.fetch() for that), despite the name.
  */
 export class ServerLog implements ECFetchable {
-
    public lines: readonly string[] = [];
 
    public constructor(public readonly connection: ECConnection) {}
@@ -387,9 +351,7 @@ export class ServerLog implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SERVERINFO) {
-         throw new Error(
-            `Expected EC_OP_SERVERINFO, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_SERVERINFO, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       const textTag = reply.find(ECTagNames.EC_TAG_STRING);
       const text = textTag instanceof ECStringTag ? textTag.value : "";
@@ -415,9 +377,7 @@ export class ServerLog implements ECFetchable {
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
-         throw new Error(
-            `Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`,
-         );
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
       debug("reset: server log cleared");
    }
