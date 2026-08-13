@@ -22,6 +22,14 @@ export enum ServerPriority {
    SRV_PR_LOW = 2,
 }
 
+function numberOrUndefined(value: bigint | undefined): number | undefined {
+   return value === undefined ? undefined : Number(value);
+}
+
+function boolOrUndefined(value: bigint | undefined): boolean | undefined {
+   return value === undefined ? undefined : value !== 0n;
+}
+
 /**
  * One EC_TAG_SERVER entry from an EC_OP_SERVER_LIST reply.
  *
@@ -32,14 +40,16 @@ export enum ServerPriority {
  * (IP + port), not a wrapper. Which children are present depends on the
  * requested detail level - at EC_DETAIL_CMD only EC_TAG_SERVER_NAME (and
  * EC_TAG_SERVER_COUNTRY if IP2Country is enabled server-side) are added;
- * ping/users/usersMax/files (among others not decoded here: prio, failed,
- * static, version, desc, country) only appear from EC_DETAIL_WEB/FULL
+ * ping/users/usersMax/files/priority/isStatic (among others not decoded
+ * here: failed, version, desc, country) only appear from EC_DETAIL_WEB/FULL
  * onward - see fetch()'s doc for why this client requests EC_DETAIL_FULL.
  * Each of ping/users/usersMax/files is omitted entirely by the daemon
  * when its own value is zero (`if ((tmpInt = server->GetPing()) != 0)`,
  * ECSpecialCoreTags.cpp:62-96) - a real zero and "not reported" are
  * indistinguishable on the wire, so these read as `undefined` rather than
- * `0n` when absent.
+ * `0n` when absent. priority/isStatic use the same `numberOrUndefined`/
+ * `boolOrUndefined` decoding `ServerUpdate` (Update.ts) already applies to
+ * the identical EC_TAG_SERVER_PRIO/EC_TAG_SERVER_STATIC tags there.
  */
 export class ServerInfo {
 
@@ -54,6 +64,10 @@ export class ServerInfo {
    public readonly usersMax: bigint | undefined;
    /** Shared files indexed by this server, if known. */
    public readonly files: bigint | undefined;
+   /** This server's own priority, if known - see Servers.setStaticPrio() to change it. */
+   public readonly priority: ServerPriority | undefined;
+   /** Whether this server is pinned ("static"), if known - see Servers.setStaticPrio() to change it. */
+   public readonly isStatic: boolean | undefined;
 
    private constructor(fields: {
       ip: string;
@@ -63,6 +77,8 @@ export class ServerInfo {
       users: bigint | undefined;
       usersMax: bigint | undefined;
       files: bigint | undefined;
+      priority: ServerPriority | undefined;
+      isStatic: boolean | undefined;
    }) {
       this.ip = fields.ip;
       this.port = fields.port;
@@ -71,6 +87,8 @@ export class ServerInfo {
       this.users = fields.users;
       this.usersMax = fields.usersMax;
       this.files = fields.files;
+      this.priority = fields.priority;
+      this.isStatic = fields.isStatic;
    }
 
    /** "ip:port", the wire format aMule's own tools (amulecmd's "show servers") use to identify a server. */
@@ -88,6 +106,8 @@ export class ServerInfo {
          users: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS),
          usersMax: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS_MAX),
          files: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES),
+         priority: numberOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO)),
+         isStatic: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC)),
       });
    }
 }

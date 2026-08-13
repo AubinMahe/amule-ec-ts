@@ -11,6 +11,8 @@ function serverTag(
       users?: number;
       usersMax?: number;
       files?: number;
+      priority?: ec.ServerPriority;
+      isStatic?: boolean;
    } = {},
 ): ec.ECTag {
    const children: ec.ECTag[] = [];
@@ -28,6 +30,12 @@ function serverTag(
    }
    if (fields.files !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SERVER_FILES, fields.files));
+   }
+   if (fields.priority !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SERVER_PRIO, fields.priority));
+   }
+   if (fields.isStatic !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SERVER_STATIC, fields.isStatic ? 1 : 0));
    }
    return new ec.ECIPv4Tag(ec.ECTagNames.EC_TAG_SERVER, new Uint8Array(address), port, children);
 }
@@ -70,6 +78,33 @@ describe("ServerInfo.fromTag", () => {
       expect(info?.usersMax).to.be.undefined;
       expect(info?.files).to.be.undefined;
       /* eslint-enable @typescript-eslint/no-unused-expressions */
+   });
+
+   it("reads priority/isStatic from EC_DETAIL_FULL children when present", () => {
+      const info = ec.ServerInfo.fromTag(
+         serverTag([192, 0, 2, 1], 4712, {
+            name: "eMule Security",
+            priority: ec.ServerPriority.SRV_PR_HIGH,
+            isStatic: true,
+         }),
+      );
+      expect(info?.priority).to.equal(ec.ServerPriority.SRV_PR_HIGH);
+      expect(info?.isStatic).to.equal(true);
+   });
+
+   it("leaves priority/isStatic undefined when the daemon omits them", () => {
+      const info = ec.ServerInfo.fromTag(serverTag([192, 0, 2, 1], 4712, { name: "eMule Security" }));
+      /* eslint-disable @typescript-eslint/no-unused-expressions -- chai's getter-style assertion */
+      expect(info?.priority).to.be.undefined;
+      expect(info?.isStatic).to.be.undefined;
+      /* eslint-enable @typescript-eslint/no-unused-expressions */
+   });
+
+   it("decodes isStatic as false (not undefined) when EC_TAG_SERVER_STATIC is present but zero", () => {
+      const info = ec.ServerInfo.fromTag(
+         serverTag([192, 0, 2, 1], 4712, { name: "eMule Security", isStatic: false }),
+      );
+      expect(info?.isStatic).to.equal(false);
    });
 });
 
