@@ -24,7 +24,12 @@ export class ServersController {
          console.error(`Usage: server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`);
          return;
       }
-      await this.servers.setStaticPrio(BigInt(ecidText), options);
+      // setStatic()/setPriority() are two separate wire calls (mirroring amule-remote-gui.cpp's own
+      // SetStaticServer()/SetServerPrio(), never combined) - this command accepts both tokens on one
+      // line purely for REPL convenience, issuing one call per token actually given.
+      const ecid = BigInt(ecidText);
+      if (options.static !== undefined) await this.servers.setStatic(ecid, options.static);
+      if (options.prio !== undefined) await this.servers.setPriority(ecid, options.prio);
       console.log(`Server priority updated: ecid=${ecidText}.`);
    }
 

@@ -63,9 +63,9 @@ export class ServerInfo {
    public readonly usersMax: bigint | undefined;
    /** Shared files indexed by this server, if known. */
    public readonly files: bigint | undefined;
-   /** This server's own priority, if known - see Servers.setStaticPrio() to change it. */
+   /** This server's own priority, if known - see Servers.setPriority() to change it. */
    public readonly priority: ServerPriority | undefined;
-   /** Whether this server is pinned ("static"), if known - see Servers.setStaticPrio() to change it. */
+   /** Whether this server is pinned ("static"), if known - see Servers.setStatic() to change it. */
    public readonly isStatic: boolean | undefined;
 
    private constructor(fields: {
@@ -282,45 +282,59 @@ export class Servers implements ECFetchable {
    }
 
    /**
-    * Sets a known server's static-priority flag and/or priority, by ECID -
-    * EC_OP_SERVER_SET_STATIC_PRIO.
+    * Pins or unpins a known server ("static"), by ECID -
+    * EC_OP_SERVER_SET_STATIC_PRIO with only EC_TAG_SERVER_STATIC as a
+    * child. See setPriority() for the sibling call that sets priority
+    * instead.
     *
     * Confirmed against ExternalConn.cpp's EC_OP_SERVER_SET_STATIC_PRIO case
     * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3420-L3434)
     * and amule-remote-gui.cpp's SetStaticServer()/SetServerPrio()
-    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1619-L1642,
-    * called separately there, one child tag each - the daemon applies
-    * whichever child(ren) are present, so a single call setting both is
-    * equally valid): the request's EC_TAG_SERVER tag carries the target's
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1619-L1642):
+    * the daemon's own opcode technically accepts either or both children in
+    * a single packet, but every caller upstream - and every caller of this
+    * wrapper - only ever changes one property at a time, so setStatic()/
+    * setPriority() mirror that rather than exposing a combined-write option
+    * nothing uses. The request's EC_TAG_SERVER tag carries the target's
     * ECID as a **plain uint32** here - unlike connect()'s EC_TAG_SERVER,
     * which carries an IP:port (ECIPv4Tag). Same tag name, different wire
     * type depending on the opcode - see Kad.ts's packBootstrapIp() doc for
-    * the same class of gotcha. Optional EC_TAG_SERVER_STATIC (nonzero =
-    * static) and/or EC_TAG_SERVER_PRIO (uint8, ServerPriority) children.
-    * Always replies EC_OP_NOOP, even if the ECID doesn't resolve to a
-    * known server - no failure case exists.
+    * the same class of gotcha. Always replies EC_OP_NOOP, even if the ECID
+    * doesn't resolve to a known server - no failure case exists.
     */
-   public async setStaticPrio(ecid: bigint, options: { static?: boolean; prio?: ServerPriority }): Promise<void> {
-      const children: ECTag[] = [];
-      if (options.static !== undefined) {
-         children.push(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, options.static ? 1 : 0));
-      }
-      if (options.prio !== undefined) {
-         children.push(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, options.prio));
-      }
+   public async setStatic(ecid: bigint, isStatic: boolean): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), children));
+      request.add(
+         new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [
+            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, isStatic ? 1 : 0),
+         ]),
+      );
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
-      debug(
-         "setStaticPrio: ecid=%s, static=%s, prio=%s",
-         ecid,
-         options.static,
-         options.prio !== undefined ? ServerPriority[options.prio] : undefined,
+      debug("setStatic: ecid=%s, static=%s", ecid, isStatic);
+   }
+
+   /**
+    * Sets a known server's priority, by ECID - EC_OP_SERVER_SET_STATIC_PRIO
+    * with only EC_TAG_SERVER_PRIO as a child. See setStatic() for the
+    * sibling call and shared wire-format notes.
+    */
+   public async setPriority(ecid: bigint, prio: ServerPriority): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
+      request.add(
+         new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [
+            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, prio),
+         ]),
       );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      debug("setPriority: ecid=%s, prio=%s", ecid, ServerPriority[prio]);
    }
 }
 

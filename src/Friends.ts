@@ -18,7 +18,7 @@ const debug = debuglog("amule-ec:friends");
  * protocol - the friend list is only ever delivered through a different,
  * incremental-update mechanism this library doesn't decode for any
  * resource. Worse than the already-accepted "blind by ECID" limitation of
- * Servers.setStaticPrio(): confirmed against Friend.h's own
+ * Servers.setStatic()/setPriority(): confirmed against Friend.h's own
  * `class CFriend : public CECID` (https://github.com/amule-org/amule/blob/master/src/Friend.h#L39-L58,
  * `CFriend(CClientRef client)` doesn't reuse the client's ECID - `CECID`
  * assigns a fresh one on construction, from the same shared pool as
@@ -144,7 +144,7 @@ export class Friends {
     * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L2971-L2980):
     * unlike ADD/REMOVE, EC_TAG_FRIEND_FRIENDSLOT's *own* data is the flag
     * itself (encoded the same way every other bool-ish flag in this
-    * library is, e.g. Servers.setStaticPrio()'s EC_TAG_SERVER_STATIC -
+    * library is, e.g. Servers.setStatic()'s EC_TAG_SERVER_STATIC -
     * ECUInt8Tag, 0 or 1; the C++ CECTag(name, bool) overload has no
     * distinct wire type of its own), with EC_TAG_FRIEND (ECID) as its
     * child. Replies EC_OP_NOOP on success; like addByEcid() (and unlike
