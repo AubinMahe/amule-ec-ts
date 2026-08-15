@@ -12,6 +12,7 @@ function uploadClientTag(fields: {
    sessionUp?: bigint;
    software?: ec.ECClientSoftware;
    softwareVersion?: string;
+   uploadFileEcid?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
@@ -34,6 +35,9 @@ function uploadClientTag(fields: {
    }
    if (fields.softwareVersion !== undefined) {
       children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CLIENT_SOFT_VER_STR, fields.softwareVersion));
+   }
+   if (fields.uploadFileEcid !== undefined) {
+      children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE, fields.uploadFileEcid));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, fields.ecid, children);
 }
@@ -61,6 +65,16 @@ describe("UploadClient", () => {
       );
       expect(client.software).to.equal(BigInt(ec.ECClientSoftware.SO_EMULE));
       expect(client.softwareVersion).to.equal("v0.50a");
+   });
+
+   it("reads uploadFileEcid from the tag", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1, uploadFileEcid: 42 }));
+      expect(client.uploadFileEcid).to.equal(42n);
+   });
+
+   it("uploadFileEcid is 0n when the client has no upload file assigned", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1, uploadFileEcid: 0 }));
+      expect(client.uploadFileEcid).to.equal(0n);
    });
 
    describe("softwareText", () => {

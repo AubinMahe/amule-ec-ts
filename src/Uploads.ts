@@ -66,6 +66,14 @@ export class UploadClient {
    public readonly fileName: string | undefined;
    /** The client's internal ECID - EC_TAG_CLIENT's own data (see class doc). */
    public readonly ecid: bigint | undefined;
+   /**
+    * The uploaded file's own internal ECID - EC_TAG_CLIENT_UPLOAD_FILE's own data, `0n` when the
+    * client has no upload file assigned (`client->GetUploadFile()` is null). Confirmed against
+    * `ECSpecialCoreTags.cpp:435-439`: unlike `hash` (the client's user hash), the file itself is
+    * only ever identified here by ECID, not by hash - correlate against `SharedFile.ecid`
+    * (`SharedFiles.files`) to resolve the hash needed by `SharedFiles.searchKadNotes()`.
+    */
+   public readonly uploadFileEcid: bigint | undefined;
 
    public constructor(tag: ECTag) {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
@@ -79,6 +87,7 @@ export class UploadClient {
       this.uploadState = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_STATE);
       this.fileName = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME);
       this.ecid = tag.intValue;
+      this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE);
    }
 
    /**
