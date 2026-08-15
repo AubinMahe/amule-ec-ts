@@ -12,6 +12,16 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-08-15
+
+### Added
+
+- `UploadClient.uploadFileEcid` - the uploaded file's own internal ECID
+  (`EC_TAG_CLIENT_UPLOAD_FILE`), `0n` when the client has no upload file
+  assigned. The upload entry itself never carries the file's hash, only its
+  ECID - correlate against `SharedFile.ecid` (`SharedFiles.files`) to
+  resolve the hash needed by `SharedFiles.searchKadNotes()`.
+
 ## [2.17.0] - 2026-08-15
 
 ### Added
