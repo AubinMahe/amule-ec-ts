@@ -12,6 +12,17 @@ source before being reflected here.
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-08-15
+
+### Added
+
+- `UploadClient.softwareVersion`/`.softwareText` - the version-only string
+  (`EC_TAG_CLIENT_SOFT_VER_STR`) and a human-readable software name decoded
+  client-side from `UploadClient.software` (the daemon never sends that name
+  as text over EC), mirroring `GetSoftName()` (`DataToText.cpp`). New
+  `ECClientSoftware` enum, confirmed against `EClientSoftware`
+  (`include/protocol/ed2k/ClientSoftware.h`).
+
 ## [2.16.0] - 2026-08-13
 
 ### Changed

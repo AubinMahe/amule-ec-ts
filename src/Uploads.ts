@@ -10,6 +10,32 @@ import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag } from "./ECTags.js";
 const debug = debuglog("amule-ec:uploads");
 
 /**
+ * A client's `EC_TAG_CLIENT_SOFTWARE` value - the ed2k protocol's client-software identifier.
+ * Confirmed against `EClientSoftware`
+ * (https://github.com/amule-org/amule/blob/master/src/include/protocol/ed2k/ClientSoftware.h).
+ */
+export enum ECClientSoftware {
+   SO_EMULE = 0,
+   SO_CDONKEY = 1,
+   SO_LXMULE = 2,
+   SO_AMULE = 3,
+   SO_SHAREAZA = 4,
+   SO_EMULEPLUS = 5,
+   SO_HYDRANODE = 6,
+   SO_NEW2_MLDONKEY = 0x0a,
+   SO_LPHANT = 0x14,
+   SO_NEW2_SHAREAZA = 0x28,
+   SO_EDONKEYHYBRID = 0x32,
+   SO_EDONKEY = 0x33,
+   SO_MLDONKEY = 0x34,
+   SO_OLDEMULE = 0x35,
+   SO_UNKNOWN = 0x36,
+   SO_NEW_SHAREAZA = 0x44,
+   SO_NEW_MLDONKEY = 0x98,
+   SO_COMPAT_UNK = 0xff,
+}
+
+/**
  * One EC_TAG_CLIENT entry from an EC_OP_ULOAD_QUEUE reply.
  *
  * Confirmed against
@@ -27,6 +53,12 @@ export class UploadClient {
    public readonly hash: string;
    public readonly name: string;
    public readonly software: bigint | undefined;
+   /**
+    * Version-only string the daemon composes itself (e.g. "v0.50a", never the software name -
+    * see `softwareText` for that) - EC_TAG_CLIENT_SOFT_VER_STR, the same source
+    * ClientUpdate.softwareVersion (Update.ts) reads for EC_OP_GET_UPDATE.
+    */
+   public readonly softwareVersion: string | undefined;
    public readonly speedUp: bigint | undefined;
    public readonly sessionUp: bigint | undefined;
    public readonly totalUp: bigint | undefined;
@@ -40,12 +72,61 @@ export class UploadClient {
       this.hash = hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : "(unknown hash)";
       this.name = tag.childString(ECTagNames.EC_TAG_CLIENT_NAME) ?? "(unknown name)";
       this.software = tag.childInt(ECTagNames.EC_TAG_CLIENT_SOFTWARE);
+      this.softwareVersion = tag.childString(ECTagNames.EC_TAG_CLIENT_SOFT_VER_STR);
       this.speedUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UP_SPEED);
       this.sessionUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_SESSION);
       this.totalUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL);
       this.uploadState = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_STATE);
       this.fileName = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME);
       this.ecid = tag.intValue;
+   }
+
+   /**
+    * Human-readable software name, mirroring `GetSoftName()`
+    * (https://github.com/amule-org/amule/blob/master/src/DataToText.cpp#L104-L142). Unlike
+    * `softwareVersion` (the version-only EC_TAG_CLIENT_SOFT_VER_STR string, e.g. "v0.50a"), the
+    * daemon never sends this name as text over EC - only the raw `software` code - so it is
+    * decoded client-side from `ECClientSoftware`.
+    */
+   public get softwareText(): string {
+      if (this.software === undefined) return "Unknown";
+      const software: ECClientSoftware = Number(this.software);
+      switch (software) {
+         case ECClientSoftware.SO_OLDEMULE:
+         case ECClientSoftware.SO_EMULE:
+            return "eMule";
+         case ECClientSoftware.SO_CDONKEY:
+            return "cDonkey";
+         case ECClientSoftware.SO_LXMULE:
+            return "(l/x)Mule";
+         case ECClientSoftware.SO_AMULE:
+            return "aMule";
+         case ECClientSoftware.SO_SHAREAZA:
+         case ECClientSoftware.SO_NEW_SHAREAZA:
+         case ECClientSoftware.SO_NEW2_SHAREAZA:
+            return "Shareaza";
+         case ECClientSoftware.SO_EMULEPLUS:
+            return "eMule+";
+         case ECClientSoftware.SO_HYDRANODE:
+            return "HydraNode";
+         case ECClientSoftware.SO_MLDONKEY:
+            return "Old MLDonkey";
+         case ECClientSoftware.SO_NEW_MLDONKEY:
+         case ECClientSoftware.SO_NEW2_MLDONKEY:
+            return "New MLDonkey";
+         case ECClientSoftware.SO_LPHANT:
+            return "lphant";
+         case ECClientSoftware.SO_EDONKEYHYBRID:
+            return "eDonkeyHybrid";
+         case ECClientSoftware.SO_EDONKEY:
+            return "eDonkey";
+         case ECClientSoftware.SO_UNKNOWN:
+            return "Unknown";
+         case ECClientSoftware.SO_COMPAT_UNK:
+            return "eMule Compatible";
+         default:
+            return "";
+      }
    }
 }
 

@@ -10,6 +10,8 @@ function uploadClientTag(fields: {
    fileName?: string;
    speedUp?: bigint;
    sessionUp?: bigint;
+   software?: ec.ECClientSoftware;
+   softwareVersion?: string;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
@@ -26,6 +28,12 @@ function uploadClientTag(fields: {
    }
    if (fields.sessionUp !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CLIENT_UPLOAD_SESSION, fields.sessionUp));
+   }
+   if (fields.software !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_SOFTWARE, fields.software));
+   }
+   if (fields.softwareVersion !== undefined) {
+      children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CLIENT_SOFT_VER_STR, fields.softwareVersion));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, fields.ecid, children);
 }
@@ -45,6 +53,50 @@ describe("UploadClient", () => {
       expect(client.name).to.equal("(unknown name)");
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(client.fileName).to.be.undefined;
+   });
+
+   it("reads software/softwareVersion from the tag", () => {
+      const client = new ec.UploadClient(
+         uploadClientTag({ ecid: 1, software: ec.ECClientSoftware.SO_EMULE, softwareVersion: "v0.50a" }),
+      );
+      expect(client.software).to.equal(BigInt(ec.ECClientSoftware.SO_EMULE));
+      expect(client.softwareVersion).to.equal("v0.50a");
+   });
+
+   describe("softwareText", () => {
+      it("returns \"Unknown\" when software is missing", () => {
+         const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
+         expect(client.softwareText).to.equal("Unknown");
+      });
+
+      // Confirmed against GetSoftName() (DataToText.cpp#L104-L142) - one case per name it returns,
+      // aliases included (SO_OLDEMULE -> "eMule", SO_NEW_SHAREAZA/SO_NEW2_SHAREAZA -> "Shareaza", ...).
+      const cases: [ec.ECClientSoftware, string][] = [
+         [ec.ECClientSoftware.SO_EMULE, "eMule"],
+         [ec.ECClientSoftware.SO_OLDEMULE, "eMule"],
+         [ec.ECClientSoftware.SO_CDONKEY, "cDonkey"],
+         [ec.ECClientSoftware.SO_LXMULE, "(l/x)Mule"],
+         [ec.ECClientSoftware.SO_AMULE, "aMule"],
+         [ec.ECClientSoftware.SO_SHAREAZA, "Shareaza"],
+         [ec.ECClientSoftware.SO_NEW_SHAREAZA, "Shareaza"],
+         [ec.ECClientSoftware.SO_NEW2_SHAREAZA, "Shareaza"],
+         [ec.ECClientSoftware.SO_EMULEPLUS, "eMule+"],
+         [ec.ECClientSoftware.SO_HYDRANODE, "HydraNode"],
+         [ec.ECClientSoftware.SO_MLDONKEY, "Old MLDonkey"],
+         [ec.ECClientSoftware.SO_NEW_MLDONKEY, "New MLDonkey"],
+         [ec.ECClientSoftware.SO_NEW2_MLDONKEY, "New MLDonkey"],
+         [ec.ECClientSoftware.SO_LPHANT, "lphant"],
+         [ec.ECClientSoftware.SO_EDONKEYHYBRID, "eDonkeyHybrid"],
+         [ec.ECClientSoftware.SO_EDONKEY, "eDonkey"],
+         [ec.ECClientSoftware.SO_UNKNOWN, "Unknown"],
+         [ec.ECClientSoftware.SO_COMPAT_UNK, "eMule Compatible"],
+      ];
+      for (const [software, expected] of cases) {
+         it(`decodes ${ec.ECClientSoftware[software]} as "${expected}"`, () => {
+            const client = new ec.UploadClient(uploadClientTag({ ecid: 1, software }));
+            expect(client.softwareText).to.equal(expected);
+         });
+      }
    });
 });
 
