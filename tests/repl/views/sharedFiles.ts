@@ -14,6 +14,9 @@ export function printSharedFile(file: ec.SharedFile): void {
          `  @ ${formatSpeed(file.uploadSpeed)}  uploading to: ${file.uploadingCount ?? "?"}` +
          `  requests: ${file.requestsTotal ?? "?"}  prio: ${file.prio ?? "?"}`,
    );
+   if (file.path) {
+      console.log(`  path: ${file.path}`);
+   }
    printFileComments(file.comments, file.kadCommentSearching);
 }
 

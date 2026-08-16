@@ -23,6 +23,7 @@ function sharedFileTag(fields: {
    name: string;
    comments?: ec.ECTag;
    kadCommentSearching?: boolean;
+   path?: string;
 }): ec.ECTag {
    const children: ec.ECTag[] = [
       new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
@@ -31,6 +32,9 @@ function sharedFileTag(fields: {
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
+   }
+   if (fields.path !== undefined) {
+      children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_KNOWNFILE_PATH, fields.path));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, fields.ecid, children);
 }
@@ -133,6 +137,21 @@ describe("SharedFiles.fetch", () => {
       expect(sharedFiles.files[0]?.kadCommentSearching).to.equal(true);
       expect(sharedFiles.files[0]?.comments).to.have.lengthOf(1);
       expect(sharedFiles.files[0]?.comments?.[0]?.userName).to.equal("Alice");
+   });
+
+   it("decodes EC_TAG_KNOWNFILE_PATH onto path, undefined when absent", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      reply.add(sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi", path: "/home/user/Shared" }));
+      reply.add(sharedFileTag({ ecid: 2, hash: hexHash("b"), name: "two.avi" }));
+      fake.queueReply(reply);
+
+      await sharedFiles.fetch();
+
+      expect(sharedFiles.files[0]?.path).to.equal("/home/user/Shared");
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(sharedFiles.files[1]?.path).to.be.undefined;
    });
 });
 

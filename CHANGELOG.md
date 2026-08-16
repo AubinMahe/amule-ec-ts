@@ -9,6 +9,14 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-08-16
+
+### Added
+
+- `DownloadFile.path`/`SharedFile.path` - the on-disk directory (`EC_TAG_KNOWNFILE_PATH`): the Temp dir while downloading and the
+  destination dir once complete for a download, the shared directory root for a shared file. Disambiguates same-named files living
+  in different directories.
+
 ## [2.19.0] - 2026-08-16
 
 ### Added

@@ -38,14 +38,6 @@ Not declared in `ECTagNames.ts`. Timestamp of when the ed2k/Kad connection was e
 
 ## Tags, declared but not decoded
 
-### `EC_TAG_KNOWNFILE_PATH`
-
-Declared in `ECTagNames.ts` (0x0416) but never decoded anywhere. Unambiguous path of a shared file (disambiguates same-named files
-in different shared directories), absent from both `SharedFiles.ts` and `Downloads.ts`.
-
-- **Priority**: Medium
-- **Effort**: Low
-
 ### `EC_TAG_KNOWNFILE_HASHED_PART_COUNT`
 
 Declared in `ECTagNames.ts` (0x041B) but never decoded anywhere. "Verify Local Data" progress (hash-check of a shared file), not

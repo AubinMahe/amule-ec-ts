@@ -124,6 +124,13 @@ export class SharedFile {
    public readonly comments: readonly FileComment[] | undefined;
    /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
    public readonly kadCommentSearching: boolean | undefined;
+   /**
+    * The shared directory this file lives in - `EC_TAG_KNOWNFILE_PATH`,
+    * confirmed against amule-remote-gui.cpp's `DirectoryPath()` decode
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L2151-L2157).
+    * Disambiguates same-named files shared from different directories.
+    */
+   public readonly path: string | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -138,6 +145,7 @@ export class SharedFile {
       ecid: bigint | undefined;
       comments: readonly FileComment[] | undefined;
       kadCommentSearching: boolean | undefined;
+      path: string | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -151,6 +159,7 @@ export class SharedFile {
       this.ecid = fields.ecid;
       this.comments = fields.comments;
       this.kadCommentSearching = fields.kadCommentSearching;
+      this.path = fields.path;
    }
 
    public static fromTag(tag: ECTag): SharedFile {
@@ -171,6 +180,7 @@ export class SharedFile {
          ecid: removed ? undefined : tag.intValue,
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
+         path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
       });
    }
 
@@ -189,6 +199,7 @@ export class SharedFile {
          ecid: update.ecid ?? this.ecid,
          comments: update.comments ?? this.comments,
          kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
+         path: update.path ?? this.path,
       });
    }
 }

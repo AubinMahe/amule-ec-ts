@@ -105,6 +105,14 @@ export class DownloadFile {
    public readonly comments: readonly FileComment[] | undefined;
    /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
    public readonly kadCommentSearching: boolean | undefined;
+   /**
+    * The on-disk directory - `EC_TAG_KNOWNFILE_PATH`, confirmed against
+    * amule-remote-gui.cpp's `DirectoryPath()` decode
+    * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L2151-L2157): the Temp
+    * dir while downloading, the destination dir once complete. Disambiguates
+    * same-named files downloaded to different directories.
+    */
+   public readonly path: string | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -122,6 +130,7 @@ export class DownloadFile {
       sourcesXfer: bigint | undefined;
       comments: readonly FileComment[] | undefined;
       kadCommentSearching: boolean | undefined;
+      path: string | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -138,6 +147,7 @@ export class DownloadFile {
       this.sourcesXfer = fields.sourcesXfer;
       this.comments = fields.comments;
       this.kadCommentSearching = fields.kadCommentSearching;
+      this.path = fields.path;
    }
 
    public static fromTag(tag: ECTag): DownloadFile {
@@ -161,6 +171,7 @@ export class DownloadFile {
          sourcesXfer: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER),
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
+         path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
       });
    }
 
@@ -182,6 +193,7 @@ export class DownloadFile {
          sourcesXfer: update.sourcesXfer ?? this.sourcesXfer,
          comments: update.comments ?? this.comments,
          kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
+         path: update.path ?? this.path,
       });
    }
 
