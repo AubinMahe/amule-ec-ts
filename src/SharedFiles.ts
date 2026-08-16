@@ -88,6 +88,48 @@ export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
 }
 
 /**
+ * A file's probed audio/video metadata - `EC_TAG_KNOWNFILE_MEDIA_*`
+ * children, shared by downloads, shared files and search results (issues
+ * #418/#430) - confirmed against `ECSpecialCoreTags.cpp`'s
+ * `CEC_SharedFile_Tag`/`CEC_SearchFile_Tag` constructors: emitted only
+ * once the file has been probed locally, so non-media/unprobed files
+ * carry none of these tags at all.
+ */
+export class MediaMetadata {
+   public constructor(
+      /** Duration in seconds. */
+      public readonly length: bigint | undefined,
+      /** Bitrate in kbps. */
+      public readonly bitrate: bigint | undefined,
+      public readonly codec: string | undefined,
+      public readonly artist: string | undefined,
+      public readonly album: string | undefined,
+      public readonly title: string | undefined,
+   ) {}
+}
+
+/** Decodes `EC_TAG_KNOWNFILE_MEDIA_*` children off `fileTag` - undefined if none are present (see MediaMetadata's doc). */
+export function parseMediaMetadata(fileTag: ECTag): MediaMetadata | undefined {
+   const length = fileTag.childInt(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_LENGTH);
+   const bitrate = fileTag.childInt(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_BITRATE);
+   const codec = fileTag.childString(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_CODEC);
+   const artist = fileTag.childString(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_ARTIST);
+   const album = fileTag.childString(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_ALBUM);
+   const title = fileTag.childString(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_TITLE);
+   if (
+      length === undefined &&
+      bitrate === undefined &&
+      codec === undefined &&
+      artist === undefined &&
+      album === undefined &&
+      title === undefined
+   ) {
+      return undefined;
+   }
+   return new MediaMetadata(length, bitrate, codec, artist, album, title);
+}
+
+/**
  * One EC_TAG_KNOWNFILE entry from an EC_OP_SHARED_FILES reply or
  * notification.
  *
@@ -131,6 +173,14 @@ export class SharedFile {
     * Disambiguates same-named files shared from different directories.
     */
    public readonly path: string | undefined;
+   /** "Verify Local Data" hash-check progress - the part currently being hashed (1-based), 0 while idle/done. */
+   public readonly hashedPartCount: bigint | undefined;
+   /** Unix timestamp (seconds) of the last time this file was uploaded from. */
+   public readonly lastUpload: bigint | undefined;
+   /** Unix timestamp (seconds) of when this file started being shared. */
+   public readonly sharedSince: bigint | undefined;
+   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   public readonly media: MediaMetadata | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -146,6 +196,10 @@ export class SharedFile {
       comments: readonly FileComment[] | undefined;
       kadCommentSearching: boolean | undefined;
       path: string | undefined;
+      hashedPartCount: bigint | undefined;
+      lastUpload: bigint | undefined;
+      sharedSince: bigint | undefined;
+      media: MediaMetadata | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -160,6 +214,10 @@ export class SharedFile {
       this.comments = fields.comments;
       this.kadCommentSearching = fields.kadCommentSearching;
       this.path = fields.path;
+      this.hashedPartCount = fields.hashedPartCount;
+      this.lastUpload = fields.lastUpload;
+      this.sharedSince = fields.sharedSince;
+      this.media = fields.media;
    }
 
    public static fromTag(tag: ECTag): SharedFile {
@@ -181,6 +239,10 @@ export class SharedFile {
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
+         hashedPartCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_HASHED_PART_COUNT),
+         lastUpload: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_LAST_UPLOAD),
+         sharedSince: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_SHARED_SINCE),
+         media: parseMediaMetadata(tag),
       });
    }
 
@@ -200,6 +262,10 @@ export class SharedFile {
          comments: update.comments ?? this.comments,
          kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
          path: update.path ?? this.path,
+         hashedPartCount: update.hashedPartCount ?? this.hashedPartCount,
+         lastUpload: update.lastUpload ?? this.lastUpload,
+         sharedSince: update.sharedSince ?? this.sharedSince,
+         media: update.media ?? this.media,
       });
    }
 }

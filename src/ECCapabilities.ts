@@ -36,4 +36,14 @@ export class ECCapabilities {
     * opcode - see Search.list()'s doc.
     */
    public searchList = false;
+   /**
+    * Whether the daemon serves EC_OP_GET_CLIENT_HISTORY - same
+    * "unconditionally advertised, remoteCapabilities-only" shape as
+    * sharedDirsConfig/searchList: EC_TAG_CAN_CLIENT_HISTORY isn't a real
+    * opt-in, it's a version-compat probe ("this daemon build answers
+    * EC_OP_GET_CLIENT_HISTORY"), echoed unconditionally on AUTH_OK. A
+    * daemon predating it has no case for the opcode and asserts before
+    * the EC_OP_FAILED path - see ClientHistory.fetch()'s doc.
+    */
+   public clientHistory = false;
 }

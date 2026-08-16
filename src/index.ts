@@ -20,6 +20,7 @@
  */
 export * from "./Categories.js";
 export * from "./Chat.js";
+export * from "./ClientHistory.js";
 export * from "./Daemon.js";
 export * from "./Downloads.js";
 export * from "./ECCapabilities.js";

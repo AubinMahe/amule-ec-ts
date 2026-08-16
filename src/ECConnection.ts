@@ -232,6 +232,8 @@ export class ECConnection extends events.EventEmitter {
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_SEARCH_LIST, new Uint8Array()));
       // Unconditional too - see ECCapabilities.partialUpdate's doc.
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE, new Uint8Array()));
+      // Unconditional too - see ECCapabilities.clientHistory's doc.
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CLIENT_HISTORY, new Uint8Array()));
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       await this.send(authRequest);
       const saltPacket = await this.receive();
@@ -270,6 +272,8 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.searchList = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_LIST);
       // Unconditional request above too - see ECCapabilities.partialUpdate's doc.
       this.remoteCapabilities.partialUpdate = reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
+      // Unconditional request above too - see ECCapabilities.clientHistory's doc.
+      this.remoteCapabilities.clientHistory = reply.has(ECTagNames.EC_TAG_CAN_CLIENT_HISTORY);
       this.sessionId = reply.find(ECTagNames.EC_TAG_SESSION_ID)?.intValue;
    }
 

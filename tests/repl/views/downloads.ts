@@ -20,7 +20,7 @@ export function printDownloadFile(file: ec.DownloadFile): void {
    console.log(`${file.name ?? "(unknown name)"}  [${file.hash ?? "unknown hash"}]`);
    console.log(
       `  ${formatPercent(file.sizeDone, file.sizeFull)}  ${formatSize(file.sizeDone)} / ${formatSize(file.sizeFull)}` +
-         `  @ ${formatSpeed(file.speed)}  sources: ${file.sources ?? "?"}  prio: ${file.prio ?? "?"}  status: ${file.status ?? "?"}`,
+         `  @ ${formatSpeed(file.speed)}  sources: ${file.sources ?? "?"}  prio: ${file.priorityText}  status: ${file.statusText}`,
    );
    if (file.partMetName) {
       console.log(`  temp file: ${file.partMetName}`);
