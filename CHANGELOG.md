@@ -9,6 +9,21 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-08-16
+
+### Added
+
+- `ECConnection.sessionId` - the daemon process's `EC_TAG_SESSION_ID`, echoed on every `AUTH_OK`. Lets a caller that indexes state
+  by ECID across a `reconnect()` detect a daemon restart (ECIDs restart from 0) and discard stale state instead of silently
+  mismatching it to new objects.
+- `Status.tempFreeSpace`/`.incomingFreeSpace` - free disk space in bytes on the Temp/Incoming directories
+  (`EC_TAG_STATS_TEMP_FREE_SPACE`/`EC_TAG_STATS_INCOMING_FREE_SPACE`). Only sent at `EC_DETAIL_FULL`, which `Status.fetch()`'s stats
+  request now uses instead of `EC_DETAIL_CMD` - a strictly larger reply, no existing field lost.
+- `Status.ed2kConnectedSince`/`.kadConnectedSince` - Unix timestamps of when the current eD2k/Kad connection was established,
+  decoded from the connection-state reply.
+- `ServerInfo.filesSoft`/`.filesHard`/`.tcpFlags`/`.udpFlags` - per-server publishing limits and wire capability flag bitmasks,
+  already present at the `EC_DETAIL_FULL` level `Servers.fetch()` already requests.
+
 ## [2.20.0] - 2026-08-16
 
 ### Added

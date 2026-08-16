@@ -36,6 +36,13 @@ export enum ECTagNames {
    EC_TAG_AEAD_SERVER_PUBKEY = 0x0022,
    EC_TAG_AEAD_CLIENT_CONFIRM = 0x0023,
    EC_TAG_AEAD_SERVER_CONFIRM = 0x0024,
+   // Random per-process identifier (uint64), unconditionally echoed on
+   // every AUTH_OK. Detects a daemon restart: ECIDs come from a counter
+   // that restarts with the process, so a client that kept objects across
+   // a reconnect and sees a different session id here knows its ECIDs mean
+   // nothing anymore and should start over instead of quietly mismatching
+   // stale state to new objects.
+   EC_TAG_SESSION_ID = 0x0025,
    EC_TAG_CLIENT_NAME = 0x0100,
    EC_TAG_CLIENT_VERSION = 0x0101,
    EC_TAG_CLIENT_MOD = 0x0102,
@@ -67,6 +74,12 @@ export enum ECTagNames {
    EC_TAG_STATS_TOTAL_RECEIVED_BYTES = 0x0219,
    EC_TAG_STATS_SHARED_FILE_COUNT = 0x021a,
    EC_TAG_STATS_KAD_NODES = 0x021b,
+   // Free disk space (uint64 bytes) for the Temp and Incoming directories -
+   // cache-backed daemon-side, never a filesystem round trip per poll. Only
+   // sent at EC_DETAIL_FULL/EC_DETAIL_INC_UPDATE, not EC_DETAIL_CMD - see
+   // Status.ts's class doc.
+   EC_TAG_STATS_TEMP_FREE_SPACE = 0x021c,
+   EC_TAG_STATS_INCOMING_FREE_SPACE = 0x021d,
    EC_TAG_PARTFILE = 0x0300,
    EC_TAG_PARTFILE_NAME = 0x0301,
    EC_TAG_PARTFILE_PARTMETID = 0x0302,
@@ -146,6 +159,13 @@ export enum ECTagNames {
    EC_TAG_SERVER_IP = 0x050c,
    EC_TAG_SERVER_PORT = 0x050d,
    EC_TAG_SERVER_COUNTRY = 0x050e,
+   // Per-user publishing limits this server advertises (0/absent = "not
+   // told us yet") and wire capability flag bitmasks - diagnostics, hidden
+   // by default in the reference GUI too.
+   EC_TAG_SERVER_FILES_SOFT = 0x050f,
+   EC_TAG_SERVER_FILES_HARD = 0x0510,
+   EC_TAG_SERVER_TCP_FLAGS = 0x0511,
+   EC_TAG_SERVER_UDP_FLAGS = 0x0512,
    EC_TAG_CLIENT = 0x0600,
    EC_TAG_CLIENT_SOFTWARE = 0x0601,
    EC_TAG_CLIENT_SCORE = 0x0602,

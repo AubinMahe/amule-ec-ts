@@ -67,6 +67,12 @@ export class ServerInfo {
    public readonly priority: ServerPriority | undefined;
    /** Whether this server is pinned ("static"), if known - see Servers.setStatic() to change it. */
    public readonly isStatic: boolean | undefined;
+   /** Per-user shared-file publishing soft/hard limits this server advertises, 0/undefined meaning "not told us yet". */
+   public readonly filesSoft: bigint | undefined;
+   public readonly filesHard: bigint | undefined;
+   /** Wire capability flag bitmasks - diagnostics, hidden by default in the reference GUI too. */
+   public readonly tcpFlags: bigint | undefined;
+   public readonly udpFlags: bigint | undefined;
 
    private constructor(fields: {
       ip: string;
@@ -78,6 +84,10 @@ export class ServerInfo {
       files: bigint | undefined;
       priority: ServerPriority | undefined;
       isStatic: boolean | undefined;
+      filesSoft: bigint | undefined;
+      filesHard: bigint | undefined;
+      tcpFlags: bigint | undefined;
+      udpFlags: bigint | undefined;
    }) {
       this.ip = fields.ip;
       this.port = fields.port;
@@ -88,6 +98,10 @@ export class ServerInfo {
       this.files = fields.files;
       this.priority = fields.priority;
       this.isStatic = fields.isStatic;
+      this.filesSoft = fields.filesSoft;
+      this.filesHard = fields.filesHard;
+      this.tcpFlags = fields.tcpFlags;
+      this.udpFlags = fields.udpFlags;
    }
 
    /** "ip:port", the wire format aMule's own tools (amulecmd's "show servers") use to identify a server. */
@@ -107,6 +121,10 @@ export class ServerInfo {
          files: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES),
          priority: numberOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO)),
          isStatic: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC)),
+         filesSoft: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_SOFT),
+         filesHard: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_HARD),
+         tcpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_TCP_FLAGS),
+         udpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_UDP_FLAGS),
       });
    }
 }
