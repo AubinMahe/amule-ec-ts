@@ -193,4 +193,71 @@ describe("Update.fetch", () => {
       expect(update.clients[0]?.name).to.equal("peer1");
       expect(update.clients[0]?.uploadSpeed).to.equal(200n);
    });
+
+   it("merges a later partial poll onto the previous server snapshot instead of discarding unmentioned fields", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+
+      const firstReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      firstReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SERVER, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SERVER, 7, [
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_SERVER_NAME, "eMule Security"),
+               new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_SERVER_PORT, 4661),
+            ]),
+         ]),
+      );
+      fake.queueReply(firstReply);
+      await update.fetch();
+
+      // Second poll only reports the changed field (port) - name is
+      // unchanged since last cycle and so is omitted by the daemon.
+      const secondReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      secondReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SERVER, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SERVER, 7, [new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_SERVER_PORT, 4662)]),
+         ]),
+      );
+      fake.queueReply(secondReply);
+      await update.fetch();
+
+      expect(update.servers).to.have.lengthOf(1);
+      expect(update.servers[0]?.name).to.equal("eMule Security");
+      expect(update.servers[0]?.port).to.equal(4662n);
+   });
+
+   it("merges a later partial poll onto the previous friend snapshot instead of discarding unmentioned fields", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+
+      const firstReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      firstReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FRIEND, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND, 5, [
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_FRIEND_NAME, "Alice"),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND_CLIENT, 0),
+            ]),
+         ]),
+      );
+      fake.queueReply(firstReply);
+      await update.fetch();
+
+      // Second poll only reports the changed field (linkedClientEcid, Alice
+      // just came online) - name is unchanged since last cycle and so is
+      // omitted by the daemon.
+      const secondReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      secondReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FRIEND, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND, 5, [new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND_CLIENT, 99)]),
+         ]),
+      );
+      fake.queueReply(secondReply);
+      await update.fetch();
+
+      expect(update.friends).to.have.lengthOf(1);
+      expect(update.friends[0]?.name).to.equal("Alice");
+      expect(update.friends[0]?.linkedClientEcid).to.equal(99n);
+   });
 });

@@ -22,6 +22,9 @@ export function printDownloadFile(file: ec.DownloadFile): void {
       `  ${formatPercent(file.sizeDone, file.sizeFull)}  ${formatSize(file.sizeDone)} / ${formatSize(file.sizeFull)}` +
          `  @ ${formatSpeed(file.speed)}  sources: ${file.sources ?? "?"}  prio: ${file.prio ?? "?"}  status: ${file.status ?? "?"}`,
    );
+   if (file.partMetName) {
+      console.log(`  temp file: ${file.partMetName}`);
+   }
    printFileComments(file.comments, file.kadCommentSearching);
 }
 
