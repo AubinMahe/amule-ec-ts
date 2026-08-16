@@ -43,6 +43,8 @@ export enum ECTagNames {
    // nothing anymore and should start over instead of quietly mismatching
    // stale state to new objects.
    EC_TAG_SESSION_ID = 0x0025,
+   // Unconditionally echoed on AUTH_OK - see ECCapabilities.clientHistory's doc.
+   EC_TAG_CAN_CLIENT_HISTORY = 0x0026,
    EC_TAG_CLIENT_NAME = 0x0100,
    EC_TAG_CLIENT_VERSION = 0x0101,
    EC_TAG_CLIENT_MOD = 0x0102,
@@ -213,6 +215,13 @@ export enum ECTagNames {
    EC_TAG_CLIENT_IS_FRIEND = 0x062c,
    EC_TAG_CLIENT_SCORE_RATIO = 0x062d,
    EC_TAG_CLIENT_COUNTRY = 0x062e,
+   // Clients-history entry fields (EC_OP_CLIENT_HISTORY) - the credit
+   // store's persisted last-seen timestamp (always present) and the
+   // extended-metadata trailer's first-seen timestamp/session count
+   // (present only when the daemon has that trailer for this peer).
+   EC_TAG_CLIENT_LAST_SEEN = 0x062f,
+   EC_TAG_CLIENT_FIRST_SEEN = 0x0630,
+   EC_TAG_CLIENT_SESSIONS = 0x0631,
    EC_TAG_SEARCHFILE = 0x0700,
    EC_TAG_SEARCH_TYPE = 0x0701,
    EC_TAG_SEARCH_NAME = 0x0702,

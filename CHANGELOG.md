@@ -9,6 +9,34 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-08-16
+
+### Added
+
+- `SharedFile.hashedPartCount`/`.lastUpload`/`.sharedSince` - "Verify Local Data" hash-check progress
+  (`EC_TAG_KNOWNFILE_HASHED_PART_COUNT`) and last-upload/share-since timestamps (`EC_TAG_KNOWNFILE_LAST_UPLOAD`/
+  `EC_TAG_KNOWNFILE_SHARED_SINCE`), all already declared but never decoded
+- `ClientUpdate.isFriend`/`.scoreRatio` (`EC_TAG_CLIENT_IS_FRIEND`/`EC_TAG_CLIENT_SCORE_RATIO`) - friends-list membership and the
+  GUI's "DL/UP modifier", only sent at the `EC_DETAIL_INC_UPDATE` level `Update.fetch()` already uses
+- `MediaMetadata` (new shared class in `SharedFiles.ts`) and `DownloadFile.media`/`SharedFile.media`/`SearchResult.media` - probed
+  audio/video metadata (`EC_TAG_KNOWNFILE_MEDIA_LENGTH`/`.MEDIA_BITRATE`/`.MEDIA_CODEC`/`.MEDIA_ARTIST`/`.MEDIA_ALBUM`/
+  `.MEDIA_TITLE`), undefined for unprobed/non-media files
+- Grouped search results (issue #431): `SearchSession.fetch()` now always sends an empty `EC_TAG_SEARCH_PARENT` flag to opt into
+  same-hash/same-size-but-different-filename children, each carrying the new `SearchResult.parent` (the parent's ecid, undefined for
+  a top-level result); `Search.download()`'s entries can now be `{ hash, ecid }` instead of a plain hash string, to select one
+  specific grouped child instead of the default parent
+- `ECSearchType.BROWSE` and `KnownSearch.browsePeerEcid` - `EC_OP_SEARCH_LIST` now also lists "View Files" browse tabs, previously
+  undecodable; `Search.list()`'s doc corrected (it used to claim browses were excluded)
+- `ClientHistory`/`ClientHistoryEntry` classes (`EC_OP_GET_CLIENT_HISTORY`/`EC_OP_CLIENT_HISTORY`) - the daemon's persisted
+  credit-store history (every peer ever exchanged data with, keyed by user hash - not the live client list), guarded on the new
+  `ECConnection.remoteCapabilities.clientHistory`
+- `Update.ts`'s `ipFromTag`/`ipFromUint32` helpers are now exported, reused by `ClientHistory.ts`
+
+### Changed
+
+- `tests/repl/views/downloads.ts`/`uploads.ts` now print `DownloadFile.priorityText`/`.statusText`/`UploadClient.softwareText`
+  instead of the raw numeric/code fields
+
 ## [2.21.0] - 2026-08-16
 
 ### Added

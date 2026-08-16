@@ -25,12 +25,12 @@ const debug = debuglog("amule-ec:update");
  * tree (`KadIPToString` is a plain big-endian read) - this helper is only
  * valid for ed2k server/client addresses.
  */
-function ipFromUint32(value: bigint): string {
+export function ipFromUint32(value: bigint): string {
    const n = Number(value) >>> 0;
    return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff].join(".");
 }
 
-function ipFromTag(tag: ECTag, name: number): string | undefined {
+export function ipFromTag(tag: ECTag, name: number): string | undefined {
    const value = tag.childInt(name);
    return value === undefined ? undefined : ipFromUint32(value);
 }
@@ -112,6 +112,10 @@ export class ClientUpdate {
    public readonly waitingPosition: bigint | undefined;
    /** `0xffff` means the remote queue is full rather than a literal rank - confirmed against `IsRemoteQueueFull()`'s use at the encoder (ECSpecialCoreTags.cpp:398-400). */
    public readonly remoteQueueRank: bigint | undefined;
+   /** Friends-list membership - `EC_TAG_CLIENT_IS_FRIEND`, distinct from the reserved-upload-slot `friendSlot`-style flag. */
+   public readonly isFriend: boolean | undefined;
+   /** The GUI's "DL/UP modifier" - `EC_TAG_CLIENT_SCORE_RATIO`, a double unlike every other ratio-like field on this class. */
+   public readonly scoreRatio: number | undefined;
 
    private constructor(fields: {
       ecid: bigint;
@@ -140,6 +144,8 @@ export class ClientUpdate {
       extProtocol: boolean | undefined;
       waitingPosition: bigint | undefined;
       remoteQueueRank: bigint | undefined;
+      isFriend: boolean | undefined;
+      scoreRatio: number | undefined;
    }) {
       this.ecid = fields.ecid;
       this.name = fields.name;
@@ -167,6 +173,8 @@ export class ClientUpdate {
       this.extProtocol = fields.extProtocol;
       this.waitingPosition = fields.waitingPosition;
       this.remoteQueueRank = fields.remoteQueueRank;
+      this.isFriend = fields.isFriend;
+      this.scoreRatio = fields.scoreRatio;
    }
 
    public static fromTag(tag: ECTag): ClientUpdate {
@@ -198,6 +206,8 @@ export class ClientUpdate {
          extProtocol: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_EXT_PROTOCOL)),
          waitingPosition: tag.childInt(ECTagNames.EC_TAG_CLIENT_WAITING_POSITION),
          remoteQueueRank: tag.childInt(ECTagNames.EC_TAG_CLIENT_REMOTE_QUEUE_RANK),
+         isFriend: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_IS_FRIEND)),
+         scoreRatio: tag.childDouble(ECTagNames.EC_TAG_CLIENT_SCORE_RATIO),
       });
    }
 
@@ -230,6 +240,8 @@ export class ClientUpdate {
          extProtocol: update.extProtocol ?? this.extProtocol,
          waitingPosition: update.waitingPosition ?? this.waitingPosition,
          remoteQueueRank: update.remoteQueueRank ?? this.remoteQueueRank,
+         isFriend: update.isFriend ?? this.isFriend,
+         scoreRatio: update.scoreRatio ?? this.scoreRatio,
       });
    }
 }

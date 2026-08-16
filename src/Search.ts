@@ -4,7 +4,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag } from "./ECTags.js";
-import { FileComment, parseFileComments, parseKadCommentSearching } from "./SharedFiles.js";
+import { FileComment, parseFileComments, parseKadCommentSearching, MediaMetadata, parseMediaMetadata } from "./SharedFiles.js";
 
 const debug = debuglog("amule-ec:search");
 
@@ -17,6 +17,8 @@ export enum ECSearchType {
    GLOBAL = 0x01,
    KAD = 0x02,
    WEB = 0x03,
+   /** A "View Files" browse tab, not a real search - `EC_OP_SEARCH_LIST` entries of this kind carry a `KnownSearch.browsePeerEcid`. */
+   BROWSE = 0x04,
 }
 
 /**
@@ -61,6 +63,10 @@ export interface ECSearchProgress {
  * unchanged. Unlike EC_OP_SEARCH_PROGRESS, there is no result count or
  * percent here by design (ExternalConn.cpp:2481-2496) - fetch progress
  * for a specific ID from SearchSession/EC_OP_SEARCH_PROGRESS instead.
+ * `EC_TAG_CLIENT` is an additional child, present only when `kind` is
+ * `ECSearchType.BROWSE` - the peer being browsed, decoded into
+ * `browsePeerEcid`. Without it a browse tab can't be identified as one at
+ * all (`CSearchListCtrl::IsBrowse`).
  */
 export class KnownSearch {
    public constructor(
@@ -68,6 +74,7 @@ export class KnownSearch {
       public readonly name: string,
       public readonly kind: ECSearchType,
       public readonly state: ECSearchLifecycleState,
+      public readonly browsePeerEcid: bigint | undefined,
    ) {}
 }
 
@@ -92,6 +99,17 @@ export class SearchResult {
    public readonly comments: readonly FileComment[];
    /** Whether a searchKadNotes() lookup is currently in flight for this result - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
    public readonly kadCommentSearching: boolean;
+   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   public readonly media: MediaMetadata | undefined;
+   /**
+    * The parent result's ECID, if this is a grouped child (same hash/size,
+    * different filename) rather than a top-level result - `EC_TAG_SEARCH_PARENT`,
+    * only present on children and only when `SearchSession.fetch()`'s request
+    * opted into grouping (see its doc). Pass this result's own `ecid` back to
+    * `Search.download()`'s `ecid` selector to download it under its own name
+    * instead of the parent's.
+    */
+   public readonly parent: bigint | undefined;
 
    public constructor(tag: ECTag) {
       this.ecid = tag.intValue ?? 0n;
@@ -102,6 +120,8 @@ export class SearchResult {
       this.sources = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
       this.comments = parseFileComments(tag) ?? [];
       this.kadCommentSearching = parseKadCommentSearching(tag) ?? false;
+      this.media = parseMediaMetadata(tag);
+      this.parent = tag.childInt(ECTagNames.EC_TAG_SEARCH_PARENT);
    }
 }
 
@@ -231,10 +251,19 @@ export class SearchSession {
     * all defaults to EC_DETAIL_FULL - the same level amulecmd's own
     * "results" command uses (TextClient.cpp:706). Throws if the daemon no
     * longer knows this ID - see progress()'s doc.
+    *
+    * Always sends an empty `EC_TAG_SEARCH_PARENT` flag (issue #431) to opt
+    * into result grouping: without it, same-hash/same-size-but-different-
+    * filename children are omitted entirely (parents-only), which is what
+    * amulecmd/amuleweb still get since they never send this flag. With it,
+    * children are flattened into `results` alongside their parent, each
+    * carrying its own `SearchResult.parent` - strictly more information,
+    * nothing lost for a caller that ignores `parent`.
     */
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_RESULTS);
       this.addIdTag(request);
+      request.add(new ECCustomTag(ECTagNames.EC_TAG_SEARCH_PARENT, new Uint8Array()));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_RESULTS) {
@@ -325,15 +354,25 @@ export class Search {
     * (TextClient.cpp:727-744): one EC_TAG_PARTFILE tag per result (own data:
     * MD4 hash), with an EC_TAG_PARTFILE_CAT child. Always replies EC_OP_STRINGS
     * unconditionally, with no tags - there is no failure case to check.
+    *
+    * Each entry is either a plain hash string (downloads the parent - the
+    * first result matching that hash, unchanged default behavior) or
+    * `{ hash, ecid }` to instead download one specific grouped child under
+    * its own name (issue #431) - pass a `SearchResult.ecid` from a grouped
+    * child (`SearchResult.parent !== undefined`) fetched with grouping on,
+    * see `SearchSession.fetch()`'s doc. `ecid` rides as an EC_TAG_SEARCHFILE
+    * child alongside the same hash; a daemon that doesn't understand it just
+    * falls back to the parent.
     */
-   public async download(hashes: readonly string[]): Promise<void> {
+   public async download(hashes: readonly (string | { hash: string; ecid: bigint })[]): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_DOWNLOAD_SEARCH_RESULT);
-      for (const hash of hashes) {
-         request.add(
-            new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
-               new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, 0),
-            ]),
-         );
+      for (const entry of hashes) {
+         const hash = typeof entry === "string" ? entry : entry.hash;
+         const children = [new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, 0)];
+         if (typeof entry !== "string") {
+            children.push(new ECUInt32Tag(ECTagNames.EC_TAG_SEARCHFILE, Number(entry.ecid)));
+         }
+         request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), children));
       }
       await this.connection.send(request);
       const reply = await this.connection.receive();
@@ -377,9 +416,9 @@ export class Search {
     * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2498-L2518): this is
     * daemon-wide, not scoped to this connection - it includes searches
     * started by any EC client or the local GUI, restored from disk, etc.
-    * "View Files" browse tabs are deliberately excluded (they're
-    * discovered via EC_OP_STRINGS/browse replies instead, not this list).
-    * Parameterless request. A legacy (non-multi-search) connection gets
+    * "View Files" browse tabs are included too, as entries with
+    * `kind === ECSearchType.BROWSE` and `browsePeerEcid` set (PR #914) -
+    * see KnownSearch's doc. Parameterless request. A legacy (non-multi-search) connection gets
     * back an empty list, not an error (ExternalConn.cpp:3478-3479).
     *
     * Guarded on `connection.remoteCapabilities.searchList`, like
@@ -412,6 +451,7 @@ export class Search {
                tag.childString(ECTagNames.EC_TAG_SEARCH_NAME) ?? "",
                Number(tag.childInt(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND) ?? 0n),
                Number(tag.childInt(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE) ?? 0n),
+               tag.childInt(ECTagNames.EC_TAG_CLIENT),
             );
          });
       debug("list: %d search(es)", searches.length);

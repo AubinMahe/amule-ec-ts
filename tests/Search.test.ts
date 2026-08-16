@@ -23,6 +23,7 @@ function searchResultTag(fields: {
    sources?: bigint;
    comments?: ec.ECTag;
    kadCommentSearching?: boolean;
+   parent?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [
       new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
@@ -32,6 +33,9 @@ function searchResultTag(fields: {
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
+   }
+   if (fields.parent !== undefined) {
+      children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCH_PARENT, fields.parent));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCHFILE, fields.ecid, children);
 }
@@ -236,7 +240,7 @@ describe("SearchSession.progress", () => {
 });
 
 describe("SearchSession.fetch", () => {
-   it("requests with no detail-level tag (defaults to FULL) and parses each EC_TAG_SEARCHFILE reply tag", async () => {
+   it("requests with no detail-level tag (defaults to FULL), an empty EC_TAG_SEARCH_PARENT flag to opt into grouping, and parses each EC_TAG_SEARCHFILE reply tag", async () => {
       const fake = createFakeConnection();
       const session = new ec.SearchSession(fake.connection, undefined);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_RESULTS);
@@ -246,7 +250,8 @@ describe("SearchSession.fetch", () => {
       await session.fetch();
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SEARCH_RESULTS);
-      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+      expect(fake.sent[0]?.tags).to.have.lengthOf(1);
+      expect(fake.sent[0]?.has(ec.ECTagNames.EC_TAG_SEARCH_PARENT)).to.equal(true);
       expect(session.results).to.have.lengthOf(1);
       expect(session.results[0]?.name).to.equal("Cars.avi");
       expect(session.results[0]?.sources).to.equal(5n);
@@ -287,6 +292,21 @@ describe("SearchSession.fetch", () => {
       ]);
       expect(session.results[1]?.kadCommentSearching).to.equal(false);
       expect(session.results[1]?.comments).to.deep.equal([]);
+   });
+
+   it("decodes EC_TAG_SEARCH_PARENT onto parent, undefined for a top-level result", async () => {
+      const fake = createFakeConnection();
+      const session = new ec.SearchSession(fake.connection, undefined);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_RESULTS);
+      reply.add(searchResultTag({ ecid: 1, hash: hexHash("a"), name: "Cars.avi" }));
+      reply.add(searchResultTag({ ecid: 2, hash: hexHash("a"), name: "Cars (2).avi", parent: 1 }));
+      fake.queueReply(reply);
+
+      await session.fetch();
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(session.results[0]?.parent).to.be.undefined;
+      expect(session.results[1]?.parent).to.equal(1n);
    });
 
    it("throws when the reply carries EC_TAG_SEARCH_EXPIRED", async () => {
@@ -331,6 +351,19 @@ describe("Search.download", () => {
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
       await expectRejection(search.download([hexHash("a")]), /EC_OP_STRINGS/);
+   });
+
+   it("adds an EC_TAG_SEARCHFILE child when an entry selects a grouped child by ecid", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_STRINGS));
+
+      await search.download([{ hash: hexHash("a"), ecid: 99n }]);
+
+      const [tag] = fake.sent[0]?.tags ?? [];
+      expect(Buffer.from((tag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SEARCHFILE)?.intValue).to.equal(99n);
+      expect(tag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_CAT)?.intValue).to.equal(0n);
    });
 });
 
@@ -392,7 +425,29 @@ describe("Search.list", () => {
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SEARCH_LIST);
       expect(fake.sent[0]?.tags).to.have.lengthOf(0);
-      expect(searches).to.deep.equal([new ec.KnownSearch(1n, "Astérix", ec.ECSearchType.KAD, ec.ECSearchLifecycleState.RUNNING)]);
+      expect(searches).to.deep.equal([
+         new ec.KnownSearch(1n, "Astérix", ec.ECSearchType.KAD, ec.ECSearchLifecycleState.RUNNING, undefined),
+      ]);
+   });
+
+   it("decodes a browse entry's EC_TAG_CLIENT into browsePeerEcid", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.searchList = true;
+      const search = new ec.Search(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SEARCH_LIST);
+      reply.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_SEARCH_ID, 2, [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND, ec.ECSearchType.BROWSE),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_LIFECYCLE_STATE, ec.ECSearchLifecycleState.RUNNING),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      const searches = await search.list();
+
+      expect(searches[0]?.kind).to.equal(ec.ECSearchType.BROWSE);
+      expect(searches[0]?.browsePeerEcid).to.equal(42n);
    });
 
    it("resolves with an empty array when the daemon has nothing to list", async () => {

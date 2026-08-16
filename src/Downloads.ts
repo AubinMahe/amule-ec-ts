@@ -6,7 +6,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
-import { FileComment, parseFileComments, parseKadCommentSearching } from "./SharedFiles.js";
+import { FileComment, parseFileComments, parseKadCommentSearching, MediaMetadata, parseMediaMetadata } from "./SharedFiles.js";
 
 const debug = debuglog("amule-ec:downloads");
 
@@ -113,6 +113,8 @@ export class DownloadFile {
     * same-named files downloaded to different directories.
     */
    public readonly path: string | undefined;
+   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   public readonly media: MediaMetadata | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -131,6 +133,7 @@ export class DownloadFile {
       comments: readonly FileComment[] | undefined;
       kadCommentSearching: boolean | undefined;
       path: string | undefined;
+      media: MediaMetadata | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -148,6 +151,7 @@ export class DownloadFile {
       this.comments = fields.comments;
       this.kadCommentSearching = fields.kadCommentSearching;
       this.path = fields.path;
+      this.media = fields.media;
    }
 
    public static fromTag(tag: ECTag): DownloadFile {
@@ -172,6 +176,7 @@ export class DownloadFile {
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
+         media: parseMediaMetadata(tag),
       });
    }
 
@@ -194,6 +199,7 @@ export class DownloadFile {
          comments: update.comments ?? this.comments,
          kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
          path: update.path ?? this.path,
+         media: update.media ?? this.media,
       });
    }
 
