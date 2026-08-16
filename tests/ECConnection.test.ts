@@ -160,6 +160,32 @@ describe("ECConnection.authenticateWithHash", () => {
       expect(connection.remoteCapabilities.multiSearch).to.equal(true);
    });
 
+   it("decodes EC_TAG_SESSION_ID from AUTH_OK", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_SESSION_ID, 0x1234_5678n)),
+      );
+      await authPromise;
+
+      expect(connection.sessionId).to.equal(0x1234_5678n);
+   });
+
+   it("leaves sessionId undefined when AUTH_OK omits EC_TAG_SESSION_ID (older daemon)", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(connection.sessionId).to.be.undefined;
+   });
+
    it("does not enable a remote capability the server echoed but we never requested", async () => {
       const { connection, peer } = await connectPeer(server);
 

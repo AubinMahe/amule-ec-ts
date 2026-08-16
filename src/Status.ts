@@ -60,6 +60,10 @@ export class Status implements ECFetchable {
    public kadRunning: boolean | undefined;
    /** The eD2k ID assigned by the connected server, if any (see class doc). */
    public ed2kId: bigint | undefined;
+   /** Unix timestamp (seconds) of when the current eD2k connection was established - only sent while actually connected. */
+   public ed2kConnectedSince: bigint | undefined;
+   /** Unix timestamp (seconds) of when Kad became connected - only sent while actually connected. */
+   public kadConnectedSince: bigint | undefined;
    /** True = Low ID (firewalled/NAT'd), false = High ID. Undefined when not connected to a server. */
    public hasLowId: boolean | undefined;
    /** Name of the currently connected eD2k server, when available (see class doc). */
@@ -78,13 +82,25 @@ export class Status implements ECFetchable {
    public serverIp: string | undefined;
    /** Port of the currently connected eD2k server, alongside serverIp (see its doc). */
    public serverPort: number | undefined;
+   /**
+    * Free disk space (bytes) on the Temp/Incoming directories -
+    * EC_TAG_STATS_TEMP_FREE_SPACE/EC_TAG_STATS_INCOMING_FREE_SPACE. Only
+    * sent at EC_DETAIL_FULL, which fetch()'s stats request now uses.
+    */
+   public tempFreeSpace: bigint | undefined;
+   public incomingFreeSpace: bigint | undefined;
 
    public constructor(public readonly connection: ECConnection) {}
 
    /** Sends EC_OP_STAT_REQ and EC_OP_GET_CONNSTATE and merges both into this snapshot. */
    public async fetch(): Promise<void> {
       const statsRequest = new ECPacket(ECOpcode.EC_OP_STAT_REQ);
-      statsRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
+      // EC_DETAIL_FULL, not _CMD: the free-space tags below are only added
+      // at EC_DETAIL_FULL/EC_DETAIL_INC_UPDATE server-side (falls through to
+      // the same UL/DL-speed-etc. block _CMD/_WEB use on their own - see
+      // Get_EC_Response_StatRequest, ExternalConn.cpp), so _CMD alone would
+      // never carry them.
+      statsRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_FULL));
       await this.connection.send(statsRequest);
       const statsReply = await this.connection.receive();
       if (statsReply.opcode !== ECOpcode.EC_OP_STATS) {
@@ -139,6 +155,8 @@ export class Status implements ECFetchable {
          this.ed2kFiles = statsPacket.find(ECTagNames.EC_TAG_STATS_ED2K_FILES)?.intValue;
          this.kadFiles = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_FILES)?.intValue;
          this.kadNodes = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_NODES)?.intValue;
+         this.tempFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_TEMP_FREE_SPACE)?.intValue;
+         this.incomingFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_INCOMING_FREE_SPACE)?.intValue;
       }
       if (!connStateTag) return;
       const bitmask = connStateTag.intValue ?? 0n;
@@ -149,6 +167,8 @@ export class Status implements ECFetchable {
       this.kadRunning = (bitmask & 0x10n) !== 0n;
       this.ed2kId = connStateTag.findChild(ECTagNames.EC_TAG_ED2K_ID)?.intValue;
       this.hasLowId = this.ed2kId !== undefined ? this.ed2kId < HIGHEST_LOWID_ED2K_KAD : undefined;
+      this.ed2kConnectedSince = connStateTag.findChild(ECTagNames.EC_TAG_ED2K_CONNECTED_SINCE)?.intValue;
+      this.kadConnectedSince = connStateTag.findChild(ECTagNames.EC_TAG_KAD_CONNECTED_SINCE)?.intValue;
       const serverTag = connStateTag.findChild(ECTagNames.EC_TAG_SERVER);
       if (serverTag) {
          this.serverName = serverTag.childString(ECTagNames.EC_TAG_SERVER_NAME);

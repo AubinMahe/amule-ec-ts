@@ -68,6 +68,14 @@ export class ECConnection extends events.EventEmitter {
 
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
+   /**
+    * The daemon process's `EC_TAG_SESSION_ID`, set on every successful
+    * `authenticateWithHash()` - see the tag's own doc. A caller that keeps
+    * state indexed by ECID across a `reconnect()` should compare this
+    * against its previous value and discard that state if it changed,
+    * rather than assume the daemon (and its ECID numbering) survived.
+    */
+   public sessionId: bigint | undefined;
    private readonly receiveChunks: Buffer[] = [];
    private receiveBufferedLength = 0;
    private readonly pendingReads: PendingRead[] = [];
@@ -262,6 +270,7 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.searchList = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_LIST);
       // Unconditional request above too - see ECCapabilities.partialUpdate's doc.
       this.remoteCapabilities.partialUpdate = reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
+      this.sessionId = reply.find(ECTagNames.EC_TAG_SESSION_ID)?.intValue;
    }
 
    public async send(packet: ECPacket): Promise<void> {

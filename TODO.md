@@ -1,41 +1,5 @@
 # TODO
 
-## Tags, not yet declared
-
-### `EC_TAG_SESSION_ID`
-
-Not declared in `ECTagNames.ts`. The daemon sends a random per-process identifier on every `AUTH_OK` reply (`ECConnection.ts`,
-alongside the `EC_TAG_CAN_LARGE_TAG_COUNT` echo). `amule-ec-ts` never reads it. ECIDs restart from 0 on every daemon restart, so a
-caller that indexes state by ECID across a reconnection can silently associate it with the wrong object; exposing the session id
-would let callers detect a daemon restart and invalidate such state.
-
-- **Priority**: Low
-- **Effort**: Low
-
-### `EC_TAG_STATS_INCOMING_FREE_SPACE`/`EC_TAG_STATS_TEMP_FREE_SPACE`
-
-Not declared in `ECTagNames.ts`. Sent as children of the `STATS` reply (`Status.ts` territory), free disk space on the incoming
-(downloads) and temp (partial files) directories respectively.
-
-- **Priority**: Low
-- **Effort**: Low
-
-### `EC_TAG_SERVER_FILES_SOFT`/`EC_TAG_SERVER_FILES_HARD`/`EC_TAG_SERVER_TCP_FLAGS`/`EC_TAG_SERVER_UDP_FLAGS`
-
-Not declared in `ECTagNames.ts`. Children of a server entry (`Servers.ts` territory, `SERVER_LIST` reply): per-server soft/hard
-shared-file limits and TCP/UDP flag bitmasks.
-
-- **Priority**: Low
-- **Effort**: Low
-
-### `EC_TAG_ED2K_CONNECTED_SINCE`/`EC_TAG_KAD_CONNECTED_SINCE`
-
-Not declared in `ECTagNames.ts`. Timestamp of when the ed2k/Kad connection was established, sent on the connection-state reply
-(`Status.ts` territory); never wired up.
-
-- **Priority**: Low
-- **Effort**: Low
-
 ## Tags, declared but not decoded
 
 ### `EC_TAG_KNOWNFILE_HASHED_PART_COUNT`
