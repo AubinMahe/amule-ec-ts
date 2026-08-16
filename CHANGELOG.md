@@ -9,6 +9,15 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-08-16
+
+### Added
+
+- `StatsGraphs.depth` - how many points the daemon can actually answer at the scale used in the reply (`EC_TAG_STATSGRAPH_DEPTH`,
+  `CStatistics::GetPointsPerRange()`). Lets a caller cap the next `fetch()`'s `width` instead of guessing - over-asking doesn't
+  error, the daemon repeats the last known record to pad the reply, and there's no per-point timestamp on the wire to detect that
+  from `points` alone.
+
 ## [2.18.0] - 2026-08-15
 
 ### Added
