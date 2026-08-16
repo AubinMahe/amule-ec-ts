@@ -25,6 +25,9 @@ export function printDownloadFile(file: ec.DownloadFile): void {
    if (file.partMetName) {
       console.log(`  temp file: ${file.partMetName}`);
    }
+   if (file.path) {
+      console.log(`  path: ${file.path}`);
+   }
    printFileComments(file.comments, file.kadCommentSearching);
 }
 

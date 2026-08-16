@@ -8,13 +8,24 @@ import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
  * ECSpecialCoreTags.cpp's CEC_PartFile_Tag at full detail (see Downloads.ts's
  * class doc) - not a removal shape (see downloadRemovalTag() below for that).
  */
-function downloadEntryTag(fields: { ecid: number; hash: string; name: string; sizeFull?: bigint; sizeDone?: bigint }): ec.ECTag {
-   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, fields.ecid, [
+function downloadEntryTag(fields: {
+   ecid: number;
+   hash: string;
+   name: string;
+   sizeFull?: bigint;
+   sizeDone?: bigint;
+   path?: string;
+}): ec.ECTag {
+   const children: ec.ECTag[] = [
       new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_FULL, fields.sizeFull ?? 0n),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, fields.sizeDone ?? 0n),
-   ]);
+   ];
+   if (fields.path !== undefined) {
+      children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_KNOWNFILE_PATH, fields.path));
+   }
+   return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, fields.ecid, children);
 }
 
 /** A removal push notification's shape (see Downloads.ts's DownloadFile doc): own data IS the hash, no children. */
@@ -180,6 +191,21 @@ describe("Downloads.fetch", () => {
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED));
 
       await expectRejection(downloads.fetch(), /EC_OP_DLOAD_QUEUE/);
+   });
+
+   it("decodes EC_TAG_KNOWNFILE_PATH onto path, undefined when absent", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      reply.add(downloadEntryTag({ ecid: 1, hash: hexHash("a"), name: "one.avi", path: "/home/user/Temp" }));
+      reply.add(downloadEntryTag({ ecid: 2, hash: hexHash("b"), name: "two.avi" }));
+      fake.queueReply(reply);
+
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.path).to.equal("/home/user/Temp");
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(downloads.files[1]?.path).to.be.undefined;
    });
 });
 
