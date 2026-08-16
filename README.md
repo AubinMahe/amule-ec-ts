@@ -6,17 +6,15 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
-A from-scratch TypeScript client for [aMule](https://github.com/amule-org/amule)'s
-binary "External Connections" (EC) protocol - the protocol `amuled` exposes for
-remote control (the same one `amulecmd`, `amuleweb` and the aMule GUI use).
+A from-scratch TypeScript client for [aMule](https://github.com/amule-org/amule)'s binary "External Connections" (EC) protocol - the
+protocol `amuled` exposes for remote control (the same one `amulecmd`, `amuleweb` and the aMule GUI use).
 
-Zero runtime dependencies - only Node built-ins (`node:net`, `node:crypto`,
-`node:zlib`, `node:events`, `node:util`, `node:timers/promises`).
+Zero runtime dependencies - only Node built-ins (`node:net`, `node:crypto`, `node:zlib`, `node:events`, `node:util`,
+`node:timers/promises`).
 
 ## Status
 
-All 88 EC opcodes are wrapped. See [CHANGELOG.md](CHANGELOG.md) for
-release history and [TODO.md](TODO.md) for open items.
+All 88 EC opcodes are wrapped. See [CHANGELOG.md](CHANGELOG.md) for release history and [TODO.md](TODO.md) for open items.
 
 ## Usage
 
@@ -32,17 +30,14 @@ await downloads.fetch();
 console.log(downloads.files);
 ```
 
-`ECEngine` has no filesystem access of its own and no opinion on where
-`port`/`passwordHash` come from - reading `amule.conf` is the caller's
-responsibility.
+`ECEngine` has no filesystem access of its own and no opinion on where `port`/`passwordHash` come from - reading `amule.conf` is the
+caller's responsibility.
 
 ## Observability
 
-Connection loss and failed reconnect attempts are always logged to stderr
-via `console.error`/`console.log` - no opt-in needed. Everything else (wire
-framing, opcode dispatch, per-request results) is silent by default and
-opt-in per topic via Node's built-in `NODE_DEBUG` env var, one topic per
-feature class, all under the `amule-ec:` prefix (e.g. `amule-ec:downloads`,
+Connection loss and failed reconnect attempts are always logged to stderr via `console.error`/`console.log` - no opt-in needed.
+Everything else (wire framing, opcode dispatch, per-request results) is silent by default and opt-in per topic via Node's built-in
+`NODE_DEBUG` env var, one topic per feature class, all under the `amule-ec:` prefix (e.g. `amule-ec:downloads`,
 `amule-ec:preferences`).
 
 ```bash
@@ -78,14 +73,12 @@ Then, from another project:
 npm install /path/to/amule-ec-<version>.tgz
 ```
 
-This installs exactly what a real consumer would get from the npm registry
-(respecting `files`/`package.json`).
+This installs exactly what a real consumer would get from the npm registry (respecting `files`/`package.json`).
 
 ## Contributing
 
-Bug reports and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md)
-for the development workflow and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for
-the project's expectations of contributors.
+Bug reports and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for the project's expectations of contributors.
 
 ## License
 

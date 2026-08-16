@@ -14,21 +14,22 @@
    "allowScripts"   : {
       "esbuild@0.28.1": true
    },
-   "dependencies"   : {},
    "devDependencies": {
-      "@eslint/js"               : "^10.0.1",
-      "@types/chai"              : "^5.2.3",
-      "@types/mocha"             : "^10.0.10",
-      "@types/node"              : "^22.10.5",
-      "chai"                     : "^6.2.2",
-      "eslint-plugin-sonarjs"    : "^4.0.3",
-      "globals"                  : "^17.7.0",
-      "mocha"                    : "^11.3.0",
-      "monocart-coverage-reports": "^2.12.11",
-      "prettier"                 : "^3.9.6",
-      "tsx"                      : "^4.22.3",
-      "typescript"               : "^5.7.2",
-      "typescript-eslint"        : "^8.59.4"
+      "@eslint/js"                            : "^10.0.1",
+      "@types/chai"                           : "^5.2.3",
+      "@types/mocha"                          : "^10.0.10",
+      "@types/node"                           : "^22.10.5",
+      "chai"                                  : "^6.2.2",
+      "eslint-plugin-sonarjs"                 : "^4.0.3",
+      "globals"                               : "^17.7.0",
+      "markdownlint-cli2"                     : "^0.23.2",
+      "mocha"                                 : "^11.3.0",
+      "monocart-coverage-reports"             : "^2.12.11",
+      "prettier"                              : "^3.9.6",
+      "prettier-plugin-compact-markdown-table": "^0.1.0",
+      "tsx"                                   : "^4.22.3",
+      "typescript"                            : "^5.7.2",
+      "typescript-eslint"                     : "^8.59.4"
    },
    "engines"        : {
       "node": ">=18"
@@ -44,17 +45,18 @@
       "url" : "git+https://github.com/AubinMahe/amule-ec-ts.git"
    },
    "scripts"        : {
-      "build"        : "tsc --build tsconfig.src.json",
-      "check"        : "rm -rf dist *.tsbuildinfo coverage && npm run lint && npm run build && npm run test",
-      "format"       : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write && node scripts/format-package.mjs --in-place package.json",
-      "lint"         : "tsc --build tsconfig.json && eslint src tests --ext .ts",
-      "pack-release" : "npm pack",
-      "prepack"      : "npm run build",
-      "prepare"      : "npm run build",
-      "repl"         : "node --import tsx ./tests/repl/main.ts",
-      "repl-run"     : "node scripts/repl-run.mjs",
-      "test"         : "mocha",
-      "test:coverage": "mcr mocha",
-      "todo-coverage": "node scripts/todo-coverage.mjs"
+      "build"           : "tsc --build tsconfig.src.json",
+      "check"           : "rm -rf dist *.tsbuildinfo coverage && npm run lint && npm run build && npm run test",
+      "choices-coverage": "node scripts/choices-coverage.mjs",
+      "format"          : "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --write && node scripts/format-package.mjs --in-place package.json",
+      "lint"            : "tsc --build tsconfig.json && eslint src tests --ext .ts",
+      "lint:md"         : "markdownlint-cli2 --fix && prettier \"*.md\" --write",
+      "pack-release"    : "npm pack",
+      "prepack"         : "npm run build",
+      "prepare"         : "npm run build",
+      "repl"            : "node --import tsx ./tests/repl/main.ts",
+      "repl-run"        : "node scripts/repl-run.mjs",
+      "test"            : "mocha",
+      "test:coverage"   : "mcr mocha"
    }
 }

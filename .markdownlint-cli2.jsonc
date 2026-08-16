@@ -1,0 +1,48 @@
+// Project markdownlint configuration.
+//
+// Read both by `markdownlint-cli2` on the command line and by VS Code's
+// markdownlint extension, hence `.markdownlint-cli2.jsonc` rather than
+// `.markdownlint.json`: only the former accepts `ignores`.
+{
+   "config": {
+      "default": true,
+      // `tables: false`: a Markdown table row can't contain a line break, so an
+      // overlong row can't be fixed - not by Prettier, not by hand. Don't flag
+      // what can't be fixed.
+      "MD013": {
+         "line_length": 132,
+         "tables"     : false
+      },
+      // `style: "tight"`: no padding around cell content, no vertical `|`
+      // alignment - this is what `prettier-plugin-compact-markdown-table`
+      // produces (`tableLayout: "compact"` in .prettierrc.json), which stays
+      // the actual table formatter. Violations are independent of each other
+      // and therefore auto-fixable, but that's no longer the normal path:
+      // Prettier already produces this style on save.
+      "MD060": {
+         "style": "tight"
+      },
+      // 3-space indent for nested lists: what Prettier produces (it applies
+      // .prettierrc.json's `tabWidth: 3`) and this project's convention, from
+      // TypeScript to package.json. The default is 2.
+      "MD007": {
+         "indent": 3
+      },
+      // `siblings_only: true`: only flag a duplicate heading against others
+      // with the same parent. Without it, CHANGELOG.md's Keep a Changelog
+      // format (a repeated "### Added"/"### Fixed" under every "## [x.y.z]"
+      // version) is a wall of false positives - those headings aren't
+      // siblings, each belongs to a different version section.
+      "MD024": {
+         "siblings_only": true
+      }
+   },
+   // Default scope, so `npm run lint:md` doesn't have to repeat it: the
+   // Markdown documents all live at the repo root.
+   "globs": [
+      "*.md"
+   ],
+   "ignores": [
+      "node_modules/**"
+   ]
+}
