@@ -36,7 +36,7 @@ function commentsTag(entries: readonly { userName: string; fileName: string; rat
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
 }
 
-/** Builds a synthetic EC_TAG_PARTFILE tag - only the fields statusText/priorityText read. */
+/** Builds a synthetic EC_TAG_PARTFILE tag - only the fields statusText/priorityText/partMetName read. */
 function partFileTag(fields: {
    status?: number;
    prio?: number;
@@ -44,6 +44,7 @@ function partFileTag(fields: {
    sourcesXfer?: number;
    comments?: ec.ECTag;
    kadCommentSearching?: boolean;
+   partMetId?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.status !== undefined) {
@@ -61,6 +62,9 @@ function partFileTag(fields: {
    if (fields.comments) children.push(fields.comments);
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
+   }
+   if (fields.partMetId !== undefined) {
+      children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE_PARTMETID, fields.partMetId));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, children);
 }
@@ -111,6 +115,19 @@ describe("DownloadFile.priorityText", () => {
    it("reports 'Unknown' when the prio field is absent", () => {
       const file = ec.DownloadFile.fromTag(partFileTag({}));
       expect(file.priorityText).to.equal("Unknown");
+   });
+});
+
+describe("DownloadFile.partMetName", () => {
+   it("zero-pads partMetId to 3 digits and appends the .part.met suffix", () => {
+      const file = ec.DownloadFile.fromTag(partFileTag({ partMetId: 12 }));
+      expect(file.partMetName).to.equal("012.part.met");
+   });
+
+   it("is undefined when partMetId is absent", () => {
+      const file = ec.DownloadFile.fromTag(partFileTag({}));
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(file.partMetName).to.be.undefined;
    });
 });
 

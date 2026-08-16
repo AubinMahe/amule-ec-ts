@@ -140,29 +140,6 @@ Capability tag `EC_TAG_CAN_CLIENT_HISTORY` is echoed on `AUTH_OK` when the daemo
 - **Priority**: Low
 - **Effort**: Medium
 
-## Merge logic, never exercised by tests
-
-### `Update.ServerUpdate.mergedWith`/`Update.FriendInfo.mergedWith`
-
-`Update.fetch()` merges every group (shared files, downloads, clients, servers, friends) through the same generic `mergeInto<T>()`,
-which only calls a group's `mergedWith()` when an entry for that ECID already exists from a previous poll. `Update.test.ts` has
-exactly one such two-poll test, and it only covers the `clients` group (`ClientUpdate.mergedWith`) - there's no equivalent test for
-`servers` or `friends`, so these two merge paths are never actually invoked by the test suite. Not reached by the REPL either, since
-it depends on the daemon returning a second partial poll for an already-known server/friend ECID, which no REPL scenario
-deliberately provokes.
-
-- **Priority**: High
-- **Effort**: Low
-
-### `DownloadFile.partMetName`
-
-Derives the "NNN.part.met" temp filename from `partMetId`. Not read anywhere in `tests/repl/views/downloads.ts`, and
-`Downloads.test.ts` has no assertion on it either - the only public method/getter on `Downloads`/`DownloadFile` with no coverage in
-either place.
-
-- **Priority**: High
-- **Effort**: Low
-
 ## REPL views, bypassing formatted getters
 
 ### `DownloadFile.priorityText`/`DownloadFile.statusText`
