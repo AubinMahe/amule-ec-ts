@@ -1,0 +1,14 @@
+{
+   // Prettier reflows prose at 132 columns and formats tables (see
+   // .prettierrc.json: prettier-plugin-compact-markdown-table +
+   // tableLayout: "compact" for padding-free tables, matching MD060's "tight"
+   // style in .markdownlint-cli2.jsonc). markdownlint stays active as a plain
+   // check alongside it - semantic rules (headings, links, raw HTML...) that
+   // Prettier, a pure formatter, doesn't cover.
+   "[markdown]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true,
+      // Visual guide at the chosen width, matching MD013.line_length.
+      "editor.rulers": [132]
+   }
+}

@@ -348,11 +348,13 @@ export class ECConnection extends events.EventEmitter {
     * across the whole protocol doc and ECCodes.h), so if the server ever
     * interleaves a pushed notification ahead of the reply to a request
     * that's still in flight, this will hand the notification to that
-    * pending receive() by mistake. In practice this hasn't been observed -
-    * aMule's ECNotifier only drains its queue between writes
-    * (WriteDoneAndQueueEmpty / NextPacketToSocket in ExternalConn.cpp) and
-    * a request's reply is produced synchronously within the same
-    * OnReceive call - but it isn't ruled out by the wire format itself.
+    * pending receive() by mistake, desyncing every later request/reply
+    * pairing on this connection. Confirmed to actually happen with several
+    * requests polling concurrently on one connection that also has
+    * `notify: true` enabled - not just a theoretical risk. The only safe
+    * pattern is a second, dedicated ECConnection purely for `notify: true`
+    * + onNotification(), never used for send()/receive(), while every
+    * other connection stays `notify: false`.
     */
    private dispatchPacket(packet: ECPacket): void {
       const waiter = this.pendingReceives.shift();

@@ -35,6 +35,14 @@ export interface ECEngineStartOptions {
     * negotiates EC_TAG_CAN_NOTIFY as part of the AUTH_REQ packet itself,
     * so setting the capability on the connection afterward (once start()
     * has returned) is too late to have any effect.
+    *
+    * Don't set this on a connection also used for send()/receive() request
+    * polling - see ECConnection.dispatchPacket()'s doc for the request/
+    * reply race this creates. `ECEngine` is a singleton (one `connection`
+    * for the whole app), so a second `notify: true` connection needs its
+    * own `ECConnection.connect()` + `authenticateWithHash()` call outside
+    * `ECEngine`, used purely for `onNotification()` and nothing else, while
+    * `ECEngine.connection` stays `notify: false`.
     */
    notify?: boolean;
    /**

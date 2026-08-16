@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Counts the Supported/Tested/REPL checkmarks in TODO.md's opcode coverage
+// Counts the Supported/Tested/REPL checkmarks in CHOICES.md's opcode coverage
 // table, for keeping that section's intro paragraph numbers in sync after
 // editing rows.
 
@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const todoPath = join(dirname(fileURLToPath(import.meta.url)), "..", "TODO.md");
-const lines = readFileSync(todoPath, "utf8").split(/\r?\n/);
+const choicesPath = join(dirname(fileURLToPath(import.meta.url)), "..", "CHOICES.md");
+const lines = readFileSync(choicesPath, "utf8").split(/\r?\n/);
 
 let supported = 0;
 let tested = 0;

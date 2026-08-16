@@ -1,5 +1,5 @@
+*.tgz
+*.tsbuildinfo
 coverage/
 dist/
 node_modules/
-*.tgz
-*.tsbuildinfo
