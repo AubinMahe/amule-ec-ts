@@ -385,6 +385,13 @@ export enum ECTagNames {
    // EC_TAG_STAT_NODE_VALUE; the English display string stays alongside it
    // (EC_VALUE_STRING) so GUI/legacy consumers are unaffected.
    EC_TAG_STAT_VALUE_ENUM = 0x1b13,
+   // How many points the daemon can actually answer for the scale used in
+   // the reply this accompanies (CStatistics::GetPointsPerRange()), so the
+   // caller can cap its next fetch()'s width instead of guessing - see
+   // StatsGraphs.fetch()'s doc. Over-asking doesn't error, it just repeats
+   // a record, and there's no timestamp per point on the wire to detect
+   // that from the data alone.
+   EC_TAG_STATSGRAPH_DEPTH = 0x1b14,
    EC_TAG_PREFS_SECURITY = 0x1c00,
    EC_TAG_SECURITY_CAN_SEE_SHARES = 0x1c01,
    EC_TAG_IPFILTER_CLIENTS = 0x1c02,

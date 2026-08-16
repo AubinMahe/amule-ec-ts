@@ -62,6 +62,14 @@ export class StatsGraphs {
    public sessionTimespan: number | undefined;
    /** Newest point's timestamp - feed this into the next fetch()'s `last` argument to poll incrementally. */
    public last: number | undefined;
+   /**
+    * How many points the daemon can actually answer for the scale used in
+    * this reply - cap the next fetch()'s `width` to this instead of
+    * guessing. Over-asking doesn't error, it silently repeats a record
+    * instead (there's no per-point timestamp on the wire to detect that
+    * from `points` alone).
+    */
+   public depth: bigint | undefined;
 
    public constructor(public readonly connection: ECConnection) {}
 
@@ -69,7 +77,10 @@ export class StatsGraphs {
     * Confirmed against GetStatsGraphs(): the request carries up to three
     * optional tags - EC_TAG_STATSGRAPH_LAST (double, lower-bound
     * timestamp), EC_TAG_STATSGRAPH_SCALE (uint16, seconds/point),
-    * EC_TAG_STATSGRAPH_WIDTH (uint16, max points). No EC_TAG_DETAIL_LEVEL
+    * EC_TAG_STATSGRAPH_WIDTH (uint16, max points - the daemon doesn't
+    * reject an over-large value, it repeats the last known record instead;
+    * see `depth`, decoded from the reply, for how many points are actually
+    * available at the requested scale). No EC_TAG_DETAIL_LEVEL
     * tag is sent - EC_DETAIL_FULL is EC_OP_GET_STATSGRAPHS's required
     * level and also this library's (and the C++ CECPacket's) wire
     * default when the tag is omitted entirely
@@ -132,6 +143,7 @@ export class StatsGraphs {
       this.sessionKadNodes = reply.find(ECTagNames.EC_TAG_STATSGRAPH_SESSION_KAD)?.intValue;
       this.sessionTimespan = reply.find(ECTagNames.EC_TAG_STATSGRAPH_SESSION_TIMESPAN)?.doubleValue;
       this.last = reply.find(ECTagNames.EC_TAG_STATSGRAPH_LAST)?.doubleValue;
+      this.depth = reply.find(ECTagNames.EC_TAG_STATSGRAPH_DEPTH)?.intValue;
       debug("fetch: %d point(s)", points.length);
    }
 }

@@ -70,7 +70,7 @@ describe("StatsGraphs.fetch", () => {
       /* eslint-enable @typescript-eslint/no-unused-expressions */
    });
 
-   it("decodes session totals (uint64 + double) and the echoed LAST timestamp", async () => {
+   it("decodes session totals (uint64 + double), the echoed LAST timestamp, and DEPTH", async () => {
       const fake = createFakeConnection();
       const statsGraphs = new ec.StatsGraphs(fake.connection);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_STATSGRAPHS);
@@ -79,6 +79,7 @@ describe("StatsGraphs.fetch", () => {
       reply.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATSGRAPH_SESSION_KAD, 42n));
       reply.add(new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_STATSGRAPH_SESSION_TIMESPAN, 3600.25));
       reply.add(new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_STATSGRAPH_LAST, 1735689600.5));
+      reply.add(new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_STATSGRAPH_DEPTH, 288));
       fake.queueReply(reply);
 
       await statsGraphs.fetch();
@@ -88,6 +89,18 @@ describe("StatsGraphs.fetch", () => {
       expect(statsGraphs.sessionKadNodes).to.equal(42n);
       expect(statsGraphs.sessionTimespan).to.equal(3600.25);
       expect(statsGraphs.last).to.equal(1735689600.5);
+      expect(statsGraphs.depth).to.equal(288n);
+   });
+
+   it("leaves depth undefined when EC_TAG_STATSGRAPH_DEPTH is absent (older daemon)", async () => {
+      const fake = createFakeConnection();
+      const statsGraphs = new ec.StatsGraphs(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_STATSGRAPHS));
+
+      await statsGraphs.fetch();
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(statsGraphs.depth).to.be.undefined;
    });
 
    it("resolves with an empty points array (no throw) on EC_OP_FAILED - 'no points for graph' is routine", async () => {

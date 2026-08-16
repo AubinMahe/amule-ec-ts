@@ -2,15 +2,6 @@
 
 ## Tags, not yet declared
 
-### `EC_TAG_STATSGRAPH_DEPTH`
-
-Not declared in `ECTagNames.ts`. The daemon sends it on `STATSGRAPHS` replies to tell the client how far back its history goes;
-`StatsGraphs.ts` sends `EC_TAG_STATSGRAPH_WIDTH` uncapped and never reads this tag, so a caller can request more points than the
-daemon actually has, returning duplicated/misleading points with a skewed time axis.
-
-- **Priority**: Medium
-- **Effort**: Low
-
 ### `EC_TAG_SESSION_ID`
 
 Not declared in `ECTagNames.ts`. The daemon sends a random per-process identifier on every `AUTH_OK` reply (`ECConnection.ts`,
