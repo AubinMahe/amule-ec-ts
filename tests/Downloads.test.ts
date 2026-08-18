@@ -267,6 +267,100 @@ describe("DownloadTracker source names accumulation", () => {
    });
 });
 
+describe("source-names per-connection cache (PartFileSourceNames.ts)", () => {
+   it("Downloads.fetch() keeps a previously-seen name across a later fetch() with no fresh delta", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+
+      const first = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      first.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      fake.queueReply(first);
+      await downloads.fetch();
+      expect(downloads.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+
+      // The daemon has nothing new to report for this file on this connection - real behavior for a
+      // repeated fetch(), or one issued after another service already polled it (see class doc).
+      const second = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      second.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, []));
+      fake.queueReply(second);
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+   });
+
+   it("does not leak one connection's accumulated names onto a different connection", async () => {
+      const fakeA = createFakeConnection();
+      const fakeB = createFakeConnection();
+      const downloadsA = new ec.Downloads(fakeA.connection);
+      const downloadsB = new ec.Downloads(fakeB.connection);
+
+      const replyA = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      replyA.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      fakeA.queueReply(replyA);
+      await downloadsA.fetch();
+
+      const replyB = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      replyB.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, []));
+      fakeB.queueReply(replyB);
+      await downloadsB.fetch();
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(downloadsB.files[0]?.sourceNames).to.be.undefined;
+   });
+
+   it("SharedFiles.fetch()'s delta reaches Downloads.fetch() on the same connection", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const downloads = new ec.Downloads(fake.connection);
+
+      // A partial-but-shared file: SharedFiles' own request happens to be the one that reaches the
+      // daemon while this name's delta is still pending (see SharedFile's class doc).
+      const sharedReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      sharedReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      fake.queueReply(sharedReply);
+      await sharedFiles.fetch();
+      expect(sharedFiles.files).to.have.lengthOf(1);
+
+      // Downloads.fetch() right after: the daemon has nothing new for THIS request (SharedFiles
+      // already consumed the one-time delta), yet the name still shows up.
+      const downloadReply = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      downloadReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, []));
+      fake.queueReply(downloadReply);
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+   });
+
+   it("DownloadTracker.seed() forgets a dropped file's names, so a later ecid reuse starts clean", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const tracker = new ec.DownloadTracker(fake.connection);
+
+      const first = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      first.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      fake.queueReply(first);
+      await downloads.fetch();
+      tracker.seed(downloads);
+      expect(tracker.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+
+      // The file completes/is cancelled: it's gone from the next fetch() entirely.
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE));
+      await downloads.fetch();
+      tracker.seed(downloads);
+      expect(tracker.files).to.have.lengthOf(0);
+
+      // The daemon later recycles ecid 1 for an unrelated new download, nothing new to report yet.
+      const reused = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      reused.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, []));
+      fake.queueReply(reused);
+      await downloads.fetch();
+      tracker.seed(downloads);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(tracker.files[0]?.sourceNames).to.be.undefined;
+   });
+});
+
 describe("Downloads.fetch", () => {
    it("requests EC_DETAIL_CMD and parses each EC_TAG_PARTFILE reply tag into a DownloadFile", async () => {
       const fake = createFakeConnection();
