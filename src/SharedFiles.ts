@@ -7,6 +7,7 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 import type { ECDownloadPriority } from "./Downloads.js";
+import { resolveSourceNames } from "./PartFileSourceNames.js";
 
 const debug = debuglog("amule-ec:sharedfiles");
 
@@ -148,6 +149,14 @@ export function parseMediaMetadata(fileTag: ECTag): MediaMetadata | undefined {
  * EC_TAG_PARTFILE (`CECTag tag(EC_TAG_PARTFILE, filehash)`, line 3245),
  * not EC_TAG_KNOWNFILE like every add/update. parseNotification() checks
  * for both.
+ *
+ * A partial file that's also shared is still, on the daemon side, encoded by the very same
+ * CPartFile_Encoder its download-queue entry uses (ExternalConn.cpp:355-364), so a response here can
+ * legitimately carry that file's EC_TAG_PARTFILE_SOURCE_NAMES delta too - see DownloadFile's class
+ * doc. SharedFile doesn't expose that data itself (it's a download's peers, not this file's own
+ * upload activity), but fromTag() still folds it into the shared per-connection cache when a
+ * connection is given, so Downloads sees it even when a SharedFiles poll is the one that happened to
+ * reach the daemon first.
  */
 export class SharedFile {
    public readonly hash: string | undefined;
@@ -220,11 +229,18 @@ export class SharedFile {
       this.media = fields.media;
    }
 
-   public static fromTag(tag: ECTag): SharedFile {
+   /**
+    * `connection`, when given, lets this file's EC_TAG_PARTFILE_SOURCE_NAMES delta (if any) be folded
+    * into the shared per-connection cache Downloads reads from - see class doc. Purely a side effect:
+    * SharedFile itself never exposes that data.
+    */
+   public static fromTag(tag: ECTag, connection?: ECConnection): SharedFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
       const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
       const removed = tag.children.length === 0 && ownHashTag !== undefined;
+      const ecid = removed ? undefined : tag.intValue;
+      resolveSourceNames(tag, connection, ecid);
       return new SharedFile({
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          name: tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME),
@@ -235,7 +251,7 @@ export class SharedFile {
          requestsTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_REQ_COUNT_ALL),
          prio: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_PRIO),
          removed,
-         ecid: removed ? undefined : tag.intValue,
+         ecid,
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
@@ -318,14 +334,16 @@ export class SharedFiles implements ECFetchable {
     * either EC_TAG_KNOWNFILE (add/update) or EC_TAG_PARTFILE (removal - see
     * class doc) as the top-level tag name.
     *
-    * Static, and doesn't touch `connection` - a notification is parsed
-    * from a packet the connection already handed us, not fetched.
+    * Static - doesn't need its *own* connection, a notification is parsed from a packet the
+    * connection already handed us, not fetched. `connection` is still accepted, purely so a partial
+    * file's source-names delta can be folded into the shared cache like fromTag()'s - pass the same
+    * ECConnection the notification came from.
     */
-   public static parseNotification(packet: ECPacket): SharedFile | undefined {
+   public static parseNotification(packet: ECPacket, connection?: ECConnection): SharedFile | undefined {
       if (packet.opcode !== ECOpcode.EC_OP_SHARED_FILES) return undefined;
       const tag = packet.find(ECTagNames.EC_TAG_KNOWNFILE) ?? packet.find(ECTagNames.EC_TAG_PARTFILE);
       if (!tag) return undefined;
-      const file = SharedFile.fromTag(tag);
+      const file = SharedFile.fromTag(tag, connection);
       debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
       return file;
    }
@@ -343,7 +361,7 @@ export class SharedFiles implements ECFetchable {
             const name: ECTagNames = tag.name;
             return name === ECTagNames.EC_TAG_KNOWNFILE;
          })
-         .map((tag) => SharedFile.fromTag(tag));
+         .map((tag) => SharedFile.fromTag(tag, this.connection));
       debug("fetch: %d file(s)", this.files.length);
    }
 
@@ -591,9 +609,15 @@ export class SharedFiles implements ECFetchable {
  * notifications, so a progress-only update (see SharedFile's class doc)
  * can still be shown against the file it belongs to instead of
  * "(unknown name)". Mirrors DownloadTracker - see its class doc.
+ *
+ * `connection`, when given, is only forwarded to parseNotification() so a partial-shared file's
+ * source-names delta still reaches DownloadTracker's cache from here too (see SharedFile's class
+ * doc) - pass the same ECConnection the SharedFiles instance fed to seed() is built on.
  */
 export class SharedFileTracker {
    private readonly filesByEcid = new Map<bigint, SharedFile>();
+
+   public constructor(private readonly connection?: ECConnection) {}
 
    public get files(): readonly SharedFile[] {
       return [...this.filesByEcid.values()];
@@ -607,7 +631,7 @@ export class SharedFileTracker {
    }
 
    public apply(packet: ECPacket): SharedFile | undefined {
-      const update = SharedFiles.parseNotification(packet);
+      const update = SharedFiles.parseNotification(packet, this.connection);
       if (!update) return undefined;
       if (update.removed) {
          for (const [ecid, file] of this.filesByEcid) {

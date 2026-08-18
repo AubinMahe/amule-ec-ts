@@ -7,6 +7,9 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 import { FileComment, parseFileComments, parseKadCommentSearching, MediaMetadata, parseMediaMetadata } from "./SharedFiles.js";
+import { SourceName, mergeSourceNames, resolveSourceNames, forgetSourceNames } from "./PartFileSourceNames.js";
+
+export type { SourceName } from "./PartFileSourceNames.js";
 
 const debug = debuglog("amule-ec:downloads");
 
@@ -50,52 +53,6 @@ export enum ECDownloadPriority {
    PR_POWERSHARE = 6,
 }
 
-/** One entry of DownloadFile.sourceNames - see DownloadFile's class doc for what an absent `name` or a `count` of 0n mean. */
-export interface SourceName {
-   readonly name: string | undefined;
-   readonly count: bigint;
-}
-
-/** Decodes EC_TAG_PARTFILE_SOURCE_NAMES into id -> {name, count} - see DownloadFile's class doc for the delta protocol this reflects. */
-function parseSourceNames(tag: ECTag): ReadonlyMap<bigint, SourceName> | undefined {
-   const container = tag.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES);
-   if (!container) return undefined;
-   const names = new Map<bigint, SourceName>();
-   for (const entry of container.children) {
-      const id = entry.intValue;
-      if (id === undefined) continue;
-      const count = entry.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS) ?? 0n;
-      const name = entry.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES)?.stringValue;
-      names.set(id, { name, count });
-   }
-   return names;
-}
-
-/**
- * Folds one response's source-name delta (see parseSourceNames()'s doc) into the running total
- * accumulated so far - a 0 count forgets the id, a present name (re)sets it, a bare count update
- * keeps whatever name `base` already had for that id (dropped silently if `base` never had one -
- * the protocol shouldn't produce that case, since an id's first appearance always carries a name).
- */
-function mergeSourceNames(
-   base: ReadonlyMap<bigint, SourceName> | undefined,
-   update: ReadonlyMap<bigint, SourceName> | undefined,
-): ReadonlyMap<bigint, SourceName> | undefined {
-   if (update === undefined) return base;
-   const merged = new Map(base ?? []);
-   for (const [id, entry] of update) {
-      if (entry.count === 0n) {
-         merged.delete(id);
-      } else if (entry.name !== undefined) {
-         merged.set(id, entry);
-      } else {
-         const existing = merged.get(id);
-         if (existing) merged.set(id, { name: existing.name, count: entry.count });
-      }
-   }
-   return merged;
-}
-
 /**
  * One EC_TAG_PARTFILE entry from an EC_OP_DLOAD_QUEUE reply or notification.
  *
@@ -130,13 +87,19 @@ function mergeSourceNames(
  * last response on this same connection: a new id carries its name; a bare count change on an
  * already-known id omits the name (SourceName.name is then undefined - not "no name", but "unknown
  * here, keep whatever you already had"); a count of 0n means "forget this id" (SourceName.count of
- * 0n never represents a real, currently-valid entry). `Downloads.fetch()` (EC_DETAIL_CMD) resets
- * this per-connection tracking before encoding (ExternalConn.cpp:1818-1819/2172-2173: any detail
- * level other than EC_DETAIL_UPDATE resets it), so a fetch() result's `sourceNames` is always the
- * complete, self-contained set. A lone EC_DETAIL_UPDATE push's `sourceNames`, read in isolation, can
- * under- or misreport the current names for exactly the same reason name/hash can be missing above
- * - feed it through DownloadTracker (or equivalent accumulation) instead of reading it directly off
- * a single notification.
+ * 0n never represents a real, currently-valid entry). Unlike the fields above, a fresh EC_DETAIL_CMD
+ * request does *not* reset this tracking - CPartFile_Encoder::ResetEncoder() (ExternalConn.cpp:3359-
+ * 3363) resets gap/req status but never touches m_sourcenameItemMap - so a fetch() result's
+ * `sourceNames` is *not* guaranteed self-contained the way every other field is: a repeated fetch(),
+ * or a fetch() on a connection another service (e.g. SharedFiles) has already polled this same file
+ * on, can legitimately come back without a name the daemon already told this connection once. That
+ * gap is closed automatically: `fromTag()`/`parseNotification()` fold every delta they see into a
+ * per-connection cache (see PartFileSourceNames.ts's resolveSourceNames()) keyed by ecid, so
+ * `sourceNames` always reflects everything this connection has ever been told, not just what the
+ * current response happened to carry - the caller doesn't need to know any of this. The one thing
+ * that cache can't do anything about is a name never having reached this connection *at all* yet
+ * (nothing changed since the connection opened) - in that case there is nothing to accumulate until
+ * an actual change occurs, from a fetch() or a push notification.
  */
 export class DownloadFile {
    public readonly hash: string | undefined;
@@ -220,11 +183,18 @@ export class DownloadFile {
       this.sourceNames = fields.sourceNames;
    }
 
-   public static fromTag(tag: ECTag): DownloadFile {
+   /**
+    * `connection`, when given, lets `sourceNames` be resolved against that connection's running
+    * accumulation instead of just this one tag's delta - see class doc and
+    * PartFileSourceNames.ts's resolveSourceNames(). Omitted by direct/test callers that only care
+    * about this one tag's own content.
+    */
+   public static fromTag(tag: ECTag, connection?: ECConnection): DownloadFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
       const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
       const removed = tag.children.length === 0 && ownHashTag !== undefined;
+      const ecid = removed ? undefined : tag.intValue;
       return new DownloadFile({
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          name: tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME),
@@ -235,7 +205,7 @@ export class DownloadFile {
          status: tag.childInt(ECTagNames.EC_TAG_PARTFILE_STATUS),
          prio: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PRIO),
          removed,
-         ecid: removed ? undefined : tag.intValue,
+         ecid,
          partMetId: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PARTMETID),
          stopped: (tag.childInt(ECTagNames.EC_TAG_PARTFILE_STOPPED) ?? 0n) !== 0n,
          sourcesXfer: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER),
@@ -243,7 +213,7 @@ export class DownloadFile {
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
          media: parseMediaMetadata(tag),
-         sourceNames: parseSourceNames(tag),
+         sourceNames: resolveSourceNames(tag, connection, ecid),
       });
    }
 
@@ -377,14 +347,16 @@ export class Downloads implements ECFetchable {
     * class doc for why the result may be missing hash/name - use
     * DownloadTracker to resolve those against previously seen files.
     *
-    * Static, and doesn't touch `connection` - a notification is parsed
-    * from a packet the connection already handed us, not fetched.
+    * Static - doesn't need its *own* connection, a notification is parsed from a packet the
+    * connection already handed us, not fetched. `connection` is still accepted, purely so
+    * `sourceNames` can be resolved against that connection's running accumulation like fromTag()'s -
+    * pass the same ECConnection the notification came from (typically DownloadTracker.apply()'s).
     */
-   public static parseNotification(packet: ECPacket): DownloadFile | undefined {
+   public static parseNotification(packet: ECPacket, connection?: ECConnection): DownloadFile | undefined {
       if (packet.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) return undefined;
       const tag = packet.find(ECTagNames.EC_TAG_PARTFILE);
       if (!tag) return undefined;
-      const file = DownloadFile.fromTag(tag);
+      const file = DownloadFile.fromTag(tag, connection);
       debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
       return file;
    }
@@ -402,7 +374,7 @@ export class Downloads implements ECFetchable {
             const name: ECTagNames = tag.name;
             return name === ECTagNames.EC_TAG_PARTFILE;
          })
-         .map((tag) => DownloadFile.fromTag(tag));
+         .map((tag) => DownloadFile.fromTag(tag, this.connection));
       debug("fetch: %d file(s)", this.files.length);
    }
 
@@ -693,18 +665,33 @@ export class Downloads implements ECFetchable {
  * Call seed() with a fresh Downloads.fetch() result whenever you have one
  * (it fully replaces the tracked set - the safe, always-correct baseline);
  * feed every notification packet through apply() in between to stay live.
+ *
+ * `connection`, when given, is only used to forget a file's accumulated `sourceNames` once it leaves
+ * the queue (see PartFileSourceNames.ts's forgetSourceNames()) - pass the same ECConnection the
+ * Downloads instance fed to seed() is built on. `sourceNames` itself doesn't depend on this: it's
+ * already resolved-and-accumulated on each DownloadFile by the time seed()/apply() see it (see
+ * DownloadFile's class doc), as long as that same connection was passed through to fetch()/the
+ * notification's connection in the first place.
  */
 export class DownloadTracker {
    private readonly filesByEcid = new Map<bigint, DownloadFile>();
+
+   public constructor(private readonly connection?: ECConnection) {}
 
    public get files(): readonly DownloadFile[] {
       return [...this.filesByEcid.values()];
    }
 
    public seed(downloads: Downloads): void {
+      const previousEcids = new Set(this.filesByEcid.keys());
       this.filesByEcid.clear();
       for (const file of downloads.files) {
-         if (file.ecid !== undefined) this.filesByEcid.set(file.ecid, file);
+         if (file.ecid === undefined) continue;
+         this.filesByEcid.set(file.ecid, file);
+         previousEcids.delete(file.ecid);
+      }
+      if (this.connection) {
+         for (const droppedEcid of previousEcids) forgetSourceNames(this.connection, droppedEcid);
       }
    }
 
@@ -718,12 +705,13 @@ export class DownloadTracker {
     * matched by hash instead.
     */
    public apply(packet: ECPacket): DownloadFile | undefined {
-      const update = Downloads.parseNotification(packet);
+      const update = Downloads.parseNotification(packet, this.connection);
       if (!update) return undefined;
       if (update.removed) {
          for (const [ecid, file] of this.filesByEcid) {
             if (file.hash === update.hash) {
                this.filesByEcid.delete(ecid);
+               if (this.connection) forgetSourceNames(this.connection, ecid);
                break;
             }
          }
