@@ -66,12 +66,13 @@ export function mergeSourceNames(
  *
  * So without this cache, a service reading `sourceNames` straight off one response would silently
  * miss any name whose one-time delta the daemon already spent on an *earlier* request on this same
- * connection - its own earlier fetch, another service's fetch (Downloads vs SharedFiles), or a push
- * notification. Keyed by connection instance (a WeakMap, so an entry never outlives the connection
- * that produced it) rather than by which class asked: Downloads and SharedFiles both feed and read
- * the same cache through resolveSourceNames() below, so whichever of them a name's delta happens to
- * reach first, the other still sees it on its own next call - no protocol awareness required from
- * either.
+ * connection - its own earlier fetch, another service's fetch (Downloads.fetch()/SharedFiles.fetch()/
+ * Update.fetch() - Get_EC_Response_GetUpdate also takes the same m_FileEncoder, ExternalConn.cpp:3641
+ * - all three end up encoding the very same object for a given ecid), or a push notification. Keyed
+ * by connection instance (a WeakMap, so an entry never outlives the connection that produced it)
+ * rather than by which class asked: every one of them feeds and reads the same cache through
+ * resolveSourceNames() below, so whichever happens to reach the daemon first, the others still see it
+ * on their own next call - no protocol awareness required from any of them.
  */
 const byConnection = new WeakMap<ECConnection, Map<bigint, ReadonlyMap<bigint, SourceName>>>();
 

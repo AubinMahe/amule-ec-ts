@@ -331,6 +331,27 @@ describe("source-names per-connection cache (PartFileSourceNames.ts)", () => {
       expect(downloads.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
    });
 
+   it("Update.fetch()'s delta reaches Downloads.fetch() on the same connection", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+      const downloads = new ec.Downloads(fake.connection);
+
+      // Update.fetch() polls far more often than a user-triggered Downloads.fetch() in a real app,
+      // so it's typically the one that happens to reach the daemon while a name's delta is pending.
+      const updateReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      updateReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      fake.queueReply(updateReply);
+      await update.fetch();
+
+      const downloadReply = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      downloadReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, []));
+      fake.queueReply(downloadReply);
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+   });
+
    it("DownloadTracker.seed() forgets a dropped file's names, so a later ecid reuse starts clean", async () => {
       const fake = createFakeConnection();
       const downloads = new ec.Downloads(fake.connection);

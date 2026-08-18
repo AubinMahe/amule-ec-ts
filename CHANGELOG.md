@@ -16,7 +16,7 @@ verified against that source before being reflected here.
 - `DownloadFile.sourceNames` (`EC_TAG_PARTFILE_SOURCE_NAMES`/`EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS`) - alternate filenames a
   download's sources have reported, id -> `{ name, count }`. Delta-encoded per EC connection, and - unlike every other field on
   `DownloadFile` - _not_ reset by a fresh `Downloads.fetch()` either, nor scoped to the request type that triggered it: the daemon
-  tracks it per connection per file, shared across `Downloads` and `SharedFiles` alike (see the class doc). `fromTag()`/
+  tracks it per connection per file, shared across `Downloads`, `SharedFiles` and `Update` alike (see the class doc). `fromTag()`/
   `parseNotification()` hide this behind a per-connection cache (`PartFileSourceNames.ts`) that both classes feed and read, so
   `sourceNames` always reflects everything a connection has ever been told, regardless of which class's request or how many
   fetch()/notification cycles it took to arrive - no protocol awareness required from callers
