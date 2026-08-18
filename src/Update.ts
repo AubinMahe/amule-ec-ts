@@ -514,10 +514,10 @@ export class Update {
       const name: ECTagNames = tag.name;
       switch (name) {
          case ECTagNames.EC_TAG_KNOWNFILE:
-            this.mergeInto(this.sharedFilesByEcid, SharedFile.fromTag(tag));
+            this.mergeInto(this.sharedFilesByEcid, SharedFile.fromTag(tag, this.connection));
             break;
          case ECTagNames.EC_TAG_PARTFILE:
-            this.mergeInto(this.downloadsByEcid, DownloadFile.fromTag(tag));
+            this.mergeInto(this.downloadsByEcid, DownloadFile.fromTag(tag, this.connection));
             break;
          case ECTagNames.EC_TAG_FILE_REMOVED: {
             const ecid = tag.intValue;
