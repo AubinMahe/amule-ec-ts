@@ -56,6 +56,7 @@ function partFileTag(fields: {
    comments?: ec.ECTag;
    kadCommentSearching?: boolean;
    partMetId?: number;
+   sourceNames?: ec.ECTag;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.status !== undefined) {
@@ -77,6 +78,7 @@ function partFileTag(fields: {
    if (fields.partMetId !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE_PARTMETID, fields.partMetId));
    }
+   if (fields.sourceNames) children.push(fields.sourceNames);
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, children);
 }
 
@@ -163,6 +165,105 @@ describe("DownloadFile comments/kadCommentSearching", () => {
       expect(file.comments).to.be.undefined;
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(file.kadCommentSearching).to.be.undefined;
+   });
+});
+
+/** Builds an EC_TAG_PARTFILE_SOURCE_NAMES container, as parseSourceNames() reads it (see Downloads.ts's doc). */
+function sourceNamesTag(entries: readonly { id: number; name?: string; count: number }[]): ec.ECTag {
+   const children = entries.map((entry) => {
+      const entryChildren: ec.ECTag[] = [];
+      if (entry.name !== undefined) {
+         entryChildren.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, entry.name));
+      }
+      entryChildren.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, entry.count));
+      return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, entry.id, entryChildren);
+   });
+   return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, new Uint8Array(), children);
+}
+
+describe("DownloadFile.sourceNames", () => {
+   it("decodes full entries (id -> name/count) from a single response", () => {
+      const file = ec.DownloadFile.fromTag(
+         partFileTag({ sourceNames: sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }, { id: 2, name: "movie.avi", count: 2 }]) }),
+      );
+
+      expect(file.sourceNames?.size).to.equal(2);
+      expect(file.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+      expect(file.sourceNames?.get(2n)).to.deep.equal({ name: "movie.avi", count: 2n });
+   });
+
+   it("is undefined when the container is absent", () => {
+      const file = ec.DownloadFile.fromTag(partFileTag({}));
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(file.sourceNames).to.be.undefined;
+   });
+
+   it("decodes a bare count update (no nested name child) as name: undefined", () => {
+      const file = ec.DownloadFile.fromTag(partFileTag({ sourceNames: sourceNamesTag([{ id: 1, count: 9 }]) }));
+      expect(file.sourceNames?.get(1n)).to.deep.equal({ name: undefined, count: 9n });
+   });
+});
+
+describe("DownloadTracker source names accumulation", () => {
+   it("keeps a fully-known entry from a fetch() reply", () => {
+      const tracker = new ec.DownloadTracker();
+      const packet = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      packet.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(hexHash("a"), "hex"))),
+            new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, "one.avi"),
+            sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }]),
+         ]),
+      );
+
+      const file = tracker.apply(packet);
+
+      expect(file?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
+   });
+
+   it("updates the count without losing the name when a later push omits it", () => {
+      const tracker = new ec.DownloadTracker();
+      const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      initial.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
+      );
+      tracker.apply(initial);
+
+      const countOnly = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      countOnly.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, count: 3 }])]));
+      const merged = tracker.apply(countOnly);
+
+      expect(merged?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 3n });
+   });
+
+   it("forgets an id once a later push reports its count as 0", () => {
+      const tracker = new ec.DownloadTracker();
+      const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      initial.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
+      );
+      tracker.apply(initial);
+
+      const removal = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      removal.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, count: 0 }])]));
+      const merged = tracker.apply(removal);
+
+      expect(merged?.sourceNames?.has(1n)).to.equal(false);
+   });
+
+   it("leaves the accumulated map untouched when a later push has no source-names container at all", () => {
+      const tracker = new ec.DownloadTracker();
+      const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      initial.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
+      );
+      tracker.apply(initial);
+
+      const unrelated = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      unrelated.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n)]));
+      const merged = tracker.apply(unrelated);
+
+      expect(merged?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
    });
 });
 

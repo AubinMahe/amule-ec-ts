@@ -50,6 +50,52 @@ export enum ECDownloadPriority {
    PR_POWERSHARE = 6,
 }
 
+/** One entry of DownloadFile.sourceNames - see DownloadFile's class doc for what an absent `name` or a `count` of 0n mean. */
+export interface SourceName {
+   readonly name: string | undefined;
+   readonly count: bigint;
+}
+
+/** Decodes EC_TAG_PARTFILE_SOURCE_NAMES into id -> {name, count} - see DownloadFile's class doc for the delta protocol this reflects. */
+function parseSourceNames(tag: ECTag): ReadonlyMap<bigint, SourceName> | undefined {
+   const container = tag.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES);
+   if (!container) return undefined;
+   const names = new Map<bigint, SourceName>();
+   for (const entry of container.children) {
+      const id = entry.intValue;
+      if (id === undefined) continue;
+      const count = entry.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS) ?? 0n;
+      const name = entry.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES)?.stringValue;
+      names.set(id, { name, count });
+   }
+   return names;
+}
+
+/**
+ * Folds one response's source-name delta (see parseSourceNames()'s doc) into the running total
+ * accumulated so far - a 0 count forgets the id, a present name (re)sets it, a bare count update
+ * keeps whatever name `base` already had for that id (dropped silently if `base` never had one -
+ * the protocol shouldn't produce that case, since an id's first appearance always carries a name).
+ */
+function mergeSourceNames(
+   base: ReadonlyMap<bigint, SourceName> | undefined,
+   update: ReadonlyMap<bigint, SourceName> | undefined,
+): ReadonlyMap<bigint, SourceName> | undefined {
+   if (update === undefined) return base;
+   const merged = new Map(base ?? []);
+   for (const [id, entry] of update) {
+      if (entry.count === 0n) {
+         merged.delete(id);
+      } else if (entry.name !== undefined) {
+         merged.set(id, entry);
+      } else {
+         const existing = merged.get(id);
+         if (existing) merged.set(id, { name: existing.name, count: entry.count });
+      }
+   }
+   return merged;
+}
+
 /**
  * One EC_TAG_PARTFILE entry from an EC_OP_DLOAD_QUEUE reply or notification.
  *
@@ -75,6 +121,22 @@ export enum ECDownloadPriority {
  * (ExternalConn.cpp:3174-3179) - there, EC_TAG_PARTFILE's own data really
  * is the hash (`CECTag(EC_TAG_PARTFILE, filehash)`), with no children and
  * no ECID at all.
+ *
+ * `sourceNames` (a fellow download's peers reporting the same file under different filenames) has
+ * its own, stricter partiality: EC_TAG_PARTFILE_SOURCE_NAMES is delta-encoded *per EC connection* -
+ * confirmed against ExternalConn.cpp:3293-3349 (`CPartFile_Encoder::Encode`) and two reference
+ * client decoders, amule-remote-gui.cpp:3026-3042 and webapi/Refresher.cpp:570-592. The daemon
+ * assigns a stable id per distinct name and, on each response, sends only what changed since its
+ * last response on this same connection: a new id carries its name; a bare count change on an
+ * already-known id omits the name (SourceName.name is then undefined - not "no name", but "unknown
+ * here, keep whatever you already had"); a count of 0n means "forget this id" (SourceName.count of
+ * 0n never represents a real, currently-valid entry). `Downloads.fetch()` (EC_DETAIL_CMD) resets
+ * this per-connection tracking before encoding (ExternalConn.cpp:1818-1819/2172-2173: any detail
+ * level other than EC_DETAIL_UPDATE resets it), so a fetch() result's `sourceNames` is always the
+ * complete, self-contained set. A lone EC_DETAIL_UPDATE push's `sourceNames`, read in isolation, can
+ * under- or misreport the current names for exactly the same reason name/hash can be missing above
+ * - feed it through DownloadTracker (or equivalent accumulation) instead of reading it directly off
+ * a single notification.
  */
 export class DownloadFile {
    public readonly hash: string | undefined;
@@ -115,6 +177,8 @@ export class DownloadFile {
    public readonly path: string | undefined;
    /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
    public readonly media: MediaMetadata | undefined;
+   /** Alternate filenames this download's sources have reported, id -> {name, count} - see class doc for the delta protocol this reflects and why DownloadTracker matters here. */
+   public readonly sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -134,6 +198,7 @@ export class DownloadFile {
       kadCommentSearching: boolean | undefined;
       path: string | undefined;
       media: MediaMetadata | undefined;
+      sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -152,6 +217,7 @@ export class DownloadFile {
       this.kadCommentSearching = fields.kadCommentSearching;
       this.path = fields.path;
       this.media = fields.media;
+      this.sourceNames = fields.sourceNames;
    }
 
    public static fromTag(tag: ECTag): DownloadFile {
@@ -177,6 +243,7 @@ export class DownloadFile {
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
          media: parseMediaMetadata(tag),
+         sourceNames: parseSourceNames(tag),
       });
    }
 
@@ -200,6 +267,7 @@ export class DownloadFile {
          kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
          path: update.path ?? this.path,
          media: update.media ?? this.media,
+         sourceNames: mergeSourceNames(this.sourceNames, update.sourceNames),
       });
    }
 

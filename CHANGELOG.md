@@ -9,6 +9,15 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-08-19
+
+### Added
+
+- `DownloadFile.sourceNames` (`EC_TAG_PARTFILE_SOURCE_NAMES`/`EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS`) - alternate filenames a
+  download's sources have reported, id -> `{ name, count }`. Delta-encoded per EC connection (see the class doc): a
+  `Downloads.fetch()` result is always complete, but a lone push notification can be a partial update - correctly accumulated across
+  notifications by `DownloadFile.mergedWith()`, so `DownloadTracker` picks it up with no change needed there
+
 ## [2.22.0] - 2026-08-16
 
 ### Added
