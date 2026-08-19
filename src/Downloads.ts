@@ -8,8 +8,10 @@ import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 import { FileComment, parseFileComments, parseKadCommentSearching, MediaMetadata, parseMediaMetadata } from "./SharedFiles.js";
 import { SourceName, mergeSourceNames, resolveSourceNames, forgetSourceNames } from "./PartFileSourceNames.js";
+import { ByteRange, resolveGaps, resolveRequestedRanges, resolvePartAvailability, forgetPartFileStatus } from "./PartFileStatus.js";
 
 export type { SourceName } from "./PartFileSourceNames.js";
+export type { ByteRange } from "./PartFileStatus.js";
 
 const debug = debuglog("amule-ec:downloads");
 
@@ -100,6 +102,16 @@ export enum ECDownloadPriority {
  * that cache can't do anything about is a name never having reached this connection *at all* yet
  * (nothing changed since the connection opened) - in that case there is nothing to accumulate until
  * an actual change occurs, from a fetch() or a push notification.
+ *
+ * `gaps`/`requestedRanges`/`partAvailability` are also RLE/XOR delta-encoded per EC connection -
+ * confirmed against RLE.h/RLE.cpp and CPartFile_Encoder::Encode() (ExternalConn.cpp:3247-3302) -
+ * but *unlike* `sourceNames`, `ResetEncoder()` (ExternalConn.cpp:3359-3363) does clear this state,
+ * and Downloads.fetch()/SharedFiles.fetch() (EC_DETAIL_CMD) always trigger that reset before
+ * encoding (ExternalConn.cpp:1818-1819/2172-2173). So on that path each is self-contained, exactly
+ * like every field above `sourceNames` - `fromTag()` still runs the accumulation machinery (see
+ * PartFileStatus.ts), but only to stay correct on Update.fetch(), whose EC_OP_GET_UPDATE handler
+ * never resets (ExternalConn.cpp:1911-2076) and so genuinely deltas against this same connection's
+ * running state. See PartFileStatus.ts's class doc for the full mechanism.
  */
 export class DownloadFile {
    public readonly hash: string | undefined;
@@ -142,6 +154,27 @@ export class DownloadFile {
    public readonly media: MediaMetadata | undefined;
    /** Alternate filenames this download's sources have reported, id -> {name, count} - see class doc for the delta protocol this reflects and why DownloadTracker matters here. */
    public readonly sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
+   /**
+    * The file's missing byte ranges - `EC_TAG_PARTFILE_GAP_STATUS` (`file->GetGapList()`,
+    * ExternalConn.cpp:3257/3263-3264). Undefined once nothing is missing (a download nearing completion
+    * can legitimately have zero gaps - see class doc) as well as when nothing is known yet. A
+    * player needing a contiguous lead-in to preview - not just an overall percentage - can check
+    * whether any range here starts before the byte offset it needs.
+    */
+   public readonly gaps: readonly ByteRange[] | undefined;
+   /**
+    * Byte ranges currently requested from peers, i.e. actively arriving right now - distinct from
+    * `gaps` (still missing) and from everything not covered by either (already on disk) -
+    * `EC_TAG_PARTFILE_REQ_STATUS` (`file->GetRequestedBlockList()`, ExternalConn.cpp:3279/3284-3285).
+    */
+   public readonly requestedRanges: readonly ByteRange[] | undefined;
+   /**
+    * Per-part source-availability count - how many of this file's sources have each part, *not*
+    * this download's own completion state (see `gaps` for that) - `EC_TAG_PARTFILE_PART_STATUS`
+    * (`m_SrcpartFrequency`, CKnownFile_Encoder::Encode(), ExternalConn.cpp:3366-3383). Each entry is
+    * capped at 255 on the wire, regardless of the real source count.
+    */
+   public readonly partAvailability: readonly number[] | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -162,6 +195,9 @@ export class DownloadFile {
       path: string | undefined;
       media: MediaMetadata | undefined;
       sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
+      gaps: readonly ByteRange[] | undefined;
+      requestedRanges: readonly ByteRange[] | undefined;
+      partAvailability: readonly number[] | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -181,15 +217,24 @@ export class DownloadFile {
       this.path = fields.path;
       this.media = fields.media;
       this.sourceNames = fields.sourceNames;
+      this.gaps = fields.gaps;
+      this.requestedRanges = fields.requestedRanges;
+      this.partAvailability = fields.partAvailability;
    }
 
    /**
-    * `connection`, when given, lets `sourceNames` be resolved against that connection's running
-    * accumulation instead of just this one tag's delta - see class doc and
-    * PartFileSourceNames.ts's resolveSourceNames(). Omitted by direct/test callers that only care
-    * about this one tag's own content.
+    * `connection`, when given, lets `sourceNames`/`gaps`/`requestedRanges`/`partAvailability` be
+    * resolved against that connection's running accumulation instead of just this one tag's own
+    * delta - see class doc, PartFileSourceNames.ts's resolveSourceNames() and PartFileStatus.ts's
+    * resolveGaps()/resolveRequestedRanges()/resolvePartAvailability(). Omitted by direct/test
+    * callers that only care about this one tag's own content.
+    *
+    * `resetsEncoder` tells the gap/req/part accumulation whether the daemon reset its own encoder
+    * before producing this tag - true for Downloads.fetch()/SharedFiles.fetch() (EC_DETAIL_CMD),
+    * false for everything else (Update.fetch(), notifications) - see PartFileStatus.ts's class doc.
+    * Irrelevant to `sourceNames`, which is never reset by any request type.
     */
-   public static fromTag(tag: ECTag, connection?: ECConnection): DownloadFile {
+   public static fromTag(tag: ECTag, connection?: ECConnection, resetsEncoder = false): DownloadFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
       const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
@@ -214,6 +259,9 @@ export class DownloadFile {
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
          media: parseMediaMetadata(tag),
          sourceNames: resolveSourceNames(tag, connection, ecid),
+         gaps: resolveGaps(tag, connection, ecid, resetsEncoder),
+         requestedRanges: resolveRequestedRanges(tag, connection, ecid, resetsEncoder),
+         partAvailability: resolvePartAvailability(tag, connection, ecid, resetsEncoder),
       });
    }
 
@@ -238,6 +286,9 @@ export class DownloadFile {
          path: update.path ?? this.path,
          media: update.media ?? this.media,
          sourceNames: mergeSourceNames(this.sourceNames, update.sourceNames),
+         gaps: update.gaps ?? this.gaps,
+         requestedRanges: update.requestedRanges ?? this.requestedRanges,
+         partAvailability: update.partAvailability ?? this.partAvailability,
       });
    }
 
@@ -374,7 +425,7 @@ export class Downloads implements ECFetchable {
             const name: ECTagNames = tag.name;
             return name === ECTagNames.EC_TAG_PARTFILE;
          })
-         .map((tag) => DownloadFile.fromTag(tag, this.connection));
+         .map((tag) => DownloadFile.fromTag(tag, this.connection, true));
       debug("fetch: %d file(s)", this.files.length);
    }
 
@@ -666,12 +717,13 @@ export class Downloads implements ECFetchable {
  * (it fully replaces the tracked set - the safe, always-correct baseline);
  * feed every notification packet through apply() in between to stay live.
  *
- * `connection`, when given, is only used to forget a file's accumulated `sourceNames` once it leaves
- * the queue (see PartFileSourceNames.ts's forgetSourceNames()) - pass the same ECConnection the
- * Downloads instance fed to seed() is built on. `sourceNames` itself doesn't depend on this: it's
- * already resolved-and-accumulated on each DownloadFile by the time seed()/apply() see it (see
- * DownloadFile's class doc), as long as that same connection was passed through to fetch()/the
- * notification's connection in the first place.
+ * `connection`, when given, is only used to forget a file's accumulated `sourceNames`/`gaps`/
+ * `requestedRanges`/`partAvailability` once it leaves the queue (see PartFileSourceNames.ts's
+ * forgetSourceNames() and PartFileStatus.ts's forgetPartFileStatus()) - pass the same ECConnection
+ * the Downloads instance fed to seed() is built on. None of those fields depend on this otherwise:
+ * they're already resolved-and-accumulated on each DownloadFile by the time seed()/apply() see it
+ * (see DownloadFile's class doc), as long as that same connection was passed through to fetch()/
+ * the notification's connection in the first place.
  */
 export class DownloadTracker {
    private readonly filesByEcid = new Map<bigint, DownloadFile>();
@@ -682,6 +734,12 @@ export class DownloadTracker {
       return [...this.filesByEcid.values()];
    }
 
+   private forget(ecid: bigint): void {
+      if (!this.connection) return;
+      forgetSourceNames(this.connection, ecid);
+      forgetPartFileStatus(this.connection, ecid);
+   }
+
    public seed(downloads: Downloads): void {
       const previousEcids = new Set(this.filesByEcid.keys());
       this.filesByEcid.clear();
@@ -690,9 +748,7 @@ export class DownloadTracker {
          this.filesByEcid.set(file.ecid, file);
          previousEcids.delete(file.ecid);
       }
-      if (this.connection) {
-         for (const droppedEcid of previousEcids) forgetSourceNames(this.connection, droppedEcid);
-      }
+      for (const droppedEcid of previousEcids) this.forget(droppedEcid);
    }
 
    /**
@@ -711,7 +767,7 @@ export class DownloadTracker {
          for (const [ecid, file] of this.filesByEcid) {
             if (file.hash === update.hash) {
                this.filesByEcid.delete(ecid);
-               if (this.connection) forgetSourceNames(this.connection, ecid);
+               this.forget(ecid);
                break;
             }
          }

@@ -8,6 +8,7 @@ import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 import type { ECDownloadPriority } from "./Downloads.js";
 import { resolveSourceNames } from "./PartFileSourceNames.js";
+import { resolveGaps, resolveRequestedRanges, resolvePartAvailability } from "./PartFileStatus.js";
 
 const debug = debuglog("amule-ec:sharedfiles");
 
@@ -230,17 +231,22 @@ export class SharedFile {
    }
 
    /**
-    * `connection`, when given, lets this file's EC_TAG_PARTFILE_SOURCE_NAMES delta (if any) be folded
-    * into the shared per-connection cache Downloads reads from - see class doc. Purely a side effect:
-    * SharedFile itself never exposes that data.
+    * `connection`, when given, lets this file's EC_TAG_PARTFILE_SOURCE_NAMES/_GAP_STATUS/_REQ_STATUS/
+    * _PART_STATUS deltas (if any) be folded into the shared per-connection caches Downloads reads
+    * from - see class doc. Purely a side effect: SharedFile itself never exposes any of that data.
+    * `resetsEncoder` - see DownloadFile.fromTag()'s doc - is true for SharedFiles.fetch() (the daemon
+    * resets before encoding at EC_DETAIL_CMD), false otherwise.
     */
-   public static fromTag(tag: ECTag, connection?: ECConnection): SharedFile {
+   public static fromTag(tag: ECTag, connection?: ECConnection, resetsEncoder = false): SharedFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
       const childHashTag = tag.findChild(ECTagNames.EC_TAG_PARTFILE_HASH);
       const hashTag = childHashTag instanceof ECHash16Tag ? childHashTag : ownHashTag;
       const removed = tag.children.length === 0 && ownHashTag !== undefined;
       const ecid = removed ? undefined : tag.intValue;
       resolveSourceNames(tag, connection, ecid);
+      resolveGaps(tag, connection, ecid, resetsEncoder);
+      resolveRequestedRanges(tag, connection, ecid, resetsEncoder);
+      resolvePartAvailability(tag, connection, ecid, resetsEncoder);
       return new SharedFile({
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          name: tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME),
@@ -361,7 +367,7 @@ export class SharedFiles implements ECFetchable {
             const name: ECTagNames = tag.name;
             return name === ECTagNames.EC_TAG_KNOWNFILE;
          })
-         .map((tag) => SharedFile.fromTag(tag, this.connection));
+         .map((tag) => SharedFile.fromTag(tag, this.connection, true));
       debug("fetch: %d file(s)", this.files.length);
    }
 

@@ -9,6 +9,19 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-08-19
+
+### Added
+
+- `DownloadFile.gaps`/`.requestedRanges`/`.partAvailability` (`EC_TAG_PARTFILE_GAP_STATUS`/`_REQ_STATUS`/`_PART_STATUS`) - the data
+  behind aMule's own GUI "chunk bar": missing byte ranges, ranges currently requested from peers, and per-part source-availability
+  counts. RLE/XOR delta-encoded per EC connection (`RLE.h`/`RLE.cpp`) - a different scheme from `sourceNames`' id-keyed map, but
+  simpler in one respect: `ResetEncoder()` _does_ clear this state, and `Downloads.fetch()`/`SharedFiles.fetch()` always trigger
+  that reset, so on that path each is self-contained. `Update.fetch()` doesn't reset, so its values are genuine deltas - handled by
+  the same per-connection accumulation approach as `sourceNames` (new `PartFileStatus.ts`), reused via `resetsEncoder` rather than a
+  second mechanism. New `ECTag.bytesValue`/`.childBytes()` accessors, mirroring the existing `intValue`/`childInt` pair, to read
+  these tags' raw binary payload.
+
 ## [2.23.0] - 2026-08-19
 
 ### Added

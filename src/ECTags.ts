@@ -37,6 +37,12 @@ export abstract class ECTag {
       return typeof value === "string" ? value : undefined;
    }
 
+   /** Reads this tag's own raw bytes (ECCustomTag/ECHash16Tag) - undefined otherwise. */
+   public get bytesValue(): Uint8Array | undefined {
+      const value = (this as { value?: unknown }).value;
+      return value instanceof Uint8Array ? value : undefined;
+   }
+
    public findChild(name: number): ECTag | undefined {
       return this.children.find((child) => child.name === name);
    }
@@ -52,6 +58,10 @@ export abstract class ECTag {
 
    public childDouble(name: number): number | undefined {
       return this.findChild(name)?.doubleValue;
+   }
+
+   public childBytes(name: number): Uint8Array | undefined {
+      return this.findChild(name)?.bytesValue;
    }
 
    /**
