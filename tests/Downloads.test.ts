@@ -181,6 +181,71 @@ function sourceNamesTag(entries: readonly { id: number; name?: string; count: nu
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, new Uint8Array(), children);
 }
 
+/** RLE-encodes raw bytes exactly like RLE_Data::Encode() (RLE.cpp:191-212): a run of 2+ equal bytes (max 255) is written twice then a count byte, anything else is a single literal. */
+function rleEncode(data: Uint8Array): Uint8Array {
+   const buffer = Buffer.from(data);
+   const out: number[] = [];
+   let i = 0;
+   while (i < buffer.length) {
+      const value = buffer.readUInt8(i);
+      let runEnd = i + 1;
+      while (runEnd < buffer.length && buffer.readUInt8(runEnd) === value && runEnd - i < 0xff) runEnd++;
+      const runLen = runEnd - i;
+      if (runLen > 1) {
+         out.push(value, value, runLen);
+      } else {
+         out.push(value);
+      }
+      i = runEnd;
+   }
+   return Uint8Array.from(out);
+}
+
+/** Column-major-encodes a flat uint64 list exactly like RLE_Data::Encode(const ArrayOfUInts64&) (RLE.cpp:245-266). */
+function uint64sToColumnMajorBytes(values: readonly bigint[]): Uint8Array {
+   const size = values.length;
+   const bytes = new Uint8Array(size * 8);
+   for (let i = 0; i < size; i++) {
+      let v = values.at(i) ?? 0n;
+      for (let j = 0; j < 8; j++) {
+         bytes[i + j * size] = Number(v & 0xffn);
+         v >>= 8n;
+      }
+   }
+   return bytes;
+}
+
+/** XORs two same-length byte buffers, treating a shorter `previous` as zero-padded. */
+function xorBytes(absolute: Uint8Array, previous: Uint8Array): Uint8Array {
+   const absoluteBuf = Buffer.from(absolute);
+   const previousBuf = Buffer.from(previous);
+   const out: number[] = [];
+   for (let i = 0; i < absoluteBuf.length; i++) {
+      const previousByte = i < previousBuf.length ? previousBuf.readUInt8(i) : 0;
+      out.push(absoluteBuf.readUInt8(i) ^ previousByte);
+   }
+   return Uint8Array.from(out);
+}
+
+/** Builds an EC_TAG_PARTFILE_GAP_STATUS/_REQ_STATUS tag by RLE-encoding `ranges` as a diff against `previousAbsolute` - pass undefined to simulate a just-reset encoder (see PartFileStatus.ts's class doc). */
+function byteRangeStatusTag(
+   tagName: ec.ECTagNames,
+   ranges: readonly { start: bigint; end: bigint }[],
+   previousAbsolute?: readonly bigint[],
+): ec.ECTag {
+   const values = ranges.flatMap((r) => [r.start, r.end]);
+   const absolute = uint64sToColumnMajorBytes(values);
+   const previous = previousAbsolute ? uint64sToColumnMajorBytes(previousAbsolute) : new Uint8Array(0);
+   return new ec.ECCustomTag(tagName, rleEncode(xorBytes(absolute, previous)));
+}
+
+/** Builds an EC_TAG_PARTFILE_PART_STATUS tag by RLE-encoding `counts` (each truncated to a byte) as a diff against `previousAbsolute`. */
+function partStatusTag(counts: readonly number[], previousAbsolute?: readonly number[]): ec.ECTag {
+   const absolute = Uint8Array.from(counts.map((c) => Math.min(c, 0xff)));
+   const previous = previousAbsolute ? Uint8Array.from(previousAbsolute.map((c) => Math.min(c, 0xff))) : new Uint8Array(0);
+   return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_PART_STATUS, rleEncode(xorBytes(absolute, previous)));
+}
+
 describe("DownloadFile.sourceNames", () => {
    it("decodes full entries (id -> name/count) from a single response", () => {
       const file = ec.DownloadFile.fromTag(
@@ -379,6 +444,126 @@ describe("source-names per-connection cache (PartFileSourceNames.ts)", () => {
 
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(tracker.files[0]?.sourceNames).to.be.undefined;
+   });
+});
+
+describe("gap/req/part status per-connection cache (PartFileStatus.ts)", () => {
+   it("decodes gaps/requestedRanges/partAvailability from a single Downloads.fetch() response", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      reply.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, [{ start: 0n, end: 100n }]),
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_REQ_STATUS, [{ start: 500n, end: 600n }]),
+            partStatusTag([3, 7, 0, 255]),
+         ]),
+      );
+      fake.queueReply(reply);
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.gaps).to.deep.equal([{ start: 0n, end: 100n }]);
+      expect(downloads.files[0]?.requestedRanges).to.deep.equal([{ start: 500n, end: 600n }]);
+      expect(downloads.files[0]?.partAvailability).to.deep.equal([3, 7, 0, 255]);
+   });
+
+   it("Downloads.fetch() (resetsEncoder) replaces stale gaps rather than XOR-ing onto them", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+
+      const first = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      first.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, [{ start: 0n, end: 100n }]),
+         ]),
+      );
+      fake.queueReply(first);
+      await downloads.fetch();
+      expect(downloads.files[0]?.gaps).to.deep.equal([{ start: 0n, end: 100n }]);
+
+      // The daemon resets its encoder before every EC_DETAIL_CMD encode (see class doc), so this
+      // second response's bytes are the new absolute value, not a diff against the first response.
+      const second = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      second.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, [{ start: 200n, end: 300n }]),
+         ]),
+      );
+      fake.queueReply(second);
+      await downloads.fetch();
+
+      expect(downloads.files[0]?.gaps).to.deep.equal([{ start: 200n, end: 300n }]);
+   });
+
+   it("accumulates a true incremental diff when resetsEncoder is false (the Update.fetch() path)", () => {
+      const fake = createFakeConnection();
+
+      const initialGaps = [
+         { start: 0n, end: 100n },
+         { start: 500n, end: 600n },
+      ];
+      const first = ec.DownloadFile.fromTag(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, initialGaps),
+         ]),
+         fake.connection,
+         false,
+      );
+      expect(first.gaps).to.deep.equal(initialGaps);
+
+      // A later push reports only what changed - the first gap closed, the second grew - as a true
+      // XOR diff against the previously-decoded absolute value.
+      const updatedGaps = [{ start: 500n, end: 700n }];
+      const second = ec.DownloadFile.fromTag(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(
+               ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS,
+               updatedGaps,
+               initialGaps.flatMap((r) => [r.start, r.end]),
+            ),
+         ]),
+         fake.connection,
+         false,
+      );
+
+      expect(second.gaps).to.deep.equal(updatedGaps);
+   });
+
+   it("DownloadTracker.seed() forgets a dropped file's gap state too, so a later ecid reuse via an incremental (non-reset) update starts clean", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const tracker = new ec.DownloadTracker(fake.connection);
+
+      const first = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
+      first.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, [{ start: 0n, end: 100n }]),
+         ]),
+      );
+      fake.queueReply(first);
+      await downloads.fetch();
+      tracker.seed(downloads);
+      expect(tracker.files[0]?.gaps).to.deep.equal([{ start: 0n, end: 100n }]);
+
+      // The file completes/is cancelled: it's gone from the next fetch() entirely.
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE));
+      await downloads.fetch();
+      tracker.seed(downloads);
+
+      // The daemon recycles ecid 1 for an unrelated new download. This time it's observed through
+      // a non-reset (Update.fetch()-style) path that only ever sends deltas - if the old file's
+      // gap state hadn't been forgotten, this bare single-byte gap would get XORed onto it instead
+      // of being read as the absolute (and tiny) value it actually is.
+      const reused = ec.DownloadFile.fromTag(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [
+            byteRangeStatusTag(ec.ECTagNames.EC_TAG_PARTFILE_GAP_STATUS, [{ start: 1n, end: 2n }]),
+         ]),
+         fake.connection,
+         false,
+      );
+
+      expect(reused.gaps).to.deep.equal([{ start: 1n, end: 2n }]);
    });
 });
 
