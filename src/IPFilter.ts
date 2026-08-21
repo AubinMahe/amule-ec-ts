@@ -7,7 +7,9 @@ import { ECStringTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:ipfilter");
 
-/** Reload/update of the daemon's IP filter - EC_OP_IPFILTER_RELOAD, EC_OP_IPFILTER_UPDATE. */
+/**
+ * Reload/update of the daemon's IP filter - EC_OP_IPFILTER_RELOAD, EC_OP_IPFILTER_UPDATE.
+ */
 export class IPFilter {
    public constructor(public readonly connection: ECConnection) {}
 

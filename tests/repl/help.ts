@@ -16,7 +16,9 @@ export const SERVER_PRIORITY_NAMES: Record<string, ec.ServerPriority> = {
    low: ec.ServerPriority.SRV_PR_LOW,
 };
 
-/** One row per command: keyword(s)/arguments, then a short description - see HELP below. */
+/**
+ * One row per command: keyword(s)/arguments, then a short description - see HELP below.
+ */
 const HELP_ENTRIES: readonly (readonly [command: string, description: string])[] = [
    ["help", "show this help"],
    ["info", "negotiated capabilities"],

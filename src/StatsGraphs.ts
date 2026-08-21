@@ -7,7 +7,10 @@ import { ECUInt16Tag, ECDoubleTag, ECCustomTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:statsgraphs");
 
-/** Decodes a big-endian uint32 array from a raw byte blob (EC_TAG_STATSGRAPH_DATA/_DATA_CONN's own data). */
+/**
+ * Decodes a big-endian uint32 array from a raw byte blob (EC_TAG_STATSGRAPH_DATA/_DATA_CONN's own
+ * data).
+ */
 function readUInt32ArrayBE(bytes: Uint8Array): readonly bigint[] {
    const buffer = Buffer.from(bytes);
    const count = Math.floor(buffer.length / 4);
@@ -54,13 +57,20 @@ export class StatsGraphPoint {
  */
 export class StatsGraphs {
    public points: readonly StatsGraphPoint[] = [];
-   /** Total bytes downloaded/uploaded this session, as of the last point in `points`. */
+   /**
+    * Total bytes downloaded/uploaded this session, as of the last point in `points`.
+    */
    public sessionDownloaded: bigint | undefined;
    public sessionUploaded: bigint | undefined;
    public sessionKadNodes: bigint | undefined;
-   /** Session length in seconds, as of the last point in `points`. */
+   /**
+    * Session length in seconds, as of the last point in `points`.
+    */
    public sessionTimespan: number | undefined;
-   /** Newest point's timestamp - feed this into the next fetch()'s `last` argument to poll incrementally. */
+   /**
+    * Newest point's timestamp - feed this into the next fetch()'s `last` argument to poll
+    * incrementally.
+    */
    public last: number | undefined;
    /**
     * How many points the daemon can actually answer for the scale used in

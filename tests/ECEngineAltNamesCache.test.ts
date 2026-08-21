@@ -6,7 +6,10 @@ import * as ec from "../src/index.js";
 import { startFakeEcServer, computeSaltedHash, type FakeEcServer, type FakeEcPeer } from "./fakeEcServer.js";
 import { hexHash } from "./testUtils.js";
 
-/** Builds an EC_TAG_PARTFILE_SOURCE_NAMES container, as parseSourceNames() reads it (see Downloads.ts's doc). */
+/**
+ * Builds an EC_TAG_PARTFILE_SOURCE_NAMES container, as parseSourceNames() reads it (see
+ * Downloads.ts's doc).
+ */
 function sourceNamesTag(entries: readonly { id: number; name: string; count: number }[]): ec.ECTag {
    const children = entries.map(
       (entry) =>
@@ -18,7 +21,10 @@ function sourceNamesTag(entries: readonly { id: number; name: string; count: num
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, new Uint8Array(), children);
 }
 
-/** A full-detail EC_TAG_PARTFILE entry (own data: ecid), as Downloads.fetch()/a fresh-file notification carry it. */
+/**
+ * A full-detail EC_TAG_PARTFILE entry (own data: ecid), as Downloads.fetch()/a fresh-file
+ * notification carry it.
+ */
 function partFileTag(fields: {
    ecid: number;
    hash: string;

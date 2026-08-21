@@ -2,7 +2,10 @@ import * as ec from "../../../src/index.js";
 import { PRIORITY_NAMES } from "../help.js";
 import { printSharedFiles } from "../views/sharedFiles.js";
 
-/** Shared-file commands (verify/comment/kadnotes/sharedprio/shareddir), plus "show shared" - all operate on ec.SharedFiles alone. */
+/**
+ * Shared-file commands (verify/comment/kadnotes/sharedprio/shareddir), plus "show shared" - all
+ * operate on ec.SharedFiles alone.
+ */
 export class SharedFilesController {
    public constructor(
       private readonly sharedFiles: ec.SharedFiles,
@@ -76,7 +79,10 @@ export class SharedFilesController {
       }
    }
 
-   /** Reports any rejections from setSharedDirs() - see SharedFiles.setSharedDirs()'s doc on why this isn't all-or-nothing. */
+   /**
+    * Reports any rejections from setSharedDirs() - see SharedFiles.setSharedDirs()'s doc on why
+    * this isn't all-or-nothing.
+    */
    private reportSharedDirRejections(rejections: readonly ec.SharedDirRejection[]): void {
       for (const rejection of rejections) {
          const reasonText = rejection.reason === ec.SharedDirRejectReason.UNREADABLE ? "unreadable" : "missing or not a directory";

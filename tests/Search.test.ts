@@ -2,7 +2,10 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
-/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+/**
+ * Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it -
+ * children evaluated by index, 4 per entry.
+ */
 function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {

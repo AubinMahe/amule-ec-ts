@@ -4,7 +4,10 @@ import { debuglog } from "node:util";
 
 const debug = debuglog("amule-ec:alt-names-cache");
 
-/** One cache entry: the alternate names known for a file, and when they were last touched - purgeOlderThan() (see init()) ages entries out by this timestamp. */
+/**
+ * One cache entry: the alternate names known for a file, and when they were last touched -
+ * purgeOlderThan() (see init()) ages entries out by this timestamp.
+ */
 interface CacheEntry {
    names: string[];
    lastUpdated: string;
@@ -27,8 +30,8 @@ type CacheFile = Record<string, CacheEntry>;
  * Every mutation is serialized on `writeChain` - concurrent add()/remove() calls (e.g. several
  * files crossing the population threshold within the same Downloads.fetch() batch) would otherwise
  * race on the same JSON file, each read-modify-write cycle risking clobbering another's update. A
- * rejected write doesn't wedge the chain: `run` is what the caller of THIS call awaits, `writeChain`
- * is bookkeeping only and always resolved, so the next queued mutation still runs.
+ * rejected write doesn't wedge the chain: `run` is what the caller of THIS call awaits,
+ * `writeChain` is bookkeeping only and always resolved, so the next queued mutation still runs.
  */
 export class AlternateNamesCache {
    private content = new Map<string, CacheEntry>();
@@ -115,7 +118,10 @@ export class AlternateNamesCache {
       return this.content.get(name)?.names ?? [];
    }
 
-   /** Drops `name`'s entry entirely - call once its file is moved out or deleted. A no-op, including no write, if `name` isn't cached. */
+   /**
+    * Drops `name`'s entry entirely - call once its file is moved out or deleted. A no-op,
+    * including no write, if `name` isn't cached.
+    */
    public async remove(name: string): Promise<void> {
       await this.mutate(async () => {
          await this.load();

@@ -19,13 +19,20 @@ const debug = debuglog("amule-ec:statstree");
  */
 export enum ECStatValueType {
    INTEGER = 0,
-   /** Formatted with a `stShowPercent`-style suffix on some counters - still a plain integer underneath. */
+   /**
+    * Formatted with a `stShowPercent`-style suffix on some counters - still a plain integer
+    * underneath.
+    */
    ISTRING = 1,
    BYTES = 2,
    ISHORT = 3,
-   /** Seconds, meant to be displayed as hours:minutes. */
+   /**
+    * Seconds, meant to be displayed as hours:minutes.
+    */
    TIME = 4,
-   /** Bytes/second. */
+   /**
+    * Bytes/second.
+    */
    SPEED = 5,
    STRING = 6,
    DOUBLE = 7,
@@ -50,7 +57,11 @@ export class StatValue {
    public readonly intValue: bigint | undefined;
    public readonly doubleValue: number | undefined;
    public readonly stringValue: string | undefined;
-   /** Locale-independent sentinel token (`"not_available"`, `"never"`) - `EC_TAG_STAT_VALUE_ENUM`, present instead of a meaningful value on `CStatTreeItemRatio`/`CStatTreeItemMaxConnLimitReached`'s edge cases. */
+   /**
+    * Locale-independent sentinel token (`"not_available"`, `"never"`) - `EC_TAG_STAT_VALUE_ENUM`,
+    * present instead of a meaningful value on
+    * `CStatTreeItemRatio`/`CStatTreeItemMaxConnLimitReached`'s edge cases.
+    */
    public readonly enumToken: string | undefined;
    public readonly companion: StatValue | undefined;
 

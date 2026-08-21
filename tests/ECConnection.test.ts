@@ -11,7 +11,10 @@ async function connectPeer(server: FakeEcServer): Promise<{ connection: ec.ECCon
    return { connection, peer };
 }
 
-/** Drives the server's side of one successful 3-step handshake; returns the parsed AUTH_REQ for inspection. */
+/**
+ * Drives the server's side of one successful 3-step handshake; returns the parsed AUTH_REQ for
+ * inspection.
+ */
 async function acceptAuthentication(peer: FakeEcPeer): Promise<ec.ECPacket> {
    const authRequest = await peer.readPacket();
    peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)));

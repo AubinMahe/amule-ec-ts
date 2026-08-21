@@ -1,6 +1,9 @@
 import * as ec from "../../../src/index.js";
 
-/** Download-category CRUD (EC_OP_CREATE/UPDATE/DELETE_CATEGORY) - listing lives on PreferencesController since there's no GET_CATEGORIES opcode. */
+/**
+ * Download-category CRUD (EC_OP_CREATE/UPDATE/DELETE_CATEGORY) - listing lives on
+ * PreferencesController since there's no GET_CATEGORIES opcode.
+ */
 export class CategoriesController {
    public constructor(private readonly categories: ec.Categories) {}
 

@@ -62,7 +62,9 @@ export async function expectRejection(promise: Promise<unknown>, matcher: RegExp
    expect.fail("Expected the promise to reject, but it resolved.");
 }
 
-/** Builds a hex string of the given length (default 32, an MD4 hash) repeating `fill`. */
+/**
+ * Builds a hex string of the given length (default 32, an MD4 hash) repeating `fill`.
+ */
 export function hexHash(fill: string): string {
    return fill.repeat(32).slice(0, 32);
 }

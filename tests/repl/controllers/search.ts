@@ -4,7 +4,10 @@ import { printKnownSearches, printSearchResults } from "../views/search.js";
 
 const SEARCH_POLL_INTERVAL_MS = 250;
 
-/** search/search stop/search more, plus download (of search results) - owns the current search session. */
+/**
+ * search/search stop/search more, plus download (of search results) - owns the current search
+ * session.
+ */
 export class SearchController {
    private currentSearch?: ec.SearchSession;
 
@@ -18,7 +21,10 @@ export class SearchController {
       console.log(`More results requested${suffix}.`);
    }
 
-   /** Starts a search, polls it to completion, then prints the results - mirrors amulecmd's own search/progress/results/download command sequence. */
+   /**
+    * Starts a search, polls it to completion, then prints the results - mirrors amulecmd's own
+    * search/progress/results/download command sequence.
+    */
    public async start(args: string[]): Promise<void> {
       if (args.length === 1 && args[0]?.toLowerCase() === "stop") {
          if (!this.currentSearch) {
@@ -53,7 +59,10 @@ export class SearchController {
       printKnownSearches(searches);
    }
 
-   /** Downloads one or more of the last search's results, identified by hash - see Search.download()'s doc. */
+   /**
+    * Downloads one or more of the last search's results, identified by hash - see
+    * Search.download()'s doc.
+    */
    public async download(hashes: string[]): Promise<void> {
       if (hashes.length === 0) {
          console.error("Usage: download <hash> [<hash> ...]");

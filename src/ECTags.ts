@@ -19,25 +19,34 @@ export abstract class ECTag {
 
    public abstract get type(): ECTagType;
 
-   /** Reads this tag's integer value, whatever its concrete subtype - undefined if it doesn't have one. */
+   /**
+    * Reads this tag's integer value, whatever its concrete subtype - undefined if it doesn't have
+    * one.
+    */
    public get intValue(): bigint | undefined {
       const value = (this as { value?: bigint }).value;
       return typeof value === "bigint" ? value : undefined;
    }
 
-   /** Reads this tag's double value (only ECDoubleTag has one) - undefined otherwise. */
+   /**
+    * Reads this tag's double value (only ECDoubleTag has one) - undefined otherwise.
+    */
    public get doubleValue(): number | undefined {
       const value = (this as { value?: unknown }).value;
       return typeof value === "number" ? value : undefined;
    }
 
-   /** Reads this tag's own string value (only ECStringTag has one) - undefined otherwise. */
+   /**
+    * Reads this tag's own string value (only ECStringTag has one) - undefined otherwise.
+    */
    public get stringValue(): string | undefined {
       const value = (this as { value?: unknown }).value;
       return typeof value === "string" ? value : undefined;
    }
 
-   /** Reads this tag's own raw bytes (ECCustomTag/ECHash16Tag) - undefined otherwise. */
+   /**
+    * Reads this tag's own raw bytes (ECCustomTag/ECHash16Tag) - undefined otherwise.
+    */
    public get bytesValue(): Uint8Array | undefined {
       const value = (this as { value?: unknown }).value;
       return value instanceof Uint8Array ? value : undefined;
@@ -456,7 +465,9 @@ function decodeUint(buffer: Buffer, offset: number, width: number, caps: ECCapab
    return { value: readBigUIntBE(Buffer.from(slice)), bytesRead: width };
 }
 
-/** Encodes a TAGNAME field: (actual_code << 1) | has_children. */
+/**
+ * Encodes a TAGNAME field: (actual_code << 1) | has_children.
+ */
 function encodeTagName(name: number, hasChildren: boolean, caps: ECCapabilities): Buffer {
    const raw = BigInt((name << 1) | (hasChildren ? 1 : 0));
    return encodeUint(raw, 2, caps);
@@ -472,7 +483,9 @@ function decodeTagName(
    return { name: raw >>> 1, hasChildren: (raw & 1) === 1, bytesRead };
 }
 
-/** Encodes a TAGLEN field (uint32 byte count). */
+/**
+ * Encodes a TAGLEN field (uint32 byte count).
+ */
 function encodeTagLen(length: number, caps: ECCapabilities): Buffer {
    return encodeUint(BigInt(length), 4, caps);
 }
@@ -553,7 +566,9 @@ export class ECTagDecoder {
       private readonly caps: ECCapabilities,
    ) {}
 
-   /** Reads a single raw byte (e.g. the packet's OPCODE) and advances past it. */
+   /**
+    * Reads a single raw byte (e.g. the packet's OPCODE) and advances past it.
+    */
    public readByte(): number {
       const byte = this.buffer[this.offset];
       if (byte === undefined) {

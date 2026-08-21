@@ -28,12 +28,18 @@ function downloadEntryTag(fields: {
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, fields.ecid, children);
 }
 
-/** A removal push notification's shape (see Downloads.ts's DownloadFile doc): own data IS the hash, no children. */
+/**
+ * A removal push notification's shape (see Downloads.ts's DownloadFile doc): own data IS the hash,
+ * no children.
+ */
 function downloadRemovalTag(hash: string): ec.ECTag {
    return new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")));
 }
 
-/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+/**
+ * Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it -
+ * children evaluated by index, 4 per entry.
+ */
 function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {
@@ -47,7 +53,10 @@ function commentsTag(entries: readonly { userName: string; fileName: string; rat
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
 }
 
-/** Builds a synthetic EC_TAG_PARTFILE tag - only the fields statusText/priorityText/partMetName read. */
+/**
+ * Builds a synthetic EC_TAG_PARTFILE tag - only the fields statusText/priorityText/partMetName
+ * read.
+ */
 function partFileTag(fields: {
    status?: number;
    prio?: number;
@@ -168,7 +177,10 @@ describe("DownloadFile comments/kadCommentSearching", () => {
    });
 });
 
-/** Builds an EC_TAG_PARTFILE_SOURCE_NAMES container, as parseSourceNames() reads it (see Downloads.ts's doc). */
+/**
+ * Builds an EC_TAG_PARTFILE_SOURCE_NAMES container, as parseSourceNames() reads it (see
+ * Downloads.ts's doc).
+ */
 function sourceNamesTag(entries: readonly { id: number; name?: string; count: number }[]): ec.ECTag {
    const children = entries.map((entry) => {
       const entryChildren: ec.ECTag[] = [];
@@ -181,7 +193,10 @@ function sourceNamesTag(entries: readonly { id: number; name?: string; count: nu
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES, new Uint8Array(), children);
 }
 
-/** RLE-encodes raw bytes exactly like RLE_Data::Encode() (RLE.cpp:191-212): a run of 2+ equal bytes (max 255) is written twice then a count byte, anything else is a single literal. */
+/**
+ * RLE-encodes raw bytes exactly like RLE_Data::Encode() (RLE.cpp:191-212): a run of 2+ equal bytes
+ * (max 255) is written twice then a count byte, anything else is a single literal.
+ */
 function rleEncode(data: Uint8Array): Uint8Array {
    const buffer = Buffer.from(data);
    const out: number[] = [];
@@ -201,7 +216,10 @@ function rleEncode(data: Uint8Array): Uint8Array {
    return Uint8Array.from(out);
 }
 
-/** Column-major-encodes a flat uint64 list exactly like RLE_Data::Encode(const ArrayOfUInts64&) (RLE.cpp:245-266). */
+/**
+ * Column-major-encodes a flat uint64 list exactly like RLE_Data::Encode(const ArrayOfUInts64&)
+ * (RLE.cpp:245-266).
+ */
 function uint64sToColumnMajorBytes(values: readonly bigint[]): Uint8Array {
    const size = values.length;
    const bytes = new Uint8Array(size * 8);
@@ -215,7 +233,9 @@ function uint64sToColumnMajorBytes(values: readonly bigint[]): Uint8Array {
    return bytes;
 }
 
-/** XORs two same-length byte buffers, treating a shorter `previous` as zero-padded. */
+/**
+ * XORs two same-length byte buffers, treating a shorter `previous` as zero-padded.
+ */
 function xorBytes(absolute: Uint8Array, previous: Uint8Array): Uint8Array {
    const absoluteBuf = Buffer.from(absolute);
    const previousBuf = Buffer.from(previous);
@@ -227,7 +247,11 @@ function xorBytes(absolute: Uint8Array, previous: Uint8Array): Uint8Array {
    return Uint8Array.from(out);
 }
 
-/** Builds an EC_TAG_PARTFILE_GAP_STATUS/_REQ_STATUS tag by RLE-encoding `ranges` as a diff against `previousAbsolute` - pass undefined to simulate a just-reset encoder (see PartFileStatus.ts's class doc). */
+/**
+ * Builds an EC_TAG_PARTFILE_GAP_STATUS/_REQ_STATUS tag by RLE-encoding `ranges` as a diff against
+ * `previousAbsolute` - pass undefined to simulate a just-reset encoder (see PartFileStatus.ts's
+ * class doc).
+ */
 function byteRangeStatusTag(
    tagName: ec.ECTagNames,
    ranges: readonly { start: bigint; end: bigint }[],
@@ -239,7 +263,10 @@ function byteRangeStatusTag(
    return new ec.ECCustomTag(tagName, rleEncode(xorBytes(absolute, previous)));
 }
 
-/** Builds an EC_TAG_PARTFILE_PART_STATUS tag by RLE-encoding `counts` (each truncated to a byte) as a diff against `previousAbsolute`. */
+/**
+ * Builds an EC_TAG_PARTFILE_PART_STATUS tag by RLE-encoding `counts` (each truncated to a byte) as
+ * a diff against `previousAbsolute`.
+ */
 function partStatusTag(counts: readonly number[], previousAbsolute?: readonly number[]): ec.ECTag {
    const absolute = Uint8Array.from(counts.map((c) => Math.min(c, 0xff)));
    const previous = previousAbsolute ? Uint8Array.from(previousAbsolute.map((c) => Math.min(c, 0xff))) : new Uint8Array(0);

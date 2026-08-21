@@ -20,7 +20,9 @@ export class NotificationActivity {
       this.statusChanged = true;
    }
 
-   /** Returns (and clears) a one-line summary of what changed, or undefined if nothing did. */
+   /**
+    * Returns (and clears) a one-line summary of what changed, or undefined if nothing did.
+    */
    public consume(): string | undefined {
       const parts: string[] = [];
 

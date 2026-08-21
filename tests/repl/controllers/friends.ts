@@ -23,7 +23,10 @@ export class FriendsController {
       console.error("Usage: friend add <ecid>  |  friend add <hash> <ip> <port> <name>");
    }
 
-   /** Browses a currently-connected client's shared files ("View Files") - polls to completion, then prints results like `search <keywords>` does. */
+   /**
+    * Browses a currently-connected client's shared files ("View Files") - polls to completion,
+    * then prints results like `search <keywords>` does.
+    */
    public async browse(args: string[]): Promise<void> {
       const ecidText = args[0];
       if (!ecidText) {

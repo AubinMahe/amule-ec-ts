@@ -9,7 +9,10 @@ export class StatusController {
       printStatus(this.status);
    }
 
-   /** Passthrough for the orchestrator's notification dispatch - see ec.Status.applyNotification()'s doc. */
+   /**
+    * Passthrough for the orchestrator's notification dispatch - see
+    * ec.Status.applyNotification()'s doc.
+    */
    public applyNotification(packet: ec.ECPacket): boolean {
       return this.status.applyNotification(packet);
    }

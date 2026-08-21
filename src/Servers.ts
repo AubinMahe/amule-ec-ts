@@ -55,22 +55,39 @@ export class ServerInfo {
    public readonly ip: string;
    public readonly port: number;
    public readonly name: string | undefined;
-   /** Round-trip latency in milliseconds, if known. */
+   /**
+    * Round-trip latency in milliseconds, if known.
+    */
    public readonly ping: bigint | undefined;
-   /** Currently connected users, if known. */
+   /**
+    * Currently connected users, if known.
+    */
    public readonly users: bigint | undefined;
-   /** Maximum user capacity, if known. */
+   /**
+    * Maximum user capacity, if known.
+    */
    public readonly usersMax: bigint | undefined;
-   /** Shared files indexed by this server, if known. */
+   /**
+    * Shared files indexed by this server, if known.
+    */
    public readonly files: bigint | undefined;
-   /** This server's own priority, if known - see Servers.setPriority() to change it. */
+   /**
+    * This server's own priority, if known - see Servers.setPriority() to change it.
+    */
    public readonly priority: ServerPriority | undefined;
-   /** Whether this server is pinned ("static"), if known - see Servers.setStatic() to change it. */
+   /**
+    * Whether this server is pinned ("static"), if known - see Servers.setStatic() to change it.
+    */
    public readonly isStatic: boolean | undefined;
-   /** Per-user shared-file publishing soft/hard limits this server advertises, 0/undefined meaning "not told us yet". */
+   /**
+    * Per-user shared-file publishing soft/hard limits this server advertises, 0/undefined meaning
+    * "not told us yet".
+    */
    public readonly filesSoft: bigint | undefined;
    public readonly filesHard: bigint | undefined;
-   /** Wire capability flag bitmasks - diagnostics, hidden by default in the reference GUI too. */
+   /**
+    * Wire capability flag bitmasks - diagnostics, hidden by default in the reference GUI too.
+    */
    public readonly tcpFlags: bigint | undefined;
    public readonly udpFlags: bigint | undefined;
 
@@ -104,7 +121,10 @@ export class ServerInfo {
       this.udpFlags = fields.udpFlags;
    }
 
-   /** "ip:port", the wire format aMule's own tools (amulecmd's "show servers") use to identify a server. */
+   /**
+    * "ip:port", the wire format aMule's own tools (amulecmd's "show servers") use to identify a
+    * server.
+    */
    public get ipPort(): string {
       return `${this.ip}:${this.port}`;
    }
@@ -129,7 +149,9 @@ export class ServerInfo {
    }
 }
 
-/** The known server list, as returned by EC_OP_GET_SERVER_LIST / EC_OP_SERVER_LIST. */
+/**
+ * The known server list, as returned by EC_OP_GET_SERVER_LIST / EC_OP_SERVER_LIST.
+ */
 export class Servers implements ECFetchable {
    public servers: readonly ServerInfo[] = [];
 

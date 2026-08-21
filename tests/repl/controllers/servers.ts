@@ -2,7 +2,10 @@ import * as ec from "../../../src/index.js";
 import { SERVER_PRIORITY_NAMES } from "../help.js";
 import { printServers } from "../views/servers.js";
 
-/** server disconnect/priority/remove/add/update, plus "show servers" - all operate on ec.Servers alone. */
+/**
+ * server disconnect/priority/remove/add/update, plus "show servers" - all operate on ec.Servers
+ * alone.
+ */
 export class ServersController {
    public constructor(private readonly servers: ec.Servers) {}
 
@@ -25,8 +28,8 @@ export class ServersController {
          return;
       }
       // setStatic()/setPriority() are two separate wire calls (mirroring amule-remote-gui.cpp's own
-      // SetStaticServer()/SetServerPrio(), never combined) - this command accepts both tokens on one
-      // line purely for REPL convenience, issuing one call per token actually given.
+      // SetStaticServer()/SetServerPrio(), never combined) - this command accepts both tokens on
+      // one line purely for REPL convenience, issuing one call per token actually given.
       const ecid = BigInt(ecidText);
       if (options.static !== undefined) await this.servers.setStatic(ecid, options.static);
       if (options.prio !== undefined) await this.servers.setPriority(ecid, options.prio);

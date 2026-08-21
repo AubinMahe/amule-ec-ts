@@ -82,7 +82,10 @@ export class Repl {
       });
    }
 
-   /** Functional: applies the notification to the relevant tracker. Returns nothing - see NotificationActivity for the presentation side. */
+   /**
+    * Functional: applies the notification to the relevant tracker. Returns nothing - see
+    * NotificationActivity for the presentation side.
+    */
    private applyNotification(packet: ec.ECPacket): void {
       if (this.downloadTracker.apply(packet)) {
          this.activity.noteDownloadUpdate();
@@ -104,7 +107,10 @@ export class Repl {
       }
    }
 
-   /** Verbs that take a variable argument list, dispatched by lookup rather than a long if-chain (keeps runCommand()'s complexity down). */
+   /**
+    * Verbs that take a variable argument list, dispatched by lookup rather than a long if-chain
+    * (keeps runCommand()'s complexity down).
+    */
    private readonly verbHandlers: Record<string, (args: string[]) => Promise<void>> = {
       search: (args) => this.searchController.start(args),
       connect: (args) => this.networkController.connect(args),

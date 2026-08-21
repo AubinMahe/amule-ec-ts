@@ -16,7 +16,7 @@ npm run lint                     # tsc --noEmit + eslint, must pass before openi
 npm run build                    # emits dist/ (JS + .d.ts)
 npm run test          # mocha
 npm run test:coverage # mocha + v8 coverage report
-npm run format                   # prettier --write on src/ and tests/
+npm run lint:ts-fix              # prettier --write on src/ and tests/
 ```
 
 `npm run repl` starts an interactive REPL (`tests/repl/main.ts`) against a real local `amuled`, reading `~/.aMule/amule.conf`
@@ -37,7 +37,7 @@ description which C++ source file(s) you checked.
 
 ## Code style
 
-Formatting is enforced by `.editorconfig` and `.prettierrc` (3-space indent, double quotes, semicolons) - run `npm run format`
+Formatting is enforced by `.editorconfig` and `.prettierrc` (3-space indent, double quotes, semicolons) - run `npm run lint:ts-fix`
 rather than hand-formatting. Lint rules (`eslint.config.js`) are type-aware; `npm run lint` must be clean.
 
 ## Reporting bugs

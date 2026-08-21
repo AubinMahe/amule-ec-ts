@@ -7,7 +7,10 @@ import { ECStringTag, ECUInt16Tag, ECUInt32Tag, packIPv4ToUint32 } from "./ECTag
 
 const debug = debuglog("amule-ec:kad");
 
-/** Every EC_TAG_STRING tag's value from a reply, in order - CONNECT/DISCONNECT's per-network status messages. */
+/**
+ * Every EC_TAG_STRING tag's value from a reply, in order - CONNECT/DISCONNECT's per-network status
+ * messages.
+ */
 function stringTagValues(reply: ECPacket): readonly string[] {
    return reply.tags
       .filter((tag) => {

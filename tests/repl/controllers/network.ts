@@ -13,7 +13,10 @@ export class NetworkController {
       private readonly servers: ec.Servers,
    ) {}
 
-   /** Bare "connect" is Kad.connect() (ed2k/Kad per daemon prefs); "connect <ip:port>" is Servers.connect(). */
+   /**
+    * Bare "connect" is Kad.connect() (ed2k/Kad per daemon prefs); "connect <ip:port>" is
+    * Servers.connect().
+    */
    public async connect(args: string[]): Promise<void> {
       const ipPort = args[0];
       if (!ipPort) {

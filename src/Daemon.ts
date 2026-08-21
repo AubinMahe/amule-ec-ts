@@ -7,7 +7,10 @@ import { ECStringTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:daemon");
 
-/** Daemon-wide commands that don't belong to any single resource (ed2k/Kad networks, downloads, ...). */
+/**
+ * Daemon-wide commands that don't belong to any single resource (ed2k/Kad networks, downloads,
+ * ...).
+ */
 export class Daemon {
    public constructor(public readonly connection: ECConnection) {}
 

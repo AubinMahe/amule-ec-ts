@@ -8,12 +8,18 @@
  * https://github.com/amule-org/amule/blob/master/src/libs/ec/cpp/ECCodes.h#L550-L557.
  */
 export enum ECDetailLevel {
-   /** Lightest level, intended for periodic command-line polling. */
+   /**
+    * Lightest level, intended for periodic command-line polling.
+    */
    EC_DETAIL_CMD = 0,
    EC_DETAIL_WEB = 1,
    EC_DETAIL_FULL = 2,
-   /** Legacy "absence implies deletion" polling level used by amuleweb. */
+   /**
+    * Legacy "absence implies deletion" polling level used by amuleweb.
+    */
    EC_DETAIL_UPDATE = 3,
-   /** Partial incremental-update mode (requires EC_TAG_CAN_PARTIAL_UPDATE). */
+   /**
+    * Partial incremental-update mode (requires EC_TAG_CAN_PARTIAL_UPDATE).
+    */
    EC_DETAIL_INC_UPDATE = 4,
 }

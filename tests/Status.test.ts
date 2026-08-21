@@ -11,7 +11,9 @@ function statsReply(): ec.ECPacket {
    return packet;
 }
 
-/** bitmask: 0x01 ed2k connected, 0x10 kad running. */
+/**
+ * bitmask: 0x01 ed2k connected, 0x10 kad running.
+ */
 function connStateTag(options: {
    bitmask: number;
    ed2kId?: number;

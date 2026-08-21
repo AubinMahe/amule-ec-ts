@@ -12,7 +12,10 @@ const RECONNECT_INITIAL_DELAY_MS = 2_000;
 
 const RECONNECT_MAX_DELAY_MS = 30_000;
 
-/** How long an AlternateNamesCache entry survives without being touched again - see ECEngineStartOptions.altNamesCachePath and AlternateNamesCache.init(). */
+/**
+ * How long an AlternateNamesCache entry survives without being touched again - see
+ * ECEngineStartOptions.altNamesCachePath and AlternateNamesCache.init().
+ */
 const ALT_NAMES_CACHE_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1_000;
 
 let instance: ECConnection | undefined;
