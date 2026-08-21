@@ -8,7 +8,9 @@ import { ECStringTag, ECCustomTag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:log");
 
-/** The daemon's accumulated log, as returned by EC_OP_GET_LOG / EC_OP_LOG. */
+/**
+ * The daemon's accumulated log, as returned by EC_OP_GET_LOG / EC_OP_LOG.
+ */
 export class Log implements ECFetchable {
    public lines: readonly string[] = [];
 
@@ -115,7 +117,10 @@ export class Log implements ECFetchable {
    }
 }
 
-/** The daemon's accumulated debug log, as returned by EC_OP_GET_DEBUGLOG / EC_OP_DEBUGLOG - structurally identical to Log. */
+/**
+ * The daemon's accumulated debug log, as returned by EC_OP_GET_DEBUGLOG / EC_OP_DEBUGLOG -
+ * structurally identical to Log.
+ */
 export class DebugLog implements ECFetchable {
    public lines: readonly string[] = [];
 

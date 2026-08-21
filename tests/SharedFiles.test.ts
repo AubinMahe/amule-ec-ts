@@ -2,7 +2,10 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
-/** Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it - children evaluated by index, 4 per entry. */
+/**
+ * Builds a synthetic EC_TAG_PARTFILE_COMMENTS container, as parseFileComments() reads it -
+ * children evaluated by index, 4 per entry.
+ */
 function commentsTag(entries: readonly { userName: string; fileName: string; rating: number; comment: string }[]): ec.ECTag {
    const children: ec.ECTag[] = [];
    for (const entry of entries) {
@@ -16,7 +19,9 @@ function commentsTag(entries: readonly { userName: string; fileName: string; rat
    return new ec.ECCustomTag(ec.ECTagNames.EC_TAG_PARTFILE_COMMENTS, new Uint8Array(), children);
 }
 
-/** Builds a synthetic EC_TAG_KNOWNFILE tag, as SharedFile.fromTag() reads it. */
+/**
+ * Builds a synthetic EC_TAG_KNOWNFILE tag, as SharedFile.fromTag() reads it.
+ */
 function sharedFileTag(fields: {
    ecid: number;
    hash: string;
@@ -39,7 +44,10 @@ function sharedFileTag(fields: {
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, fields.ecid, children);
 }
 
-/** A removal push notification's shape: own data IS the hash, tag name is EC_TAG_PARTFILE (see SharedFile's class doc). */
+/**
+ * A removal push notification's shape: own data IS the hash, tag name is EC_TAG_PARTFILE (see
+ * SharedFile's class doc).
+ */
 function sharedFileRemovalTag(hash: string): ec.ECTag {
    return new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")));
 }

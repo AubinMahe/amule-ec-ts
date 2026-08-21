@@ -16,7 +16,10 @@ export type { ByteRange } from "./PartFileStatus.js";
 
 const debug = debuglog("amule-ec:downloads");
 
-/** Progress (percent) past which a download's reported source names are worth persisting to ECEngine's alt-names cache - see cacheAltNamesIfEligible()'s doc. */
+/**
+ * Progress (percent) past which a download's reported source names are worth persisting to
+ * ECEngine's alt-names cache - see cacheAltNamesIfEligible()'s doc.
+ */
 const ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT = 75;
 
 /**
@@ -28,7 +31,10 @@ function isEligibleForAltNamesCache(file: DownloadFile): boolean {
    return file.sizeDone * 100n >= BigInt(ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT) * file.sizeFull;
 }
 
-/** `sourceNames`' distinct reported names, `file.name` itself excluded - see DownloadFile's class doc for what an absent SourceName.name means (nothing to add here). */
+/**
+ * `sourceNames`' distinct reported names, `file.name` itself excluded - see DownloadFile's class
+ * doc for what an absent SourceName.name means (nothing to add here).
+ */
 function altNamesOf(file: DownloadFile): string[] {
    const names = new Set<string>();
    for (const entry of file.sourceNames?.values() ?? []) {
@@ -127,26 +133,26 @@ export enum ECDownloadPriority {
  * no ECID at all.
  *
  * `sourceNames` (a fellow download's peers reporting the same file under different filenames) has
- * its own, stricter partiality: EC_TAG_PARTFILE_SOURCE_NAMES is delta-encoded *per EC connection* -
- * confirmed against ExternalConn.cpp:3293-3349 (`CPartFile_Encoder::Encode`) and two reference
+ * its own, stricter partiality: EC_TAG_PARTFILE_SOURCE_NAMES is delta-encoded *per EC connection*
+ * - confirmed against ExternalConn.cpp:3293-3349 (`CPartFile_Encoder::Encode`) and two reference
  * client decoders, amule-remote-gui.cpp:3026-3042 and webapi/Refresher.cpp:570-592. The daemon
  * assigns a stable id per distinct name and, on each response, sends only what changed since its
  * last response on this same connection: a new id carries its name; a bare count change on an
  * already-known id omits the name (SourceName.name is then undefined - not "no name", but "unknown
  * here, keep whatever you already had"); a count of 0n means "forget this id" (SourceName.count of
- * 0n never represents a real, currently-valid entry). Unlike the fields above, a fresh EC_DETAIL_CMD
- * request does *not* reset this tracking - CPartFile_Encoder::ResetEncoder() (ExternalConn.cpp:3359-
- * 3363) resets gap/req status but never touches m_sourcenameItemMap - so a fetch() result's
- * `sourceNames` is *not* guaranteed self-contained the way every other field is: a repeated fetch(),
- * or a fetch() on a connection another service (e.g. SharedFiles) has already polled this same file
- * on, can legitimately come back without a name the daemon already told this connection once. That
- * gap is closed automatically: `fromTag()`/`parseNotification()` fold every delta they see into a
- * per-connection cache (see PartFileSourceNames.ts's resolveSourceNames()) keyed by ecid, so
- * `sourceNames` always reflects everything this connection has ever been told, not just what the
- * current response happened to carry - the caller doesn't need to know any of this. The one thing
- * that cache can't do anything about is a name never having reached this connection *at all* yet
- * (nothing changed since the connection opened) - in that case there is nothing to accumulate until
- * an actual change occurs, from a fetch() or a push notification.
+ * 0n never represents a real, currently-valid entry). Unlike the fields above, a fresh
+ * EC_DETAIL_CMD request does *not* reset this tracking - CPartFile_Encoder::ResetEncoder()
+ * (ExternalConn.cpp:3359- 3363) resets gap/req status but never touches m_sourcenameItemMap - so a
+ * fetch() result's `sourceNames` is *not* guaranteed self-contained the way every other field is:
+ * a repeated fetch(), or a fetch() on a connection another service (e.g. SharedFiles) has already
+ * polled this same file on, can legitimately come back without a name the daemon already told this
+ * connection once. That gap is closed automatically: `fromTag()`/`parseNotification()` fold every
+ * delta they see into a per-connection cache (see PartFileSourceNames.ts's resolveSourceNames())
+ * keyed by ecid, so `sourceNames` always reflects everything this connection has ever been told,
+ * not just what the current response happened to carry - the caller doesn't need to know any of
+ * this. The one thing that cache can't do anything about is a name never having reached this
+ * connection *at all* yet (nothing changed since the connection opened) - in that case there is
+ * nothing to accumulate until an actual change occurs, from a fetch() or a push notification.
  *
  * `gaps`/`requestedRanges`/`partAvailability` are also RLE/XOR delta-encoded per EC connection -
  * confirmed against RLE.h/RLE.cpp and CPartFile_Encoder::Encode() (ExternalConn.cpp:3247-3302) -
@@ -167,9 +173,14 @@ export class DownloadFile {
    public readonly sources: bigint | undefined;
    public readonly status: bigint | undefined;
    public readonly prio: bigint | undefined;
-   /** True for a removal push notification (see class doc) - every other field is then unavailable. */
+   /**
+    * True for a removal push notification (see class doc) - every other field is then unavailable.
+    */
    public readonly removed: boolean;
-   /** The file's internal ECID - present on every shape except a removal notification (see class doc). */
+   /**
+    * The file's internal ECID - present on every shape except a removal notification (see class
+    * doc).
+    */
    public readonly ecid: bigint | undefined;
    /**
     * The number part of the "NNN.part.met" temp filename - `EC_TAG_PARTFILE_PARTMETID`
@@ -177,15 +188,24 @@ export class DownloadFile {
     * EC_DETAIL_UPDATE push (added after that early-return, same as hash/name).
     */
    public readonly partMetId: bigint | undefined;
-   /** `EC_TAG_PARTFILE_STOPPED` (`file->IsStopped()`, ECSpecialCoreTags.cpp:175). */
+   /**
+    * `EC_TAG_PARTFILE_STOPPED` (`file->IsStopped()`, ECSpecialCoreTags.cpp:175).
+    */
    public readonly stopped: boolean;
-   /** Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER` (ECSpecialCoreTags.cpp:179),
-    * used by statusText to tell "Downloading" from "Waiting".
+   /**
+    * Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER`
+    * (ECSpecialCoreTags.cpp:179), used by statusText to tell "Downloading" from "Waiting".
     */
    public readonly sourcesXfer: bigint | undefined;
-   /** Community ratings/comments (own source comments + Kad NOTES) - see FileComment/parseFileComments' doc. */
+   /**
+    * Community ratings/comments (own source comments + Kad NOTES) - see
+    * FileComment/parseFileComments' doc.
+    */
    public readonly comments: readonly FileComment[] | undefined;
-   /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   /**
+    * Whether a searchKadNotes() lookup is currently in flight for this file -
+    * EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING.
+    */
    public readonly kadCommentSearching: boolean | undefined;
    /**
     * The on-disk directory - `EC_TAG_KNOWNFILE_PATH`, confirmed against
@@ -195,29 +215,35 @@ export class DownloadFile {
     * same-named files downloaded to different directories.
     */
    public readonly path: string | undefined;
-   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   /**
+    * Probed audio/video metadata, if any - see MediaMetadata's doc.
+    */
    public readonly media: MediaMetadata | undefined;
-   /** Alternate filenames this download's sources have reported, id -> {name, count} - see class doc for the delta protocol this reflects and why DownloadTracker matters here. */
+   /**
+    * Alternate filenames this download's sources have reported, id -> {name, count} - see class
+    * doc for the delta protocol this reflects and why DownloadTracker matters here.
+    */
    public readonly sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
    /**
     * The file's missing byte ranges - `EC_TAG_PARTFILE_GAP_STATUS` (`file->GetGapList()`,
-    * ExternalConn.cpp:3257/3263-3264). Undefined once nothing is missing (a download nearing completion
-    * can legitimately have zero gaps - see class doc) as well as when nothing is known yet. A
-    * player needing a contiguous lead-in to preview - not just an overall percentage - can check
-    * whether any range here starts before the byte offset it needs.
+    * ExternalConn.cpp:3257/3263-3264). Undefined once nothing is missing (a download nearing
+    * completion can legitimately have zero gaps - see class doc) as well as when nothing is known
+    * yet. A player needing a contiguous lead-in to preview - not just an overall percentage - can
+    * check whether any range here starts before the byte offset it needs.
     */
    public readonly gaps: readonly ByteRange[] | undefined;
    /**
     * Byte ranges currently requested from peers, i.e. actively arriving right now - distinct from
     * `gaps` (still missing) and from everything not covered by either (already on disk) -
-    * `EC_TAG_PARTFILE_REQ_STATUS` (`file->GetRequestedBlockList()`, ExternalConn.cpp:3279/3284-3285).
+    * `EC_TAG_PARTFILE_REQ_STATUS` (`file->GetRequestedBlockList()`,
+    * ExternalConn.cpp:3279/3284-3285).
     */
    public readonly requestedRanges: readonly ByteRange[] | undefined;
    /**
     * Per-part source-availability count - how many of this file's sources have each part, *not*
     * this download's own completion state (see `gaps` for that) - `EC_TAG_PARTFILE_PART_STATUS`
-    * (`m_SrcpartFrequency`, CKnownFile_Encoder::Encode(), ExternalConn.cpp:3366-3383). Each entry is
-    * capped at 255 on the wire, regardless of the real source count.
+    * (`m_SrcpartFrequency`, CKnownFile_Encoder::Encode(), ExternalConn.cpp:3366-3383). Each entry
+    * is capped at 255 on the wire, regardless of the real source count.
     */
    public readonly partAvailability: readonly number[] | undefined;
 
@@ -310,7 +336,10 @@ export class DownloadFile {
       });
    }
 
-   /** Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be partial). */
+   /**
+    * Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be
+    * partial).
+    */
    public mergedWith(update: DownloadFile): DownloadFile {
       return new DownloadFile({
          hash: update.hash ?? this.hash,
@@ -337,7 +366,9 @@ export class DownloadFile {
       });
    }
 
-   /** The temp filename this download is stored under, e.g. "012.part.met" - see partMetId's doc. */
+   /**
+    * The temp filename this download is stored under, e.g. "012.part.met" - see partMetId's doc.
+    */
    public get partMetName(): string | undefined {
       if (this.partMetId === undefined) return undefined;
       return `${this.partMetId.toString().padStart(3, "0")}.part.met`;
@@ -424,7 +455,9 @@ export class DownloadFile {
    }
 }
 
-/** The download queue, as returned by EC_OP_GET_DLOAD_QUEUE / EC_OP_DLOAD_QUEUE. */
+/**
+ * The download queue, as returned by EC_OP_GET_DLOAD_QUEUE / EC_OP_DLOAD_QUEUE.
+ */
 export class Downloads implements ECFetchable {
    public files: readonly DownloadFile[] = [];
 
@@ -445,8 +478,9 @@ export class Downloads implements ECFetchable {
     *
     * Static - doesn't need its *own* connection, a notification is parsed from a packet the
     * connection already handed us, not fetched. `connection` is still accepted, purely so
-    * `sourceNames` can be resolved against that connection's running accumulation like fromTag()'s -
-    * pass the same ECConnection the notification came from (typically DownloadTracker.apply()'s).
+    * `sourceNames` can be resolved against that connection's running accumulation like fromTag()'s
+    * - pass the same ECConnection the notification came from (typically
+    * DownloadTracker.apply()'s).
     */
    public static parseNotification(packet: ECPacket, connection?: ECConnection): DownloadFile | undefined {
       if (packet.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) return undefined;
@@ -571,19 +605,28 @@ export class Downloads implements ECFetchable {
       }
    }
 
-   /** Pauses a download, identified by its MD4 hash - EC_OP_PARTFILE_PAUSE. See sendPartFileCommand()'s doc. */
+   /**
+    * Pauses a download, identified by its MD4 hash - EC_OP_PARTFILE_PAUSE. See
+    * sendPartFileCommand()'s doc.
+    */
    public async pause(hash: string): Promise<void> {
       await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_PAUSE, hash, `Failed to pause ${hash}.`);
       debug("pause: hash=%s", hash);
    }
 
-   /** Resumes a paused download, identified by its MD4 hash - EC_OP_PARTFILE_RESUME. See sendPartFileCommand()'s doc. */
+   /**
+    * Resumes a paused download, identified by its MD4 hash - EC_OP_PARTFILE_RESUME. See
+    * sendPartFileCommand()'s doc.
+    */
    public async resume(hash: string): Promise<void> {
       await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_RESUME, hash, `Failed to resume ${hash}.`);
       debug("resume: hash=%s", hash);
    }
 
-   /** Stops a download, identified by its MD4 hash - EC_OP_PARTFILE_STOP. See sendPartFileCommand()'s doc. */
+   /**
+    * Stops a download, identified by its MD4 hash - EC_OP_PARTFILE_STOP. See
+    * sendPartFileCommand()'s doc.
+    */
    public async stop(hash: string): Promise<void> {
       await this.sendPartFileCommand(ECOpcode.EC_OP_PARTFILE_STOP, hash, `Failed to stop ${hash}.`);
       debug("stop: hash=%s", hash);

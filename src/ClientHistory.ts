@@ -27,29 +27,49 @@ const debug = debuglog("amule-ec:clienthistory");
  * metadata" than the fields' own absence.
  */
 export class ClientHistoryEntry {
-   /** The peer's ed2k user hash, hex - `EC_TAG_CLIENT`'s own data (see class doc). */
+   /**
+    * The peer's ed2k user hash, hex - `EC_TAG_CLIENT`'s own data (see class doc).
+    */
    public readonly hash: string;
    public readonly uploadTotal: bigint | undefined;
    public readonly downloadTotal: bigint | undefined;
-   /** Unix timestamp (seconds) of the last time this daemon saw this peer. */
+   /**
+    * Unix timestamp (seconds) of the last time this daemon saw this peer.
+    */
    public readonly lastSeen: bigint | undefined;
-   /** Unix timestamp (seconds) of the first time this daemon ever saw this peer - metadata trailer only. */
+   /**
+    * Unix timestamp (seconds) of the first time this daemon ever saw this peer - metadata trailer
+    * only.
+    */
    public readonly firstSeen: bigint | undefined;
-   /** How many times this daemon has seen this peer since - metadata trailer only. */
+   /**
+    * How many times this daemon has seen this peer since - metadata trailer only.
+    */
    public readonly sessions: bigint | undefined;
-   /** Last known nickname - metadata trailer only. */
+   /**
+    * Last known nickname - metadata trailer only.
+    */
    public readonly name: string | undefined;
-   /** Last known address - metadata trailer only. */
+   /**
+    * Last known address - metadata trailer only.
+    */
    public readonly userIp: string | undefined;
    public readonly userPort: bigint | undefined;
    public readonly kadPort: bigint | undefined;
-   /** Raw `EC_TAG_CLIENT_SOFTWARE` code - see `ECClientSoftware` (Uploads.ts) - metadata trailer only. */
+   /**
+    * Raw `EC_TAG_CLIENT_SOFTWARE` code - see `ECClientSoftware` (Uploads.ts) - metadata trailer
+    * only.
+    */
    public readonly software: bigint | undefined;
    public readonly softwareVersion: string | undefined;
-   /** Raw `EC_TAG_CLIENT_FROM` value - see `ECClientSourceFrom` (Update.ts) - metadata trailer only. */
+   /**
+    * Raw `EC_TAG_CLIENT_FROM` value - see `ECClientSourceFrom` (Update.ts) - metadata trailer only.
+    */
    public readonly sourceFrom: bigint | undefined;
    public readonly obfuscationStatus: bigint | undefined;
-   /** ISO country code, present only when the daemon has GeoIP enabled - metadata trailer only. */
+   /**
+    * ISO country code, present only when the daemon has GeoIP enabled - metadata trailer only.
+    */
    public readonly country: string | undefined;
 
    public constructor(tag: ECTag) {
@@ -85,7 +105,9 @@ export class ClientHistory implements ECFetchable {
 
    public constructor(public readonly connection: ECConnection) {}
 
-   /** Sends EC_OP_GET_CLIENT_HISTORY (no request tags) and replaces `entries` with the whole store. */
+   /**
+    * Sends EC_OP_GET_CLIENT_HISTORY (no request tags) and replaces `entries` with the whole store.
+    */
    public async fetch(): Promise<void> {
       if (!this.connection.remoteCapabilities.clientHistory) {
          throw new Error(

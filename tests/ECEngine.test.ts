@@ -51,7 +51,8 @@ describe("armReconnect", () => {
          setTimeout(resolve, 100);
       });
 
-      // Proves the reconnected socket is genuinely wired for both directions, not just re-authenticated.
+      // Proves the reconnected socket is genuinely wired for both directions, not just
+      // re-authenticated.
       await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
       const afterReconnect = await secondPeer.readPacket();
       expect(afterReconnect.opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);

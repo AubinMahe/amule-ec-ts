@@ -9,7 +9,9 @@ import { ECTag, ECUInt8Tag, ECUInt16Tag, ECUInt32Tag, ECUInt64Tag, ECStringTag, 
 
 const debug = debuglog("amule-ec:preferences");
 
-/** MessageFilter section of the daemon preferences - EC_TAG_PREFS_MESSAGEFILTER. */
+/**
+ * MessageFilter section of the daemon preferences - EC_TAG_PREFS_MESSAGEFILTER.
+ */
 export interface MessageFilterPrefs {
    enabled: boolean;
    filterAll: boolean;
@@ -228,11 +230,15 @@ export interface SecurityPrefs {
    ipFilterSystem: boolean;
 }
 
-/** ONLINESIG section of the daemon preferences - EC_TAG_PREFS_ONLINESIG. */
+/**
+ * ONLINESIG section of the daemon preferences - EC_TAG_PREFS_ONLINESIG.
+ */
 export interface OnlineSigPrefs {
    enabled: boolean;
    directory: string;
-   /** Seconds between refreshes - confirmed against amule.cpp's own consumer, which compares elapsed milliseconds against `GetOSUpdate() * 1000` (https://github.com/amule-org/amule/blob/master/src/amule.cpp#L2033). */
+   /**
+    * Seconds between refreshes - confirmed against amule.cpp's own consumer, which compares elapsed milliseconds against `GetOSUpdate() * 1000` (https://github.com/amule-org/amule/blob/master/src/amule.cpp#L2033).
+    */
    updateIntervalSeconds: number;
 }
 
@@ -281,7 +287,9 @@ export interface KademliaPrefs {
  */
 export interface GeneralPrefs {
    userNick: string;
-   /** Hex-encoded MD4 hash identifying this client - EC_TAG_USER_HASH. */
+   /**
+    * Hex-encoded MD4 hash identifying this client - EC_TAG_USER_HASH.
+    */
    userHash: string;
    userHost: string;
    checkNewVersion: boolean;
@@ -296,7 +304,10 @@ export interface GeneralPrefs {
  */
 export interface AmuleApiAccountPrefs {
    enabled: boolean;
-   /** GET: real hash if one happens to be readable (rare/legacy path) - almost always undefined even when a password IS configured. SET: provide to set/replace; omit to leave unchanged. */
+   /**
+    * GET: real hash if one happens to be readable (rare/legacy path) - almost always undefined
+    * even when a password IS configured. SET: provide to set/replace; omit to leave unchanged.
+    */
    passwordHash?: string;
 }
 
@@ -387,7 +398,9 @@ export interface IP2CountryPrefs {
    updateNow: boolean;
 }
 
-/** One entry of the CATEGORIES section - EC_TAG_CATEGORY. */
+/**
+ * One entry of the CATEGORIES section - EC_TAG_CATEGORY.
+ */
 export class Category {
    public constructor(
       public readonly index: number,
@@ -465,7 +478,9 @@ export class Preferences {
       }
    }
 
-   /** Fetches the MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER. */
+   /**
+    * Fetches the MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER.
+    */
    public async getMessageFilter(): Promise<MessageFilterPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.MESSAGEFILTER, ECTagNames.EC_TAG_PREFS_MESSAGEFILTER);
       if (!section) {
@@ -487,7 +502,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER. */
+   /**
+    * Replaces the whole MESSAGEFILTER section - EC_TAG_PREFS_MESSAGEFILTER.
+    */
    public async setMessageFilter(prefs: MessageFilterPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_MESSAGEFILTER, new Uint8Array(), [
@@ -505,7 +522,9 @@ export class Preferences {
       debug("setMessageFilter: applied");
    }
 
-   /** Fetches the CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
+   /**
+    * Fetches the CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS.
+    */
    public async getConnections(): Promise<ConnectionsPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.CONNECTIONS, ECTagNames.EC_TAG_PREFS_CONNECTIONS);
       if (!section) {
@@ -547,7 +566,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS. */
+   /**
+    * Replaces the whole CONNECTIONS section - EC_TAG_PREFS_CONNECTIONS.
+    */
    public async setConnections(prefs: ConnectionsPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_CONNECTIONS, new Uint8Array(), [
@@ -581,7 +602,9 @@ export class Preferences {
       debug("setConnections: applied");
    }
 
-   /** Fetches the FILES section - EC_TAG_PREFS_FILES. */
+   /**
+    * Fetches the FILES section - EC_TAG_PREFS_FILES.
+    */
    public async getFiles(): Promise<FilesPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.FILES, ECTagNames.EC_TAG_PREFS_FILES);
       if (!section) {
@@ -613,7 +636,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole FILES section - EC_TAG_PREFS_FILES. */
+   /**
+    * Replaces the whole FILES section - EC_TAG_PREFS_FILES.
+    */
    public async setFiles(prefs: FilesPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_FILES, new Uint8Array(), [
@@ -640,7 +665,9 @@ export class Preferences {
       debug("setFiles: applied");
    }
 
-   /** Fetches the DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
+   /**
+    * Fetches the DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES.
+    */
    public async getDirectories(): Promise<DirectoriesPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.DIRECTORIES, ECTagNames.EC_TAG_PREFS_DIRECTORIES);
       if (!section) {
@@ -661,7 +688,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES. */
+   /**
+    * Replaces the whole DIRECTORIES section - EC_TAG_PREFS_DIRECTORIES.
+    */
    public async setDirectories(prefs: DirectoriesPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_DIRECTORIES, new Uint8Array(), [
@@ -682,7 +711,9 @@ export class Preferences {
       debug("setDirectories: applied");
    }
 
-   /** Fetches the SECURITY section - EC_TAG_PREFS_SECURITY. */
+   /**
+    * Fetches the SECURITY section - EC_TAG_PREFS_SECURITY.
+    */
    public async getSecurity(): Promise<SecurityPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.SECURITY, ECTagNames.EC_TAG_PREFS_SECURITY);
       if (!section) {
@@ -709,7 +740,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole SECURITY section - EC_TAG_PREFS_SECURITY. */
+   /**
+    * Replaces the whole SECURITY section - EC_TAG_PREFS_SECURITY.
+    */
    public async setSecurity(prefs: SecurityPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SECURITY, new Uint8Array(), [
@@ -731,7 +764,9 @@ export class Preferences {
       debug("setSecurity: applied");
    }
 
-   /** Fetches the ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
+   /**
+    * Fetches the ONLINESIG section - EC_TAG_PREFS_ONLINESIG.
+    */
    public async getOnlineSig(): Promise<OnlineSigPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.ONLINESIG, ECTagNames.EC_TAG_PREFS_ONLINESIG);
       if (!section) {
@@ -746,7 +781,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole ONLINESIG section - EC_TAG_PREFS_ONLINESIG. */
+   /**
+    * Replaces the whole ONLINESIG section - EC_TAG_PREFS_ONLINESIG.
+    */
    public async setOnlineSig(prefs: OnlineSigPrefs): Promise<void> {
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_ONLINESIG, new Uint8Array(), [
          ...(prefs.enabled ? [new ECCustomTag(ECTagNames.EC_TAG_ONLINESIG_ENABLED, new Uint8Array())] : []),
@@ -757,7 +794,9 @@ export class Preferences {
       debug("setOnlineSig: applied");
    }
 
-   /** Fetches the SERVERS section - EC_TAG_PREFS_SERVERS. */
+   /**
+    * Fetches the SERVERS section - EC_TAG_PREFS_SERVERS.
+    */
    public async getServers(): Promise<ServersPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.SERVERS, ECTagNames.EC_TAG_PREFS_SERVERS);
       if (!section) {
@@ -781,7 +820,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole SERVERS section - EC_TAG_PREFS_SERVERS. */
+   /**
+    * Replaces the whole SERVERS section - EC_TAG_PREFS_SERVERS.
+    */
    public async setServers(prefs: ServersPrefs): Promise<void> {
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SERVERS, new Uint8Array(), [
@@ -801,7 +842,9 @@ export class Preferences {
       debug("setServers: applied");
    }
 
-   /** Fetches the KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
+   /**
+    * Fetches the KADEMLIA section - EC_TAG_PREFS_KADEMLIA.
+    */
    public async getKademlia(): Promise<KademliaPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.KADEMLIA, ECTagNames.EC_TAG_PREFS_KADEMLIA);
       if (!section) {
@@ -814,7 +857,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole KADEMLIA section - EC_TAG_PREFS_KADEMLIA. */
+   /**
+    * Replaces the whole KADEMLIA section - EC_TAG_PREFS_KADEMLIA.
+    */
    public async setKademlia(prefs: KademliaPrefs): Promise<void> {
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_KADEMLIA, new Uint8Array(), [
          new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, prefs.nodesUpdateUrl),
@@ -823,7 +868,9 @@ export class Preferences {
       debug("setKademlia: applied");
    }
 
-   /** Fetches the GENERAL section - EC_TAG_PREFS_GENERAL. */
+   /**
+    * Fetches the GENERAL section - EC_TAG_PREFS_GENERAL.
+    */
    public async getGeneral(): Promise<GeneralPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.GENERAL, ECTagNames.EC_TAG_PREFS_GENERAL);
       if (!section) {
@@ -842,7 +889,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole GENERAL section - EC_TAG_PREFS_GENERAL. */
+   /**
+    * Replaces the whole GENERAL section - EC_TAG_PREFS_GENERAL.
+    */
    public async setGeneral(prefs: GeneralPrefs): Promise<void> {
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_GENERAL, new Uint8Array(), [
          new ECStringTag(ECTagNames.EC_TAG_USER_NICK, prefs.userNick),
@@ -854,7 +903,9 @@ export class Preferences {
       debug("setGeneral: applied");
    }
 
-   /** Fetches the REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL. */
+   /**
+    * Fetches the REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL.
+    */
    public async getRemoteControls(): Promise<RemoteControlsPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.REMOTECONTROLS, ECTagNames.EC_TAG_PREFS_REMOTECTRL);
       if (!section) {
@@ -896,7 +947,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL. */
+   /**
+    * Replaces the whole REMOTECONTROLS section - EC_TAG_PREFS_REMOTECTRL.
+    */
    public async setRemoteControls(prefs: RemoteControlsPrefs): Promise<void> {
       const account = (name: number, value: AmuleApiAccountPrefs): ECTag[] => {
          if (!value.enabled) {
@@ -928,7 +981,9 @@ export class Preferences {
       debug("setRemoteControls: applied");
    }
 
-   /** Fetches the IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY. */
+   /**
+    * Fetches the IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY.
+    */
    public async getIP2Country(): Promise<IP2CountryPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.IP2COUNTRY, ECTagNames.EC_TAG_PREFS_IP2COUNTRY);
       if (!section) {
@@ -957,7 +1012,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY. */
+   /**
+    * Replaces the whole IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY.
+    */
    public async setIP2Country(prefs: IP2CountryPrefs): Promise<void> {
       const children: ECTag[] = [
          new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, prefs.enabled ? 1 : 0),
@@ -974,7 +1031,9 @@ export class Preferences {
       debug("setIP2Country: applied");
    }
 
-   /** Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
+   /**
+    * Fetches the CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS.
+    */
    public async getCoreTweaks(): Promise<CoreTweaksPrefs> {
       const section = await this.fetchSection(ECPreferencesSelection.CORETWEAKS, ECTagNames.EC_TAG_PREFS_CORETWEAKS);
       if (!section) {
@@ -995,7 +1054,9 @@ export class Preferences {
       return prefs;
    }
 
-   /** Replaces the whole CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS. */
+   /**
+    * Replaces the whole CORETWEAKS section - EC_TAG_PREFS_CORETWEAKS.
+    */
    public async setCoreTweaks(prefs: CoreTweaksPrefs): Promise<void> {
       const children: ECTag[] = [new ECUInt16Tag(ECTagNames.EC_TAG_CORETW_MAX_CONN_PER_FIVE, prefs.maxConnPerFive)];
       if (prefs.verbose) {

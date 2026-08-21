@@ -9,7 +9,9 @@ import { ECTag, ECUInt8Tag, ECIPv4Tag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:status");
 
-/** IDs at/above this threshold are eD2k "High ID" (reachable directly); below it, "Low ID" (behind a firewall/NAT). Confirmed against https://github.com/amule-org/amule/blob/master/src/NetworkFunctions.h#L122. */
+/**
+ * IDs at/above this threshold are eD2k "High ID" (reachable directly); below it, "Low ID" (behind a firewall/NAT). Confirmed against https://github.com/amule-org/amule/blob/master/src/NetworkFunctions.h#L122.
+ */
 const HIGHEST_LOWID_ED2K_KAD = 16_777_216n;
 
 /**
@@ -58,15 +60,26 @@ export class Status implements ECFetchable {
    public kadConnected: boolean | undefined;
    public kadFirewalled: boolean | undefined;
    public kadRunning: boolean | undefined;
-   /** The eD2k ID assigned by the connected server, if any (see class doc). */
+   /**
+    * The eD2k ID assigned by the connected server, if any (see class doc).
+    */
    public ed2kId: bigint | undefined;
-   /** Unix timestamp (seconds) of when the current eD2k connection was established - only sent while actually connected. */
+   /**
+    * Unix timestamp (seconds) of when the current eD2k connection was established - only sent
+    * while actually connected.
+    */
    public ed2kConnectedSince: bigint | undefined;
-   /** Unix timestamp (seconds) of when Kad became connected - only sent while actually connected. */
+   /**
+    * Unix timestamp (seconds) of when Kad became connected - only sent while actually connected.
+    */
    public kadConnectedSince: bigint | undefined;
-   /** True = Low ID (firewalled/NAT'd), false = High ID. Undefined when not connected to a server. */
+   /**
+    * True = Low ID (firewalled/NAT'd), false = High ID. Undefined when not connected to a server.
+    */
    public hasLowId: boolean | undefined;
-   /** Name of the currently connected eD2k server, when available (see class doc). */
+   /**
+    * Name of the currently connected eD2k server, when available (see class doc).
+    */
    public serverName: string | undefined;
    /**
     * IP address of the currently connected eD2k server, when available
@@ -80,7 +93,9 @@ export class Status implements ECFetchable {
     * CEC_Server_Tag constructor (preferences editing), not this one.
     */
    public serverIp: string | undefined;
-   /** Port of the currently connected eD2k server, alongside serverIp (see its doc). */
+   /**
+    * Port of the currently connected eD2k server, alongside serverIp (see its doc).
+    */
    public serverPort: number | undefined;
    /**
     * Free disk space (bytes) on the Temp/Incoming directories -
@@ -92,7 +107,9 @@ export class Status implements ECFetchable {
 
    public constructor(public readonly connection: ECConnection) {}
 
-   /** Sends EC_OP_STAT_REQ and EC_OP_GET_CONNSTATE and merges both into this snapshot. */
+   /**
+    * Sends EC_OP_STAT_REQ and EC_OP_GET_CONNSTATE and merges both into this snapshot.
+    */
    public async fetch(): Promise<void> {
       const statsRequest = new ECPacket(ECOpcode.EC_OP_STAT_REQ);
       // EC_DETAIL_FULL, not _CMD: the free-space tags below are only added

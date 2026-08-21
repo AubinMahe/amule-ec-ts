@@ -1,7 +1,10 @@
 import * as ec from "../../../src/index.js";
 import { formatPercent, formatSize, formatSpeed } from "../format.js";
 
-/** Shared by printDownloadFile/printSharedFile/printSearchResult - prints the Kad-notes-searching flag and each community comment, if any. */
+/**
+ * Shared by printDownloadFile/printSharedFile/printSearchResult - prints the Kad-notes-searching
+ * flag and each community comment, if any.
+ */
 export function printFileComments(comments: readonly ec.FileComment[] | undefined, kadCommentSearching: boolean | undefined): void {
    if (kadCommentSearching) {
       console.log("  Kad notes search in progress...");

@@ -36,7 +36,10 @@ class SocketReader {
    }
 }
 
-/** The fake server's side of one accepted TCP connection, speaking the same wire framing as ECConnection. */
+/**
+ * The fake server's side of one accepted TCP connection, speaking the same wire framing as
+ * ECConnection.
+ */
 export interface FakeEcPeer {
    readonly socket: net.Socket;
    readPacket(): Promise<ec.ECPacket>;
@@ -71,7 +74,10 @@ function wrapPeer(socket: net.Socket): FakeEcPeer {
 
 export interface FakeEcServer {
    readonly port: number;
-   /** Resolves with the next inbound connection, wrapped for packet read/write - queued if it already arrived. */
+   /**
+    * Resolves with the next inbound connection, wrapped for packet read/write - queued if it
+    * already arrived.
+    */
    nextPeer(): Promise<FakeEcPeer>;
    close(): Promise<void>;
 }
@@ -86,7 +92,10 @@ function createNextPeer(queuedPeers: FakeEcPeer[], waitingResolvers: ((peer: Fak
    };
 }
 
-/** close() force-drops any socket a test forgot to end - otherwise server.close()'s callback never fires. */
+/**
+ * close() force-drops any socket a test forgot to end - otherwise server.close()'s callback never
+ * fires.
+ */
 function createClose(server: net.Server, openSockets: Set<net.Socket>): () => Promise<void> {
    return function close(): Promise<void> {
       return new Promise((resolve) => {
@@ -98,7 +107,10 @@ function createClose(server: net.Server, openSockets: Set<net.Socket>): () => Pr
    };
 }
 
-/** Starts a real TCP server on an ephemeral loopback port, for ECConnection/ECEngine tests to connect to for real. */
+/**
+ * Starts a real TCP server on an ephemeral loopback port, for ECConnection/ECEngine tests to
+ * connect to for real.
+ */
 export function startFakeEcServer(): Promise<FakeEcServer> {
    return new Promise((resolve, reject) => {
       const queuedPeers: FakeEcPeer[] = [];

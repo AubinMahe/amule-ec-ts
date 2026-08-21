@@ -2,7 +2,9 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
-/** Builds a synthetic EC_TAG_CLIENT tag, as UploadClient's constructor reads it. */
+/**
+ * Builds a synthetic EC_TAG_CLIENT tag, as UploadClient's constructor reads it.
+ */
 function uploadClientTag(fields: {
    ecid: number;
    hash?: string;
@@ -84,7 +86,8 @@ describe("UploadClient", () => {
       });
 
       // Confirmed against GetSoftName() (DataToText.cpp#L104-L142) - one case per name it returns,
-      // aliases included (SO_OLDEMULE -> "eMule", SO_NEW_SHAREAZA/SO_NEW2_SHAREAZA -> "Shareaza", ...).
+      // aliases included (SO_OLDEMULE -> "eMule", SO_NEW_SHAREAZA/SO_NEW2_SHAREAZA -> "Shareaza",
+      // ...).
       const cases: [ec.ECClientSoftware, string][] = [
          [ec.ECClientSoftware.SO_EMULE, "eMule"],
          [ec.ECClientSoftware.SO_OLDEMULE, "eMule"],

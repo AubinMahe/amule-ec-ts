@@ -43,7 +43,10 @@ export class DebugLogController {
       console.log("Debug log cleared.");
    }
 
-   /** Always passes toStatus: true - see DebugLog.addLine()'s doc: without it, a non-debug-build daemon silently drops the line. */
+   /**
+    * Always passes toStatus: true - see DebugLog.addLine()'s doc: without it, a non-debug-build
+    * daemon silently drops the line.
+    */
    public async addLine(args: string[]): Promise<void> {
       const text = args.join(" ");
       if (!text) {

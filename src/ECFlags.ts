@@ -1,11 +1,19 @@
 export const enum ECFlag {
-   /** 1 << 0 */
+   /**
+    * 1 << 0
+    */
    ZLIB = 1,
-   /** 1 << 1 */
+   /**
+    * 1 << 1
+    */
    UTF8_NUMBERS = 2,
-   /** 1 << 4 */
+   /**
+    * 1 << 4
+    */
    LARGE_TAG_COUNT = 16,
-   /** 1 << 5 */
+   /**
+    * 1 << 5
+    */
    PROTOCOL_MARKER = 32,
 }
 

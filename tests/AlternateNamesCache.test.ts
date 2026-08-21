@@ -10,7 +10,8 @@ describe("AlternateNamesCache", () => {
 
    beforeEach(async () => {
       dir = await fs.mkdtemp(path.join(os.tmpdir(), "amule-ec-alt-names-"));
-      // Nested under `dir` rather than directly in it - also exercises persist()'s mkdir(recursive).
+      // Nested under `dir` rather than directly in it - also exercises persist()'s
+      // mkdir(recursive).
       file = path.join(dir, "sub", "names.json");
    });
 
@@ -111,7 +112,8 @@ describe("AlternateNamesCache", () => {
       ).to.deep.equal(["Alt1.mkv", "Alt2.mkv"]);
       expect(cache.get("OtherFile.mkv")).to.deep.equal(["OtherAlt.mkv"]);
 
-      // A fresh instance reloading from disk sees the same result - proves it was actually persisted.
+      // A fresh instance reloading from disk sees the same result - proves it was actually
+      // persisted.
       const reloaded = new ec.AlternateNamesCache(file);
       await reloaded.init(Number.MAX_SAFE_INTEGER);
       expect(

@@ -17,7 +17,10 @@ export enum ECSearchType {
    GLOBAL = 0x01,
    KAD = 0x02,
    WEB = 0x03,
-   /** A "View Files" browse tab, not a real search - `EC_OP_SEARCH_LIST` entries of this kind carry a `KnownSearch.browsePeerEcid`. */
+   /**
+    * A "View Files" browse tab, not a real search - `EC_OP_SEARCH_LIST` entries of this kind carry
+    * a `KnownSearch.browsePeerEcid`.
+    */
    BROWSE = 0x04,
 }
 
@@ -33,9 +36,14 @@ export enum ECSearchLifecycleState {
 
 export interface ECSearchParams {
    keywords: string;
-   /** EC_SEARCH_TYPE for this search - defaults to GLOBAL (ed2k) if omitted. */
+   /**
+    * EC_SEARCH_TYPE for this search - defaults to GLOBAL (ed2k) if omitted.
+    */
    type?: ECSearchType;
-   /** ED2KFTSTR_* value (e.g. "Video", "Audio", "Arc", ...) - see FileTags.h:129-135. Empty/omitted = no filter. */
+   /**
+    * ED2KFTSTR_* value (e.g. "Video", "Audio", "Arc", ...) - see FileTags.h:129-135. Empty/omitted
+    * = no filter.
+    */
    fileType?: string;
    extension?: string;
    availability?: number;
@@ -45,7 +53,10 @@ export interface ECSearchParams {
 
 export interface ECSearchProgress {
    state: ECSearchLifecycleState;
-   /** EC_SEARCH_TYPE this search was started with - decoded from EC_TAG_SEARCH_LIFECYCLE_KIND, present on every reply regardless of multi-search. */
+   /**
+    * EC_SEARCH_TYPE this search was started with - decoded from EC_TAG_SEARCH_LIFECYCLE_KIND,
+    * present on every reply regardless of multi-search.
+    */
    kind: ECSearchType;
    percent: number;
    resultCount: number;
@@ -95,11 +106,18 @@ export class SearchResult {
    public readonly name: string;
    public readonly sizeFull: bigint;
    public readonly sources: bigint;
-   /** Community ratings/comments (Kad NOTES) - see FileComment/parseFileComments' doc. */
+   /**
+    * Community ratings/comments (Kad NOTES) - see FileComment/parseFileComments' doc.
+    */
    public readonly comments: readonly FileComment[];
-   /** Whether a searchKadNotes() lookup is currently in flight for this result - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   /**
+    * Whether a searchKadNotes() lookup is currently in flight for this result -
+    * EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING.
+    */
    public readonly kadCommentSearching: boolean;
-   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   /**
+    * Probed audio/video metadata, if any - see MediaMetadata's doc.
+    */
    public readonly media: MediaMetadata | undefined;
    /**
     * The parent result's ECID, if this is a grouped child (same hash/size,

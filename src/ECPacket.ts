@@ -18,12 +18,16 @@ export class ECPacket {
       return this;
    }
 
-   /** Finds the first top-level tag with the given name, if any. */
+   /**
+    * Finds the first top-level tag with the given name, if any.
+    */
    public find(name: number): ECTag | undefined {
       return this.tags.find((tag) => tag.name === name);
    }
 
-   /** Returns whether a top-level tag with the given name is present. */
+   /**
+    * Returns whether a top-level tag with the given name is present.
+    */
    public has(name: number): boolean {
       return this.find(name) !== undefined;
    }

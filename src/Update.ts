@@ -97,24 +97,40 @@ export class ClientUpdate {
    public readonly serverPort: bigint | undefined;
    public readonly serverName: string | undefined;
    public readonly uploadSpeed: bigint | undefined;
-   /** Kilobytes/second - the one field on this class transmitted as a DOUBLE, not an integer (`EC_TAG_CLIENT_DOWN_SPEED`). */
+   /**
+    * Kilobytes/second - the one field on this class transmitted as a DOUBLE, not an integer
+    * (`EC_TAG_CLIENT_DOWN_SPEED`).
+    */
    public readonly downloadSpeed: number | undefined;
    public readonly sessionUp: bigint | undefined;
    public readonly transferredDown: bigint | undefined;
    public readonly uploadTotal: bigint | undefined;
    public readonly downloadTotal: bigint | undefined;
-   /** Raw `EUploadState` wire value (`Constants.h`'s `US_*`) - not decoded into a named enum here. */
+   /**
+    * Raw `EUploadState` wire value (`Constants.h`'s `US_*`) - not decoded into a named enum here.
+    */
    public readonly uploadState: bigint | undefined;
-   /** Raw `EDownloadState` wire value (`Constants.h`'s `DS_*`) - not decoded into a named enum here. */
+   /**
+    * Raw `EDownloadState` wire value (`Constants.h`'s `DS_*`) - not decoded into a named enum here.
+    */
    public readonly downloadState: bigint | undefined;
    public readonly identState: ECIdentState | undefined;
    public readonly extProtocol: boolean | undefined;
    public readonly waitingPosition: bigint | undefined;
-   /** `0xffff` means the remote queue is full rather than a literal rank - confirmed against `IsRemoteQueueFull()`'s use at the encoder (ECSpecialCoreTags.cpp:398-400). */
+   /**
+    * `0xffff` means the remote queue is full rather than a literal rank - confirmed against
+    * `IsRemoteQueueFull()`'s use at the encoder (ECSpecialCoreTags.cpp:398-400).
+    */
    public readonly remoteQueueRank: bigint | undefined;
-   /** Friends-list membership - `EC_TAG_CLIENT_IS_FRIEND`, distinct from the reserved-upload-slot `friendSlot`-style flag. */
+   /**
+    * Friends-list membership - `EC_TAG_CLIENT_IS_FRIEND`, distinct from the reserved-upload-slot
+    * `friendSlot`-style flag.
+    */
    public readonly isFriend: boolean | undefined;
-   /** The GUI's "DL/UP modifier" - `EC_TAG_CLIENT_SCORE_RATIO`, a double unlike every other ratio-like field on this class. */
+   /**
+    * The GUI's "DL/UP modifier" - `EC_TAG_CLIENT_SCORE_RATIO`, a double unlike every other
+    * ratio-like field on this class.
+    */
    public readonly scoreRatio: number | undefined;
 
    private constructor(fields: {
@@ -211,7 +227,10 @@ export class ClientUpdate {
       });
    }
 
-   /** Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be partial). */
+   /**
+    * Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be
+    * partial).
+    */
    public mergedWith(update: ClientUpdate): ClientUpdate {
       return new ClientUpdate({
          ecid: update.ecid,
@@ -333,7 +352,10 @@ export class ServerUpdate {
       });
    }
 
-   /** Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be partial). */
+   /**
+    * Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be
+    * partial).
+    */
    public mergedWith(update: ServerUpdate): ServerUpdate {
       return new ServerUpdate({
          ecid: update.ecid,
@@ -401,7 +423,10 @@ export class FriendInfo {
       });
    }
 
-   /** Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be partial). */
+   /**
+    * Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be
+    * partial).
+    */
    public mergedWith(update: FriendInfo): FriendInfo {
       return new FriendInfo({
          ecid: update.ecid,

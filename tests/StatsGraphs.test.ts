@@ -2,7 +2,10 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection } from "./testUtils.js";
 
-/** Packs uint32 values as a big-endian byte blob, matching EC_TAG_STATSGRAPH_DATA/_DATA_CONN's own data. */
+/**
+ * Packs uint32 values as a big-endian byte blob, matching EC_TAG_STATSGRAPH_DATA/_DATA_CONN's own
+ * data.
+ */
 function packUInt32BE(values: readonly number[]): Uint8Array {
    const buffer = Buffer.alloc(values.length * 4);
    values.forEach((value, i) => {

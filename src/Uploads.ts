@@ -64,7 +64,9 @@ export class UploadClient {
    public readonly totalUp: bigint | undefined;
    public readonly uploadState: bigint | undefined;
    public readonly fileName: string | undefined;
-   /** The client's internal ECID - EC_TAG_CLIENT's own data (see class doc). */
+   /**
+    * The client's internal ECID - EC_TAG_CLIENT's own data (see class doc).
+    */
    public readonly ecid: bigint | undefined;
    /**
     * The uploaded file's own internal ECID - EC_TAG_CLIENT_UPLOAD_FILE's own data, `0n` when the
@@ -139,7 +141,9 @@ export class UploadClient {
    }
 }
 
-/** The upload queue, as returned by EC_OP_GET_ULOAD_QUEUE / EC_OP_ULOAD_QUEUE. */
+/**
+ * The upload queue, as returned by EC_OP_GET_ULOAD_QUEUE / EC_OP_ULOAD_QUEUE.
+ */
 export class Uploads implements ECFetchable {
    public clients: readonly UploadClient[] = [];
 

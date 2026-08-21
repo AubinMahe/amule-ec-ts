@@ -5,7 +5,9 @@ import { ECTagNames } from "./ECTagNames.js";
 
 const debug = debuglog("amule-ec:partfile-status");
 
-/** One contiguous byte range - see DownloadFile.gaps/.requestedRanges' doc. */
+/**
+ * One contiguous byte range - see DownloadFile.gaps/.requestedRanges' doc.
+ */
 export interface ByteRange {
    readonly start: bigint;
    readonly end: bigint;
@@ -153,7 +155,9 @@ function resolveBytes(
    return cache.get(key);
 }
 
-/** See the class doc above `byConnection` for `resetsEncoder`'s meaning. */
+/**
+ * See the class doc above `byConnection` for `resetsEncoder`'s meaning.
+ */
 export function resolveGaps(
    tag: ECTag,
    connection: ECConnection | undefined,
@@ -164,7 +168,9 @@ export function resolveGaps(
    return bytes === undefined ? undefined : bytesToByteRanges(bytes);
 }
 
-/** See the class doc above `byConnection` for `resetsEncoder`'s meaning. */
+/**
+ * See the class doc above `byConnection` for `resetsEncoder`'s meaning.
+ */
 export function resolveRequestedRanges(
    tag: ECTag,
    connection: ECConnection | undefined,
@@ -175,7 +181,9 @@ export function resolveRequestedRanges(
    return bytes === undefined ? undefined : bytesToByteRanges(bytes);
 }
 
-/** See the class doc above `byConnection` for `resetsEncoder`'s meaning. */
+/**
+ * See the class doc above `byConnection` for `resetsEncoder`'s meaning.
+ */
 export function resolvePartAvailability(
    tag: ECTag,
    connection: ECConnection | undefined,
@@ -186,7 +194,11 @@ export function resolvePartAvailability(
    return bytes === undefined ? undefined : bytesToPartAvailability(bytes);
 }
 
-/** Forgets everything accumulated for one file on one connection - call once it leaves the queue, so a later ecid reuse can't inherit a stale history (mirrors PartFileSourceNames.ts's forgetSourceNames()). */
+/**
+ * Forgets everything accumulated for one file on one connection - call once it leaves the queue,
+ * so a later ecid reuse can't inherit a stale history (mirrors PartFileSourceNames.ts's
+ * forgetSourceNames()).
+ */
 export function forgetPartFileStatus(connection: ECConnection, ecid: bigint): void {
    const cache = byConnection.get(connection);
    if (!cache) return;

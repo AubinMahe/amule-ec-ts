@@ -309,7 +309,9 @@ export class ECConnection extends events.EventEmitter {
       });
    }
 
-   /** Type-safe shorthand for on("notification", listener). */
+   /**
+    * Type-safe shorthand for on("notification", listener).
+    */
    public onNotification(listener: (packet: ECPacket) => void): this {
       return this.on("notification", listener);
    }

@@ -99,9 +99,13 @@ export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
  */
 export class MediaMetadata {
    public constructor(
-      /** Duration in seconds. */
+      /**
+       * Duration in seconds.
+       */
       public readonly length: bigint | undefined,
-      /** Bitrate in kbps. */
+      /**
+       * Bitrate in kbps.
+       */
       public readonly bitrate: bigint | undefined,
       public readonly codec: string | undefined,
       public readonly artist: string | undefined,
@@ -110,7 +114,10 @@ export class MediaMetadata {
    ) {}
 }
 
-/** Decodes `EC_TAG_KNOWNFILE_MEDIA_*` children off `fileTag` - undefined if none are present (see MediaMetadata's doc). */
+/**
+ * Decodes `EC_TAG_KNOWNFILE_MEDIA_*` children off `fileTag` - undefined if none are present (see
+ * MediaMetadata's doc).
+ */
 export function parseMediaMetadata(fileTag: ECTag): MediaMetadata | undefined {
    const length = fileTag.childInt(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_LENGTH);
    const bitrate = fileTag.childInt(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_BITRATE);
@@ -152,12 +159,12 @@ export function parseMediaMetadata(fileTag: ECTag): MediaMetadata | undefined {
  * for both.
  *
  * A partial file that's also shared is still, on the daemon side, encoded by the very same
- * CPartFile_Encoder its download-queue entry uses (ExternalConn.cpp:355-364), so a response here can
- * legitimately carry that file's EC_TAG_PARTFILE_SOURCE_NAMES delta too - see DownloadFile's class
- * doc. SharedFile doesn't expose that data itself (it's a download's peers, not this file's own
- * upload activity), but fromTag() still folds it into the shared per-connection cache when a
- * connection is given, so Downloads sees it even when a SharedFiles poll is the one that happened to
- * reach the daemon first.
+ * CPartFile_Encoder its download-queue entry uses (ExternalConn.cpp:355-364), so a response here
+ * can legitimately carry that file's EC_TAG_PARTFILE_SOURCE_NAMES delta too - see DownloadFile's
+ * class doc. SharedFile doesn't expose that data itself (it's a download's peers, not this file's
+ * own upload activity), but fromTag() still folds it into the shared per-connection cache when a
+ * connection is given, so Downloads sees it even when a SharedFiles poll is the one that happened
+ * to reach the daemon first.
  */
 export class SharedFile {
    public readonly hash: string | undefined;
@@ -168,13 +175,24 @@ export class SharedFile {
    public readonly uploadingCount: bigint | undefined;
    public readonly requestsTotal: bigint | undefined;
    public readonly prio: bigint | undefined;
-   /** True for a removal push notification (see class doc) - every other field is then unavailable. */
+   /**
+    * True for a removal push notification (see class doc) - every other field is then unavailable.
+    */
    public readonly removed: boolean;
-   /** The file's internal ECID - present on every shape except a removal notification (see class doc). */
+   /**
+    * The file's internal ECID - present on every shape except a removal notification (see class
+    * doc).
+    */
    public readonly ecid: bigint | undefined;
-   /** Community ratings/comments (own source comments + Kad NOTES) - see FileComment/parseFileComments' doc. */
+   /**
+    * Community ratings/comments (own source comments + Kad NOTES) - see
+    * FileComment/parseFileComments' doc.
+    */
    public readonly comments: readonly FileComment[] | undefined;
-   /** Whether a searchKadNotes() lookup is currently in flight for this file - EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING. */
+   /**
+    * Whether a searchKadNotes() lookup is currently in flight for this file -
+    * EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING.
+    */
    public readonly kadCommentSearching: boolean | undefined;
    /**
     * The shared directory this file lives in - `EC_TAG_KNOWNFILE_PATH`,
@@ -183,13 +201,22 @@ export class SharedFile {
     * Disambiguates same-named files shared from different directories.
     */
    public readonly path: string | undefined;
-   /** "Verify Local Data" hash-check progress - the part currently being hashed (1-based), 0 while idle/done. */
+   /**
+    * "Verify Local Data" hash-check progress - the part currently being hashed (1-based), 0 while
+    * idle/done.
+    */
    public readonly hashedPartCount: bigint | undefined;
-   /** Unix timestamp (seconds) of the last time this file was uploaded from. */
+   /**
+    * Unix timestamp (seconds) of the last time this file was uploaded from.
+    */
    public readonly lastUpload: bigint | undefined;
-   /** Unix timestamp (seconds) of when this file started being shared. */
+   /**
+    * Unix timestamp (seconds) of when this file started being shared.
+    */
    public readonly sharedSince: bigint | undefined;
-   /** Probed audio/video metadata, if any - see MediaMetadata's doc. */
+   /**
+    * Probed audio/video metadata, if any - see MediaMetadata's doc.
+    */
    public readonly media: MediaMetadata | undefined;
 
    private constructor(fields: {
@@ -231,11 +258,12 @@ export class SharedFile {
    }
 
    /**
-    * `connection`, when given, lets this file's EC_TAG_PARTFILE_SOURCE_NAMES/_GAP_STATUS/_REQ_STATUS/
-    * _PART_STATUS deltas (if any) be folded into the shared per-connection caches Downloads reads
-    * from - see class doc. Purely a side effect: SharedFile itself never exposes any of that data.
-    * `resetsEncoder` - see DownloadFile.fromTag()'s doc - is true for SharedFiles.fetch() (the daemon
-    * resets before encoding at EC_DETAIL_CMD), false otherwise.
+    * `connection`, when given, lets this file's
+    * EC_TAG_PARTFILE_SOURCE_NAMES/_GAP_STATUS/_REQ_STATUS/ _PART_STATUS deltas (if any) be folded
+    * into the shared per-connection caches Downloads reads from - see class doc. Purely a side
+    * effect: SharedFile itself never exposes any of that data. `resetsEncoder` - see
+    * DownloadFile.fromTag()'s doc - is true for SharedFiles.fetch() (the daemon resets before
+    * encoding at EC_DETAIL_CMD), false otherwise.
     */
    public static fromTag(tag: ECTag, connection?: ECConnection, resetsEncoder = false): SharedFile {
       const ownHashTag = tag instanceof ECHash16Tag ? tag : undefined;
@@ -268,7 +296,10 @@ export class SharedFile {
       });
    }
 
-   /** Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be partial). */
+   /**
+    * Fills in whatever `this` has that `update` doesn't (see class doc on why an update can be
+    * partial).
+    */
    public mergedWith(update: SharedFile): SharedFile {
       return new SharedFile({
          hash: update.hash ?? this.hash,
@@ -316,7 +347,9 @@ export enum SharedDirRejectReason {
    UNREADABLE = 2,
 }
 
-/** One rejected path from SharedFiles.setSharedDirs()'s reply - see SharedDirRejectReason's doc. */
+/**
+ * One rejected path from SharedFiles.setSharedDirs()'s reply - see SharedDirRejectReason's doc.
+ */
 export class SharedDirRejection {
    public constructor(
       public readonly path: string,
@@ -324,7 +357,9 @@ export class SharedDirRejection {
    ) {}
 }
 
-/** The shared file list, as returned by EC_OP_GET_SHARED_FILES / EC_OP_SHARED_FILES. */
+/**
+ * The shared file list, as returned by EC_OP_GET_SHARED_FILES / EC_OP_SHARED_FILES.
+ */
 export class SharedFiles implements ECFetchable {
    public files: readonly SharedFile[] = [];
 

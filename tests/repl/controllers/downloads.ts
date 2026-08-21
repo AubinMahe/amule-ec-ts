@@ -2,7 +2,10 @@ import * as ec from "../../../src/index.js";
 import { PRIORITY_NAMES } from "../help.js";
 import { printDownloadFiles } from "../views/downloads.js";
 
-/** Download-queue commands (cancel/pause/resume/stop/priority/swap/setcat/addlink/clear) - all operate on ec.Downloads alone. */
+/**
+ * Download-queue commands (cancel/pause/resume/stop/priority/swap/setcat/addlink/clear) - all
+ * operate on ec.Downloads alone.
+ */
 export class DownloadsController {
    public constructor(
       private readonly downloads: ec.Downloads,
@@ -15,7 +18,9 @@ export class DownloadsController {
       printDownloadFiles(this.downloads.files);
    }
 
-   /** Works on a shared file too, not just a download - see Downloads.rename()'s doc. */
+   /**
+    * Works on a shared file too, not just a download - see Downloads.rename()'s doc.
+    */
    public async rename(args: string[]): Promise<void> {
       const hash = args[0];
       const newName = args.slice(1).join(" ");
@@ -118,7 +123,9 @@ export class DownloadsController {
       console.log(`Link added: ${link}.`);
    }
 
-   /** Fetches the download queue, clears every completed entry, and reports how many. */
+   /**
+    * Fetches the download queue, clears every completed entry, and reports how many.
+    */
    public async clearCompleted(): Promise<void> {
       await this.downloads.fetch();
       const ecids = this.downloads.files

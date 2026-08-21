@@ -15,7 +15,10 @@ import {
    printServersPrefs,
 } from "../views/preferences.js";
 
-/** "show prefs <section>"/"prefs <section> ..."/"show categories" - all operate on ec.Preferences alone (the biggest feature class in the library, so also the biggest controller here). */
+/**
+ * "show prefs <section>"/"prefs <section> ..."/"show categories" - all operate on ec.Preferences
+ * alone (the biggest feature class in the library, so also the biggest controller here).
+ */
 export class PreferencesController {
    public constructor(private readonly preferences: ec.Preferences) {}
 
@@ -58,7 +61,10 @@ export class PreferencesController {
       },
    };
 
-   /** Dispatches "show prefs <section>" - kept out of the orchestrator's own switch to stay under its max-case limit. */
+   /**
+    * Dispatches "show prefs <section>" - kept out of the orchestrator's own switch to stay under
+    * its max-case limit.
+    */
    public async showSection(subject: string): Promise<void> {
       const handler = this.showHandlers[subject];
       if (!handler) {

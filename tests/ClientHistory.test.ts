@@ -2,7 +2,10 @@ import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
-/** Builds a synthetic EC_TAG_CLIENT entry as ClientHistoryEntry reads it - own data is the user hash, not an ECID. */
+/**
+ * Builds a synthetic EC_TAG_CLIENT entry as ClientHistoryEntry reads it - own data is the user
+ * hash, not an ECID.
+ */
 function clientHistoryTag(fields: {
    hash: string;
    uploadTotal?: bigint;
