@@ -74,7 +74,9 @@ describe("ClientHistory.fetch", () => {
       fake.connection.remoteCapabilities.clientHistory = true;
       const history = new ec.ClientHistory(fake.connection);
       const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_CLIENT_HISTORY);
-      reply.add(clientHistoryTag({ hash: hexHash("a"), lastSeen: 1_735_689_600, firstSeen: 1_700_000_000, sessions: 12, name: "Bob" }));
+      reply.add(
+         clientHistoryTag({ hash: hexHash("a"), lastSeen: 1_735_689_600, firstSeen: 1_700_000_000, sessions: 12, name: "Bob" }),
+      );
       reply.add(clientHistoryTag({ hash: hexHash("b"), lastSeen: 1_735_689_600 }));
       fake.queueReply(reply);
 

@@ -9,6 +9,20 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-08-21
+
+### Added
+
+- `AlternateNamesCache`, a persistent JSON-backed cache of alternate filenames, and
+  `ECEngineStartOptions.altNamesCachePath`/`ECEngine.altNamesCache` to wire it in - optional, no cache is created unless a path is
+  given. `sourceNames` (see the 2.23.0 entry below) only exists while the daemon still tracks a file as an active partfile with
+  connected sources; once it completes and leaves the download queue (or simply runs out of connected sources), that data is gone
+  for good, with no way to recover it from a later `fetch()`/notification. `Downloads.fetch()`/`DownloadTracker.apply()` now feed
+  the cache automatically for any file past 75% complete with at least one reported alternate name, so a caller can still look those
+  names up long after the underlying protocol has forgotten them. `add()`/`remove()`/`get()` are public, so a caller-side rename
+  that never went through the EC protocol at all can also update the cache directly. `init()` purges entries untouched for more than
+  45 days.
+
 ## [2.24.0] - 2026-08-19
 
 ### Added

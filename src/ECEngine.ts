@@ -1,6 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 import { debuglog } from "node:util";
 
+import { AlternateNamesCache } from "./AlternateNamesCache.js";
 import { ECConnection } from "./ECConnection.js";
 
 const debug = debuglog("amule-ec:engine");
@@ -11,7 +12,11 @@ const RECONNECT_INITIAL_DELAY_MS = 2_000;
 
 const RECONNECT_MAX_DELAY_MS = 30_000;
 
+/** How long an AlternateNamesCache entry survives without being touched again - see ECEngineStartOptions.altNamesCachePath and AlternateNamesCache.init(). */
+const ALT_NAMES_CACHE_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1_000;
+
 let instance: ECConnection | undefined;
+let altNamesCacheInstance: AlternateNamesCache | undefined;
 
 export interface ECEngineStartOptions {
    /**
@@ -52,6 +57,15 @@ export interface ECEngineStartOptions {
     * itself. See Search.ts's SearchSession doc for what this unlocks.
     */
    multiSearch?: boolean;
+   /**
+    * Path to a JSON file persisting alternate filenames observed for downloads - see
+    * AlternateNamesCache's doc for what it stores and why, Downloads.ts's
+    * cacheAltNamesIfEligible() for the population policy (progress threshold, fetch()/notification
+    * hooks). Omitted entirely (the default): no cache is created and ECEngine.altNamesCache stays
+    * undefined. This is the one option that gives the library filesystem access of its own - every
+    * other option only ever talks to amuled over the network.
+    */
+   altNamesCachePath?: string;
 }
 
 /**
@@ -126,6 +140,10 @@ export const ECEngine = {
       connection.localCapabilities.multiSearch = multiSearch;
       await connection.authenticateWithHash(options.passwordHash);
       instance = connection;
+      altNamesCacheInstance = options.altNamesCachePath ? new AlternateNamesCache(options.altNamesCachePath) : undefined;
+      if (altNamesCacheInstance) {
+         await altNamesCacheInstance.init(ALT_NAMES_CACHE_MAX_AGE_MS);
+      }
       armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch);
    },
 
@@ -134,5 +152,15 @@ export const ECEngine = {
          throw new Error("ECEngine.start() must complete before ECEngine.connection is used.");
       }
       return instance;
+   },
+
+   /**
+    * The cache configured via ECEngineStartOptions.altNamesCachePath, or undefined if that option
+    * was never given. Unlike `connection`, never throws - Downloads.ts's cacheAltNamesIfEligible()
+    * (and any caller-side code, e.g. a "free rename" outside the EC protocol) can check this
+    * unconditionally, cache-disabled being just as valid a configuration as cache-enabled.
+    */
+   get altNamesCache(): AlternateNamesCache | undefined {
+      return altNamesCacheInstance;
    },
 };

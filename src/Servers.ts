@@ -342,11 +342,7 @@ export class Servers implements ECFetchable {
     */
    public async setPriority(ecid: bigint, prio: ServerPriority): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      request.add(
-         new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [
-            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, prio),
-         ]),
-      );
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, prio)]));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {

@@ -139,3 +139,50 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
   `prefs kademlia seturl <url>`, `show prefs general`, `prefs general checknewversion <on|off>`, `show prefs remotecontrols`,
   `prefs remotecontrols gzip <on|off>`, `show prefs ip2country`, `prefs ip2country autoupdate <on|off>`, `show prefs coretweaks`,
   `prefs coretweaks verbose <on|off>`, `show categories`, `show update`, `show statstree`, `show statstree <key>`.
+
+## Comparison with amule-ec-node
+
+[amule-ec-node](https://github.com/vetler/amule-ec-node) is another independent JavaScript client for the same EC protocol.
+`amule-ec-ts` was started without prior knowledge of it, after publishing 2.0.0; had it been found earlier, building on that work
+rather than starting an independent implementation would likely have been the better call. With two separate takes on the same
+protocol now existing, both codebases were reviewed against the aMule C++ source to produce a factual feature comparison.
+
+|Feature|aMule (C++)|amule-ec-node (JS)|amule-ec-ts (TS)|
+|-|-|-|-|
+|Connection & authentication (salt + double MD5 hash)|✓|✓|✓|
+|zlib packet compression|✓|✗|✓|
+|Push / live notifications|✓|✗|✓|
+|Session encryption (X25519 / AEAD)|✓ (1)|✗|✗|
+|Download queue|✓|✓|✓|
+|Alternate source filenames (`EC_TAG_PARTFILE_SOURCE_NAMES`)|✓|✗|✓ (2)|
+|Chunk / gap / requested-block / part-availability status|✓|✓ (3)|✓ (3)|
+|Shared files|✓|✓|✓|
+|Shared directories configuration|✓|✗|✓ (4)|
+|Search (local / global / Kad / web)|✓|✓|✓|
+|Grouped search results|✓|✗|✓|
+|Servers list management|✓|✓|✓|
+|Categories|✓|✓|✓|
+|Upload queue / connected clients|✓|✓|✓|
+|Client history|✓|✗|✓|
+|Kademlia control (start / stop / bootstrap)|✓|✗|✓|
+|Friends|✓|✗|✓|
+|Chat messages|✓|✗|✓|
+|Preferences (get / set)|✓|✓ (5)|✓|
+|Statistics / graphs / tree|✓|✓|✓|
+
+(1) Recently added upstream (an optional forward-secrecy handshake over X25519). Neither client implements the handshake yet - it's
+tracked as open work on the `amule-ec-ts` side too.
+
+(2) The daemon delta-encodes this per EC connection - a name is only sent once, and that delta state turns out to be shared across
+every request type touching the same file (download-queue fetch, shared-files fetch, incremental update alike), confirmed against
+`ExternalConn.cpp`. `amule-ec-ts` hides this behind a per-connection cache (`PartFileSourceNames.ts`) so callers don't need to know
+the protocol has this quirk at all.
+
+(3) RLE-decoding then XOR-reconstructing against the previous state, matching aMule's own `RLE_Data::Realloc()` behavior
+byte-for-byte. `amule-ec-ts` implements this the same way, in `PartFileStatus.ts`, independently confirmed against the same C++
+source.
+
+(4) Guarded behind a negotiated capability check - sending it unconditionally to a daemon predating this opcode was found, live, to
+trip a `wxASSERT` in `ProcessRequest2`.
+
+(5) Scoped to the Connections preferences category; `amule-ec-ts` exposes the full `EC_PREFS_*` selection bitmask.

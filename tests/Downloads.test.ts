@@ -249,7 +249,12 @@ function partStatusTag(counts: readonly number[], previousAbsolute?: readonly nu
 describe("DownloadFile.sourceNames", () => {
    it("decodes full entries (id -> name/count) from a single response", () => {
       const file = ec.DownloadFile.fromTag(
-         partFileTag({ sourceNames: sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }, { id: 2, name: "movie.avi", count: 2 }]) }),
+         partFileTag({
+            sourceNames: sourceNamesTag([
+               { id: 1, name: "Movie.mkv", count: 7 },
+               { id: 2, name: "movie.avi", count: 2 },
+            ]),
+         }),
       );
 
       expect(file.sourceNames?.size).to.equal(2);
@@ -289,9 +294,7 @@ describe("DownloadTracker source names accumulation", () => {
    it("updates the count without losing the name when a later push omits it", () => {
       const tracker = new ec.DownloadTracker();
       const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
-      initial.add(
-         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
-      );
+      initial.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
       tracker.apply(initial);
 
       const countOnly = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
@@ -304,9 +307,7 @@ describe("DownloadTracker source names accumulation", () => {
    it("forgets an id once a later push reports its count as 0", () => {
       const tracker = new ec.DownloadTracker();
       const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
-      initial.add(
-         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
-      );
+      initial.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
       tracker.apply(initial);
 
       const removal = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
@@ -319,13 +320,13 @@ describe("DownloadTracker source names accumulation", () => {
    it("leaves the accumulated map untouched when a later push has no source-names container at all", () => {
       const tracker = new ec.DownloadTracker();
       const initial = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
-      initial.add(
-         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
-      );
+      initial.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
       tracker.apply(initial);
 
       const unrelated = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
-      unrelated.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n)]));
+      unrelated.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, 20n)]),
+      );
       const merged = tracker.apply(unrelated);
 
       expect(merged?.sourceNames?.get(1n)).to.deep.equal({ name: "Movie.mkv", count: 7n });
@@ -381,7 +382,9 @@ describe("source-names per-connection cache (PartFileSourceNames.ts)", () => {
       // A partial-but-shared file: SharedFiles' own request happens to be the one that reaches the
       // daemon while this name's delta is still pending (see SharedFile's class doc).
       const sharedReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
-      sharedReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      sharedReply.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
+      );
       fake.queueReply(sharedReply);
       await sharedFiles.fetch();
       expect(sharedFiles.files).to.have.lengthOf(1);
@@ -405,7 +408,9 @@ describe("source-names per-connection cache (PartFileSourceNames.ts)", () => {
       // Update.fetch() polls far more often than a user-triggered Downloads.fetch() in a real app,
       // so it's typically the one that happens to reach the daemon while a name's delta is pending.
       const updateReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
-      updateReply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]));
+      updateReply.add(
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, [sourceNamesTag([{ id: 1, name: "Movie.mkv", count: 7 }])]),
+      );
       fake.queueReply(updateReply);
       await update.fetch();
 

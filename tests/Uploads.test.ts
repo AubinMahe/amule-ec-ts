@@ -78,7 +78,7 @@ describe("UploadClient", () => {
    });
 
    describe("softwareText", () => {
-      it("returns \"Unknown\" when software is missing", () => {
+      it('returns "Unknown" when software is missing', () => {
          const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
          expect(client.softwareText).to.equal("Unknown");
       });

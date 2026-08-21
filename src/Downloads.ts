@@ -1,5 +1,6 @@
 import { debuglog } from "node:util";
 import { ECConnection } from "./ECConnection.js";
+import { ECEngine } from "./ECEngine.js";
 import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
@@ -14,6 +15,50 @@ export type { SourceName } from "./PartFileSourceNames.js";
 export type { ByteRange } from "./PartFileStatus.js";
 
 const debug = debuglog("amule-ec:downloads");
+
+/** Progress (percent) past which a download's reported source names are worth persisting to ECEngine's alt-names cache - see cacheAltNamesIfEligible()'s doc. */
+const ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT = 75;
+
+/**
+ * True once `file` is at least ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT complete. Undefined/zero
+ * sizeFull (nothing known yet) reads as not eligible, not a division by zero.
+ */
+function isEligibleForAltNamesCache(file: DownloadFile): boolean {
+   if (file.sizeFull === undefined || file.sizeFull <= 0n || file.sizeDone === undefined) return false;
+   return file.sizeDone * 100n >= BigInt(ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT) * file.sizeFull;
+}
+
+/** `sourceNames`' distinct reported names, `file.name` itself excluded - see DownloadFile's class doc for what an absent SourceName.name means (nothing to add here). */
+function altNamesOf(file: DownloadFile): string[] {
+   const names = new Set<string>();
+   for (const entry of file.sourceNames?.values() ?? []) {
+      if (entry.name !== undefined && entry.name !== file.name) names.add(entry.name);
+   }
+   return [...names];
+}
+
+/**
+ * Feeds ECEngine's alt-names cache (see AlternateNamesCache's doc) once a download is far enough
+ * along that its sources' reported names are worth surviving past this download's own lifetime - an
+ * up-to-date `sourceNames` set otherwise vanishes the moment the file completes and leaves the
+ * queue (no sources left connected to report anything). Called from both Downloads.fetch() and
+ * DownloadTracker.apply(), the two points a DownloadFile can newly reflect progress/sourceNames.
+ *
+ * Fire-and-forget: caching is a best-effort side effect, never something fetch()/apply() should
+ * block on or fail because of - a rejected write is only logged. A no-op, including no cache
+ * lookup, if ECEngineStartOptions.altNamesCachePath was never given (ECEngine.altNamesCache is
+ * undefined).
+ */
+function cacheAltNamesIfEligible(file: DownloadFile): void {
+   if (file.name === undefined || !isEligibleForAltNamesCache(file)) return;
+   const altNames = altNamesOf(file);
+   if (altNames.length === 0) return;
+   const cache = ECEngine.altNamesCache;
+   if (!cache) return;
+   void cache.add(file.name, altNames).catch((error: unknown) => {
+      debug("cacheAltNamesIfEligible: %o", error);
+   });
+}
 
 /**
  * A partfile's `EC_TAG_PARTFILE_STATUS` value - confirmed against
@@ -426,6 +471,7 @@ export class Downloads implements ECFetchable {
             return name === ECTagNames.EC_TAG_PARTFILE;
          })
          .map((tag) => DownloadFile.fromTag(tag, this.connection, true));
+      for (const file of this.files) cacheAltNamesIfEligible(file);
       debug("fetch: %d file(s)", this.files.length);
    }
 
@@ -776,6 +822,7 @@ export class DownloadTracker {
       if (update.ecid === undefined) return update;
       const merged = this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
       this.filesByEcid.set(update.ecid, merged);
+      cacheAltNamesIfEligible(merged);
       return merged;
    }
 }

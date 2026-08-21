@@ -70,7 +70,7 @@ function bytesToByteRanges(bytes: Uint8Array): readonly ByteRange[] {
    const values: bigint[] = [];
    for (let i = 0; i < size; i++) {
       let value = 0n;
-      for (let j = 8; j-- > 0; ) {
+      for (let j = 8; j-- > 0;) {
          value = (value << 8n) | BigInt(buffer.readUInt8(i + j * size));
       }
       values.push(value);
