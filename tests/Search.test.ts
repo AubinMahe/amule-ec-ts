@@ -33,7 +33,9 @@ function searchResultTag(fields: {
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT, fields.sources ?? 0n),
    ];
-   if (fields.comments) children.push(fields.comments);
+   if (fields.comments) {
+      children.push(fields.comments);
+   }
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }

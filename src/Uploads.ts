@@ -100,7 +100,9 @@ export class UploadClient {
     * decoded client-side from `ECClientSoftware`.
     */
    public get softwareText(): string {
-      if (this.software === undefined) return "Unknown";
+      if (this.software === undefined) {
+         return "Unknown";
+      }
       const software: ECClientSoftware = Number(this.software);
       switch (software) {
          case ECClientSoftware.SO_OLDEMULE:

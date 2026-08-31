@@ -288,8 +288,11 @@ export class ECConnection extends events.EventEmitter {
       const header = new TransmissionHeader(flags, body.length);
       await new Promise<void>((resolve, reject) => {
          this.socket.write(Buffer.concat([header.encode(), body]), (error) => {
-            if (error) reject(error);
-            else resolve();
+            if (error) {
+               reject(error);
+            } else {
+               resolve();
+            }
          });
       });
    }
@@ -407,7 +410,9 @@ export class ECConnection extends events.EventEmitter {
    private flushPendingReads(): void {
       for (;;) {
          const next = this.pendingReads[0];
-         if (!next || this.receiveBufferedLength < next.length) return;
+         if (!next || this.receiveBufferedLength < next.length) {
+            return;
+         }
          this.pendingReads.shift();
          const [firstChunk] = this.receiveChunks;
          const combined =
@@ -417,14 +422,18 @@ export class ECConnection extends events.EventEmitter {
          const result = Buffer.from(combined.subarray(0, next.length));
          const rest = combined.subarray(next.length);
          this.receiveChunks.length = 0;
-         if (rest.length > 0) this.receiveChunks.push(rest);
+         if (rest.length > 0) {
+            this.receiveChunks.push(rest);
+         }
          this.receiveBufferedLength = rest.length;
          next.resolve(result);
       }
    }
 
    private readBytes(length: number): Promise<Buffer> {
-      if (length === 0) return Promise.resolve(Buffer.alloc(0));
+      if (length === 0) {
+         return Promise.resolve(Buffer.alloc(0));
+      }
       if (this.closed) {
          return Promise.reject(this.closeError ?? new Error("EC connection closed."));
       }
@@ -446,7 +455,9 @@ export class ECConnection extends events.EventEmitter {
     * feature.
     */
    private onClose(error: Error): void {
-      if (this.closed) return;
+      if (this.closed) {
+         return;
+      }
       this.closed = true;
       this.closeError = error;
       while (this.pendingReads.length > 0) {

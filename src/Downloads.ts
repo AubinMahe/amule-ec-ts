@@ -27,7 +27,9 @@ const ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT = 75;
  * sizeFull (nothing known yet) reads as not eligible, not a division by zero.
  */
 function isEligibleForAltNamesCache(file: DownloadFile): boolean {
-   if (file.sizeFull === undefined || file.sizeFull <= 0n || file.sizeDone === undefined) return false;
+   if (file.sizeFull === undefined || file.sizeFull <= 0n || file.sizeDone === undefined) {
+      return false;
+   }
    return file.sizeDone * 100n >= BigInt(ALT_NAMES_CACHE_MIN_PROGRESS_PERCENT) * file.sizeFull;
 }
 
@@ -38,7 +40,9 @@ function isEligibleForAltNamesCache(file: DownloadFile): boolean {
 function altNamesOf(file: DownloadFile): string[] {
    const names = new Set<string>();
    for (const entry of file.sourceNames?.values() ?? []) {
-      if (entry.name !== undefined && entry.name !== file.name) names.add(entry.name);
+      if (entry.name !== undefined && entry.name !== file.name) {
+         names.add(entry.name);
+      }
    }
    return [...names];
 }
@@ -56,11 +60,17 @@ function altNamesOf(file: DownloadFile): string[] {
  * undefined).
  */
 function cacheAltNamesIfEligible(file: DownloadFile): void {
-   if (file.name === undefined || !isEligibleForAltNamesCache(file)) return;
+   if (file.name === undefined || !isEligibleForAltNamesCache(file)) {
+      return;
+   }
    const altNames = altNamesOf(file);
-   if (altNames.length === 0) return;
+   if (altNames.length === 0) {
+      return;
+   }
    const cache = ECEngine.altNamesCache;
-   if (!cache) return;
+   if (!cache) {
+      return;
+   }
    void cache.add(file.name, altNames).catch((error: unknown) => {
       debug("cacheAltNamesIfEligible: %o", error);
    });
@@ -370,7 +380,9 @@ export class DownloadFile {
     * The temp filename this download is stored under, e.g. "012.part.met" - see partMetId's doc.
     */
    public get partMetName(): string | undefined {
-      if (this.partMetId === undefined) return undefined;
+      if (this.partMetId === undefined) {
+         return undefined;
+      }
       return `${this.partMetId.toString().padStart(3, "0")}.part.met`;
    }
 
@@ -380,7 +392,9 @@ export class DownloadFile {
     * class doc for the "+10 means auto" wire encoding this decodes.
     */
    public get priorityText(): string {
-      if (this.prio === undefined) return "Unknown";
+      if (this.prio === undefined) {
+         return "Unknown";
+      }
       const raw = Number(this.prio);
       const isAuto = raw >= 10;
       const base: ECDownloadPriority = isAuto ? raw - 10 : raw;
@@ -420,7 +434,9 @@ export class DownloadFile {
     * connected), and a stopped file reads "Stopped" unless already complete.
     */
    public get statusText(): string {
-      if (this.status === undefined) return "Unknown";
+      if (this.status === undefined) {
+         return "Unknown";
+      }
       const status: ECPartFileStatus = Number(this.status);
       if (status === ECPartFileStatus.PS_HASHING || status === ECPartFileStatus.PS_WAITING_FOR_HASH) {
          return "Hashing";
@@ -483,9 +499,13 @@ export class Downloads implements ECFetchable {
     * DownloadTracker.apply()'s).
     */
    public static parseNotification(packet: ECPacket, connection?: ECConnection): DownloadFile | undefined {
-      if (packet.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) return undefined;
+      if (packet.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) {
+         return undefined;
+      }
       const tag = packet.find(ECTagNames.EC_TAG_PARTFILE);
-      if (!tag) return undefined;
+      if (!tag) {
+         return undefined;
+      }
       const file = DownloadFile.fromTag(tag, connection);
       debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
       return file;
@@ -505,7 +525,9 @@ export class Downloads implements ECFetchable {
             return name === ECTagNames.EC_TAG_PARTFILE;
          })
          .map((tag) => DownloadFile.fromTag(tag, this.connection, true));
-      for (const file of this.files) cacheAltNamesIfEligible(file);
+      for (const file of this.files) {
+         cacheAltNamesIfEligible(file);
+      }
       debug("fetch: %d file(s)", this.files.length);
    }
 
@@ -824,7 +846,9 @@ export class DownloadTracker {
    }
 
    private forget(ecid: bigint): void {
-      if (!this.connection) return;
+      if (!this.connection) {
+         return;
+      }
       forgetSourceNames(this.connection, ecid);
       forgetPartFileStatus(this.connection, ecid);
    }
@@ -833,11 +857,15 @@ export class DownloadTracker {
       const previousEcids = new Set(this.filesByEcid.keys());
       this.filesByEcid.clear();
       for (const file of downloads.files) {
-         if (file.ecid === undefined) continue;
+         if (file.ecid === undefined) {
+            continue;
+         }
          this.filesByEcid.set(file.ecid, file);
          previousEcids.delete(file.ecid);
       }
-      for (const droppedEcid of previousEcids) this.forget(droppedEcid);
+      for (const droppedEcid of previousEcids) {
+         this.forget(droppedEcid);
+      }
    }
 
    /**
@@ -851,7 +879,9 @@ export class DownloadTracker {
     */
    public apply(packet: ECPacket): DownloadFile | undefined {
       const update = Downloads.parseNotification(packet, this.connection);
-      if (!update) return undefined;
+      if (!update) {
+         return undefined;
+      }
       if (update.removed) {
          for (const [ecid, file] of this.filesByEcid) {
             if (file.hash === update.hash) {
@@ -862,7 +892,9 @@ export class DownloadTracker {
          }
          return update;
       }
-      if (update.ecid === undefined) return update;
+      if (update.ecid === undefined) {
+         return update;
+      }
       const merged = this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
       this.filesByEcid.set(update.ecid, merged);
       cacheAltNamesIfEligible(merged);

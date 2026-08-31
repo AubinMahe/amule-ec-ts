@@ -80,14 +80,18 @@ function partFileTag(fields: {
    if (fields.sourcesXfer !== undefined) {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER, fields.sourcesXfer));
    }
-   if (fields.comments) children.push(fields.comments);
+   if (fields.comments) {
+      children.push(fields.comments);
+   }
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }
    if (fields.partMetId !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE_PARTMETID, fields.partMetId));
    }
-   if (fields.sourceNames) children.push(fields.sourceNames);
+   if (fields.sourceNames) {
+      children.push(fields.sourceNames);
+   }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, 1, children);
 }
 
@@ -204,7 +208,9 @@ function rleEncode(data: Uint8Array): Uint8Array {
    while (i < buffer.length) {
       const value = buffer.readUInt8(i);
       let runEnd = i + 1;
-      while (runEnd < buffer.length && buffer.readUInt8(runEnd) === value && runEnd - i < 0xff) runEnd++;
+      while (runEnd < buffer.length && buffer.readUInt8(runEnd) === value && runEnd - i < 0xff) {
+         runEnd++;
+      }
       const runLen = runEnd - i;
       if (runLen > 1) {
          out.push(value, value, runLen);

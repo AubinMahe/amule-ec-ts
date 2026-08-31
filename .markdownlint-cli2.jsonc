@@ -42,7 +42,13 @@
    "globs": [
       "*.md"
    ],
+   // CLAUDE.md (if it ever exists) is an instructions file for Claude Code, never rendered as
+   // HTML: its deliberately un-wrapped prose shouldn't have to satisfy MD013. commit-message.md is
+   // a commit-message draft (see .gitignore): same reason, deliberately simple formatting, no
+   // line breaks within paragraphs.
    "ignores": [
+      "CLAUDE.md",
+      "commit-message.md",
       "node_modules/**"
    ]
 }

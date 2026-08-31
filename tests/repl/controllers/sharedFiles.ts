@@ -118,8 +118,12 @@ export class SharedFilesController {
 
    public async sharedDirDispatch(args: string[]): Promise<void> {
       const sub = args[0]?.toLowerCase();
-      if (sub === "add") return this.sharedDirAdd(args.slice(1));
-      if (sub === "remove") return this.sharedDirRemove(args.slice(1));
+      if (sub === "add") {
+         return this.sharedDirAdd(args.slice(1));
+      }
+      if (sub === "remove") {
+         return this.sharedDirRemove(args.slice(1));
+      }
       console.error("Usage: shareddir <add <path> [recursive]|remove <path>>");
    }
 }

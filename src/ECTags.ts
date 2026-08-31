@@ -406,7 +406,9 @@ function utf8EncodeNumber(value: bigint): Buffer {
    }
    // Escape sequence for values beyond 36 bits (e.g. UINT64/UINT128 values).
    let hex = value.toString(16);
-   if (hex.length % 2 === 1) hex = "0" + hex;
+   if (hex.length % 2 === 1) {
+      hex = "0" + hex;
+   }
    const raw = Buffer.from(hex, "hex");
    if (raw.length > 0xff) {
       throw new RangeError("Value too large to UTF8-encode.");
@@ -547,7 +549,9 @@ function encodeCString(value: string): Buffer {
 
 function decodeCString(data: Buffer): string {
    let end = data.length;
-   if (end > 0 && data[end - 1] === 0) end--;
+   if (end > 0 && data[end - 1] === 0) {
+      end--;
+   }
    return data.subarray(0, end).toString("utf8");
 }
 

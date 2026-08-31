@@ -59,7 +59,9 @@ export class FileComment {
  */
 export function parseFileComments(fileTag: ECTag): readonly FileComment[] | undefined {
    const container = fileTag.findChild(ECTagNames.EC_TAG_PARTFILE_COMMENTS);
-   if (!container) return undefined;
+   if (!container) {
+      return undefined;
+   }
    const comments: FileComment[] = [];
    for (let i = 0; i + 3 < container.children.length; i += 4) {
       const userName = container.children[i];
@@ -381,9 +383,13 @@ export class SharedFiles implements ECFetchable {
     * ECConnection the notification came from.
     */
    public static parseNotification(packet: ECPacket, connection?: ECConnection): SharedFile | undefined {
-      if (packet.opcode !== ECOpcode.EC_OP_SHARED_FILES) return undefined;
+      if (packet.opcode !== ECOpcode.EC_OP_SHARED_FILES) {
+         return undefined;
+      }
       const tag = packet.find(ECTagNames.EC_TAG_KNOWNFILE) ?? packet.find(ECTagNames.EC_TAG_PARTFILE);
-      if (!tag) return undefined;
+      if (!tag) {
+         return undefined;
+      }
       const file = SharedFile.fromTag(tag, connection);
       debug("parseNotification: ecid=%s, removed=%s", file.ecid, file.removed);
       return file;
@@ -667,13 +673,17 @@ export class SharedFileTracker {
    public seed(sharedFiles: SharedFiles): void {
       this.filesByEcid.clear();
       for (const file of sharedFiles.files) {
-         if (file.ecid !== undefined) this.filesByEcid.set(file.ecid, file);
+         if (file.ecid !== undefined) {
+            this.filesByEcid.set(file.ecid, file);
+         }
       }
    }
 
    public apply(packet: ECPacket): SharedFile | undefined {
       const update = SharedFiles.parseNotification(packet, this.connection);
-      if (!update) return undefined;
+      if (!update) {
+         return undefined;
+      }
       if (update.removed) {
          for (const [ecid, file] of this.filesByEcid) {
             if (file.hash === update.hash) {
@@ -683,7 +693,9 @@ export class SharedFileTracker {
          }
          return update;
       }
-      if (update.ecid === undefined) return update;
+      if (update.ecid === undefined) {
+         return update;
+      }
       const merged = this.filesByEcid.get(update.ecid)?.mergedWith(update) ?? update;
       this.filesByEcid.set(update.ecid, merged);
       return merged;

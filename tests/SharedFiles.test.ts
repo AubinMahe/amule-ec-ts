@@ -34,7 +34,9 @@ function sharedFileTag(fields: {
       new ec.ECHash16Tag(ec.ECTagNames.EC_TAG_PARTFILE_HASH, new Uint8Array(Buffer.from(fields.hash, "hex"))),
       new ec.ECStringTag(ec.ECTagNames.EC_TAG_PARTFILE_NAME, fields.name),
    ];
-   if (fields.comments) children.push(fields.comments);
+   if (fields.comments) {
+      children.push(fields.comments);
+   }
    if (fields.kadCommentSearching !== undefined) {
       children.push(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING, fields.kadCommentSearching ? 1n : 0n));
    }

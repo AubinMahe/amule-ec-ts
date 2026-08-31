@@ -29,7 +29,9 @@ function rleDecodeDiff(encoded: Uint8Array): Uint8Array {
       const value = buffer.readUInt8(i);
       if (i < buffer.length - 2 && buffer.readUInt8(i + 1) === value) {
          const count = buffer.readUInt8(i + 2);
-         for (let k = 0; k < count; k++) out.push(value);
+         for (let k = 0; k < count; k++) {
+            out.push(value);
+         }
          i += 3;
       } else {
          out.push(value);
@@ -80,7 +82,9 @@ function bytesToByteRanges(bytes: Uint8Array): readonly ByteRange[] {
    const ranges: ByteRange[] = [];
    for (let i = 0; i + 1 < values.length; i += 2) {
       const [start, end] = values.slice(i, i + 2);
-      if (start !== undefined && end !== undefined) ranges.push({ start, end });
+      if (start !== undefined && end !== undefined) {
+         ranges.push({ start, end });
+      }
    }
    return ranges;
 }
@@ -145,10 +149,14 @@ function resolveBytes(
 ): Uint8Array | undefined {
    const raw = tag.childBytes(tagName);
    const diff = raw ? rleDecodeDiff(raw) : undefined;
-   if (connection === undefined || ecid === undefined) return diff;
+   if (connection === undefined || ecid === undefined) {
+      return diff;
+   }
    const key = cacheKey(kind, ecid);
    const cache = cacheFor(connection);
-   if (resetsEncoder) cache.delete(key);
+   if (resetsEncoder) {
+      cache.delete(key);
+   }
    if (diff !== undefined) {
       cache.set(key, reconstructState(cache.get(key), diff));
    }
@@ -201,10 +209,14 @@ export function resolvePartAvailability(
  */
 export function forgetPartFileStatus(connection: ECConnection, ecid: bigint): void {
    const cache = byConnection.get(connection);
-   if (!cache) return;
+   if (!cache) {
+      return;
+   }
    let forgotAny = false;
    for (const kind of ["gap", "req", "part"] as const) {
       forgotAny = cache.delete(cacheKey(kind, ecid)) || forgotAny;
    }
-   if (forgotAny) debug("forgetPartFileStatus: ecid=%s", ecid);
+   if (forgotAny) {
+      debug("forgetPartFileStatus: ecid=%s", ecid);
+   }
 }

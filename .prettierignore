@@ -1,0 +1,12 @@
+# CLAUDE.md (if it ever exists) is an instructions file for Claude Code, never rendered as HTML:
+# its deliberately un-wrapped prose shouldn't be reflowed.
+# commit-message.md is a commit-message draft (see .gitignore): same reason, deliberately simple
+# formatting, no line breaks within paragraphs.
+# Must stay consistent with .markdownlint-cli2.jsonc's "ignores".
+CLAUDE.md
+commit-message.md
+
+*.tsbuildinfo
+coverage/
+dist/
+node_modules/

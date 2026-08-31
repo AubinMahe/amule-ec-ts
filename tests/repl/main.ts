@@ -30,7 +30,9 @@ function readExternalConnectSettings(): ExternalConnectSettings {
          inSection = line === "[ExternalConnect]";
          continue;
       }
-      if (!inSection) continue;
+      if (!inSection) {
+         continue;
+      }
       const portMatch = /^ECPort=(\d+)$/.exec(line);
       if (portMatch?.[1]) {
          port = Number(portMatch[1]);

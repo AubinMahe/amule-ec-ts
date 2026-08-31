@@ -276,13 +276,21 @@ export class Repl {
       console.log(HELP);
       for (;;) {
          const indicator = this.activity.consume();
-         if (indicator) console.log(indicator);
+         if (indicator) {
+            console.log(indicator);
+         }
          stdout.write("> ");
          const next = await lines.next();
-         if (next.done) break;
+         if (next.done) {
+            break;
+         }
          const command = next.value.trim();
-         if (command === "") continue;
-         if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit") break;
+         if (command === "") {
+            continue;
+         }
+         if (command.toLowerCase() === "quit" || command.toLowerCase() === "exit") {
+            break;
+         }
          try {
             await this.runCommand(command.split(/\s+/).filter(Boolean));
          } catch (error) {

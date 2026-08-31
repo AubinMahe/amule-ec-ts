@@ -175,10 +175,14 @@ export class StatNode {
     * none).
     */
    public findByKey(key: string): StatNode | undefined {
-      if (this.key === key) return this;
+      if (this.key === key) {
+         return this;
+      }
       for (const child of this.children) {
          const found = child.findByKey(key);
-         if (found) return found;
+         if (found) {
+            return found;
+         }
       }
       return undefined;
    }
