@@ -15,6 +15,7 @@ function uploadClientTag(fields: {
    software?: ec.ECClientSoftware;
    softwareVersion?: string;
    uploadFileEcid?: number;
+   friendSlot?: boolean;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
@@ -40,6 +41,9 @@ function uploadClientTag(fields: {
    }
    if (fields.uploadFileEcid !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE, fields.uploadFileEcid));
+   }
+   if (fields.friendSlot !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT, fields.friendSlot ? 1 : 0));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, fields.ecid, children);
 }
@@ -77,6 +81,19 @@ describe("UploadClient", () => {
    it("uploadFileEcid is 0n when the client has no upload file assigned", () => {
       const client = new ec.UploadClient(uploadClientTag({ ecid: 1, uploadFileEcid: 0 }));
       expect(client.uploadFileEcid).to.equal(0n);
+   });
+
+   it("reads friendSlot true/false when present", () => {
+      const holder = new ec.UploadClient(uploadClientTag({ ecid: 1, friendSlot: true }));
+      const other = new ec.UploadClient(uploadClientTag({ ecid: 1, friendSlot: false }));
+      expect(holder.friendSlot).to.equal(true);
+      expect(other.friendSlot).to.equal(false);
+   });
+
+   it("friendSlot is undefined when the tag is absent", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(client.friendSlot).to.be.undefined;
    });
 
    describe("softwareText", () => {

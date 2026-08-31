@@ -728,6 +728,39 @@ export class Downloads implements ECFetchable {
    }
 
    /**
+    * Sets a download's "auto swap A4AF" flag to a given value, by hash -
+    * EC_OP_PARTFILE_SET_A4AF_AUTO.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_PARTFILE_SET_A4AF_AUTO case
+    * (`pfile->SetA4AFAuto(hashtag.GetFirstTagSafe()->GetInt() != 0)`): a set rather than a flip -
+    * unlike swapA4AFThisAuto(), which cannot express "make it true" (a caller that cannot see the
+    * current value cannot ask for a particular one, and a retried request would undo itself). The
+    * request's EC_TAG_PARTFILE tag (own data: MD4 hash) carries one EC_TAG_PARTFILE_A4AFAUTO child
+    * (uint8, 0/1) - same shape setCategory() already builds. Replies EC_OP_FAILED/EC_OP_NOOP
+    * exactly like pause()/resume()/stop()/setCategory(); re-sending the value the daemon already
+    * holds is a no-op rather than an undo.
+    */
+   public async setA4AFAuto(hash: string, value: boolean): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_SET_A4AF_AUTO);
+      request.add(
+         new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), [
+            new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_A4AFAUTO, value ? 1 : 0),
+         ]),
+      );
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set A4AF-auto for ${hash}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      debug("setA4AFAuto: hash=%s, value=%s", hash, value);
+   }
+
+   /**
     * Sets a download's priority, identified by its MD4 hash -
     * EC_OP_PARTFILE_PRIO_SET.
     *

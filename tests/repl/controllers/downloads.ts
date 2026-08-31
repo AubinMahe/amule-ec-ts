@@ -101,6 +101,17 @@ export class DownloadsController {
       console.log(`A4AF swap (${mode}) requested: ${hash}.`);
    }
 
+   public async setA4AFAuto(args: string[]): Promise<void> {
+      const hash = args[0];
+      const state = args[1]?.toLowerCase();
+      if (!hash || (state !== "on" && state !== "off")) {
+         console.error("Usage: a4afauto <hash> <on|off>");
+         return;
+      }
+      await this.downloads.setA4AFAuto(hash, state === "on");
+      console.log(`A4AF-auto set to ${state}: ${hash}.`);
+   }
+
    public async setCategory(args: string[]): Promise<void> {
       const hash = args[0];
       const indexText = args[1];

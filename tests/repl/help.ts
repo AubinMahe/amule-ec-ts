@@ -50,6 +50,7 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    [`priority <hash> <${Object.keys(PRIORITY_NAMES).join("|")}>`, "set a download's priority"],
    ["addlink <ed2k-link>", "start a download from a link"],
    ["swap <this|auto|others> <hash>", "swap A4AF sources for a download"],
+   ["a4afauto <hash> <on|off>", "set (not flip) a download's A4AF-auto flag"],
    ["setcat <hash> <category-index>", "assign a download to a category"],
    ["category create <title> <path> [comment] [color] [prio]", "create a download category"],
    ["category update <index> <title> <path> [comment] [color] [prio]", "update a download category"],

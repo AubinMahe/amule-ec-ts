@@ -404,17 +404,17 @@ export class Search {
     * Re-asks already-queried Kad peers for a wider result frontier on one
     * running search - EC_OP_SEARCH_REQUEST_MORE.
     *
-    * Confirmed against Get_EC_Response_Search_Request_More
-    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L2726-L2745): Kad-only -
-    * silently does nothing for a local/global (ed2k) search, and is capped
-    * at a handful of reasks per search server-side, past which it's also a
-    * silent no-op. `searchId` mirrors SearchSession.stop()'s optional
-    * EC_TAG_SEARCH_ID (omit for "the current/most-recent search" when
-    * multi-search is active). Always replies EC_OP_MISC_DATA with no
-    * tags - fire-and-forget: whether a peer was actually reasked is never
-    * surfaced over EC, only logged daemon-side.
+    * Confirmed against Get_EC_Response_Search_Request_More: Kad-only - silently does nothing for a
+    * local/global (ed2k) search, and is capped at a handful of reasks per search server-side, past
+    * which it's also a silent no-op. `searchId` mirrors SearchSession.stop()'s optional
+    * EC_TAG_SEARCH_ID (omit for "the current/most-recent search" when multi-search is active).
+    * Always replies EC_OP_MISC_DATA, carrying EC_TAG_SEARCH_MORE_REASKABLE (whether a *later* press
+    * could still widen this search - not whether this press just did) - emitted on every path,
+    * including an unknown/expired search id, which reads as not-reaskable rather than being
+    * distinguished from it. Returned as `undefined`, not `false`, when the tag itself is absent: a
+    * daemon predating it hasn't told you "exhausted", only "unknown" - don't collapse the two.
     */
-   public async requestMore(searchId?: bigint): Promise<void> {
+   public async requestMore(searchId?: bigint): Promise<boolean | undefined> {
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_REQUEST_MORE);
       if (searchId !== undefined) {
          request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_ID, Number(searchId)));
@@ -424,7 +424,10 @@ export class Search {
       if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
          throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`);
       }
-      debug("requestMore: searchId=%s", searchId);
+      const reaskableTag = reply.find(ECTagNames.EC_TAG_SEARCH_MORE_REASKABLE);
+      const reaskable = reaskableTag === undefined ? undefined : reaskableTag.intValue !== 0n;
+      debug("requestMore: searchId=%s, reaskable=%s", searchId, reaskable);
+      return reaskable;
    }
 
    /**

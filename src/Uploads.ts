@@ -9,6 +9,10 @@ import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:uploads");
 
+function boolOrUndefined(value: bigint | undefined): boolean | undefined {
+   return value === undefined ? undefined : value !== 0n;
+}
+
 /**
  * A client's `EC_TAG_CLIENT_SOFTWARE` value - the ed2k protocol's client-software identifier.
  * Confirmed against `EClientSoftware`
@@ -76,6 +80,15 @@ export class UploadClient {
     * (`SharedFiles.files`) to resolve the hash needed by `SharedFiles.searchKadNotes()`.
     */
    public readonly uploadFileEcid: bigint | undefined;
+   /**
+    * Whether this client holds the upload slot reserved for a friend - `EC_TAG_CLIENT_FRIEND_SLOT`
+    * (`client->GetFriendSlot()`), distinct from friends-list membership
+    * (`EC_TAG_CLIENT_IS_FRIEND`, decoded as `ClientUpdate.isFriend` in `Update.ts`, not exposed
+    * here). Confirmed against `CEC_UpDownClient_Tag` in `ECSpecialCoreTags.cpp`: added
+    * unconditionally, alongside every other field read below, so it's present at the same
+    * `EC_DETAIL_CMD` level `Uploads.fetch()` already requests.
+    */
+   public readonly friendSlot: boolean | undefined;
 
    public constructor(tag: ECTag) {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
@@ -90,6 +103,7 @@ export class UploadClient {
       this.fileName = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME);
       this.ecid = tag.intValue;
       this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE);
+      this.friendSlot = boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT));
    }
 
    /**

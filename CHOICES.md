@@ -13,13 +13,13 @@ limitation of the EC protocol itself - already documented in `Chat.ts`'s docstri
 
 ## Protocol/REPL coverage
 
-`ECOpcode.ts` declares 91 opcodes. The library wraps all 91 of them; all 91 are covered by a unit test. Only 6 (the auth handshake +
+`ECOpcode.ts` declares 92 opcodes. The library wraps all 92 of them; all 92 are covered by a unit test. Only 6 (the auth handshake +
 `NOOP`) are exercised through the full wire-level fake TCP server (`tests/fakeEcServer.ts`, byte-for-byte
 framing/compression/capabilities) - every other tested opcode goes through the lighter in-memory `FakeConnection` stub in
 `testUtils.ts` (queued replies, no real socket). Extending the fake server past auth+`NOOP` was considered and rejected: live
 `amuled` smoke tests are preferred over more wire-level test scaffolding for the remaining opcodes.
 
-The REPL column below reflects the 87 opcodes reachable on a REPL command's golden (success) path - see the command list further
+The REPL column below reflects the 88 opcodes reachable on a REPL command's golden (success) path - see the command list further
 down. `N/A` marks the two opcodes (`AUTH_FAIL`, `FAILED`) that are inherently error-path-only replies - no REPL command could ever
 deliberately target them on a success path.
 
@@ -116,6 +116,7 @@ deliberately target them on a success path.
 |0x61|`GET_CLIENT_HISTORY`|Requests the daemon's known-clients history (credit store)|✓|✓|||
 |0x62|`CLIENT_HISTORY`|Reply to GET_CLIENT_HISTORY|✓|✓|||
 |0x67|`REFRESH_MEDIA_METADATA`|Re-extracts audio/video metadata for one shared file, or the whole share|✓|✓||✓|
+|0x68|`PARTFILE_SET_A4AF_AUTO`|Sets (rather than flips) a download's A4AF-auto flag|✓|✓||✓|
 
 The REPL (`tests/repl/`) drives all 19 feature classes:
 
@@ -128,7 +129,7 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
   `server update <url>`, `search <keywords>`, `search stop`, `search more [id]`, `show searches`, `download <hash>...`,
   `cancel <hash>`, `pause <hash>`, `resume <hash>`, `stop <hash>`,
   `priority <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`, `addlink <ed2k-link>`, `swap <this|auto|others> <hash>`,
-  `setcat <hash> <category-index>`, `category create <title> <path> [comment] [color] [prio]`,
+  `a4afauto <hash> <on|off>`, `setcat <hash> <category-index>`, `category create <title> <path> [comment] [color] [prio]`,
   `category update <index> <title> <path> [comment] [color] [prio]`, `category delete <index>`,
   `sharedprio <hash> <low|normal|high|veryhigh|verylow|auto|powershare>`, `show shareddirs`, `shareddir add <path> [recursive]`,
   `shareddir remove <path>`, `clear completed`, `kad start`, `kad stop`, `kad bootstrap <ip> <port>`, `kad update <url>`,

@@ -812,6 +812,51 @@ describe("Downloads.setCategory", () => {
    });
 });
 
+describe("Downloads.setA4AFAuto", () => {
+   it("sends the hash as EC_TAG_PARTFILE with an EC_TAG_PARTFILE_A4AFAUTO child", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.setA4AFAuto(hexHash("a"), true);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_PARTFILE_SET_A4AF_AUTO);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+      const flagTag = hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_A4AFAUTO);
+      expect(flagTag?.intValue).to.equal(1n);
+   });
+
+   it("sends 0 for false", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await downloads.setA4AFAuto(hexHash("a"), false);
+
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE);
+      expect(hashTag?.findChild(ec.ECTagNames.EC_TAG_PARTFILE_A4AFAUTO)?.intValue).to.equal(0n);
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "FileHash not found: deadbeef"));
+      fake.queueReply(failure);
+
+      await expectRejection(downloads.setA4AFAuto(hexHash("a"), true), /FileHash not found/);
+   });
+
+   it("throws a generic error on any other unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const downloads = new ec.Downloads(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES));
+
+      await expectRejection(downloads.setA4AFAuto(hexHash("a"), true), /EC_OP_NOOP/);
+   });
+});
+
 describe("Downloads.addLink", () => {
    it("sends the link as a single EC_TAG_STRING tag and succeeds on EC_OP_NOOP", async () => {
       const fake = createFakeConnection();

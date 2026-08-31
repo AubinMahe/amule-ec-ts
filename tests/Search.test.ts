@@ -394,6 +394,29 @@ describe("Search.requestMore", () => {
       expect(fake.sent[0]?.tags).to.have.lengthOf(0);
    });
 
+   it("decodes EC_TAG_SEARCH_MORE_REASKABLE true/false when present", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      const reaskable = new ec.ECPacket(ec.ECOpcode.EC_OP_MISC_DATA);
+      reaskable.add(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_MORE_REASKABLE, 1));
+      fake.queueReply(reaskable);
+      const exhausted = new ec.ECPacket(ec.ECOpcode.EC_OP_MISC_DATA);
+      exhausted.add(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_SEARCH_MORE_REASKABLE, 0));
+      fake.queueReply(exhausted);
+
+      expect(await search.requestMore(7n)).to.equal(true);
+      expect(await search.requestMore(7n)).to.equal(false);
+   });
+
+   it("returns undefined when the reply carries no EC_TAG_SEARCH_MORE_REASKABLE tag (daemon predates it)", async () => {
+      const fake = createFakeConnection();
+      const search = new ec.Search(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_MISC_DATA));
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(await search.requestMore(7n)).to.be.undefined;
+   });
+
    it("throws a generic error on any unexpected opcode", async () => {
       const fake = createFakeConnection();
       const search = new ec.Search(fake.connection);
