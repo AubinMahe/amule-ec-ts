@@ -13,13 +13,13 @@ limitation of the EC protocol itself - already documented in `Chat.ts`'s docstri
 
 ## Protocol/REPL coverage
 
-`ECOpcode.ts` declares 88 opcodes. The library wraps all 88 of them; all 88 are covered by a unit test. Only 6 (the auth handshake +
+`ECOpcode.ts` declares 91 opcodes. The library wraps all 91 of them; all 91 are covered by a unit test. Only 6 (the auth handshake +
 `NOOP`) are exercised through the full wire-level fake TCP server (`tests/fakeEcServer.ts`, byte-for-byte
 framing/compression/capabilities) - every other tested opcode goes through the lighter in-memory `FakeConnection` stub in
 `testUtils.ts` (queued replies, no real socket). Extending the fake server past auth+`NOOP` was considered and rejected: live
 `amuled` smoke tests are preferred over more wire-level test scaffolding for the remaining opcodes.
 
-The REPL column below reflects the 86 opcodes reachable on a REPL command's golden (success) path - see the command list further
+The REPL column below reflects the 87 opcodes reachable on a REPL command's golden (success) path - see the command list further
 down. `N/A` marks the two opcodes (`AUTH_FAIL`, `FAILED`) that are inherently error-path-only replies - no REPL command could ever
 deliberately target them on a success path.
 
@@ -113,6 +113,9 @@ deliberately target them on a success path.
 |0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|✓|✓||✓|
 |0x5f|`SEARCH_REQUEST_MORE`|Kad-only: re-asks already-queried peers for more results on a multi-search-addressed search|✓|✓||✓|
 |0x60|`SEARCH_LIST`|Lists every search the daemon currently holds, from any source (not just this connection's)|✓|✓||✓|
+|0x61|`GET_CLIENT_HISTORY`|Requests the daemon's known-clients history (credit store)|✓|✓|||
+|0x62|`CLIENT_HISTORY`|Reply to GET_CLIENT_HISTORY|✓|✓|||
+|0x67|`REFRESH_MEDIA_METADATA`|Re-extracts audio/video metadata for one shared file, or the whole share|✓|✓||✓|
 
 The REPL (`tests/repl/`) drives all 19 feature classes:
 
@@ -132,7 +135,7 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
   `shutdown`, `checkversion`, `swapclient <client-ecid> <hash>`, `verify <hash>`, `sharedreload`, `rename <hash> <new-name>`,
   `ipfilter reload`, `ipfilter update [url]`, `friend add <ecid>`, `friend add <hash> <ip> <port> <name>`,
   `friend browse <client-ecid>`, `friend remove <ecid>`, `friend slot <ecid> <on|off>`, `comment <hash> <rating 0-5> <text>`,
-  `kadnotes <hash>`, `show prefs messagefilter`, `prefs messagefilter <on|off>`, `show prefs connections`,
+  `kadnotes <hash>`, `refreshmedia [hash]`, `show prefs messagefilter`, `prefs messagefilter <on|off>`, `show prefs connections`,
   `prefs connections reconnect <on|off>`, `show prefs files`, `prefs files checkfreespace <on|off>`, `show prefs directories`,
   `prefs directories autorescan <on|off>`, `show prefs security`, `prefs security filterlan <on|off>`, `show prefs onlinesig`,
   `prefs onlinesig <on|off>`, `show prefs servers`, `prefs servers autoupdate <on|off>`, `show prefs kademlia`,
