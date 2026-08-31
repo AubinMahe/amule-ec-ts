@@ -54,9 +54,15 @@ export class CategoriesController {
 
    public async dispatch(args: string[]): Promise<void> {
       const sub = args[0]?.toLowerCase();
-      if (sub === "create") return this.create(args.slice(1));
-      if (sub === "update") return this.update(args.slice(1));
-      if (sub === "delete") return this.delete(args.slice(1));
+      if (sub === "create") {
+         return this.create(args.slice(1));
+      }
+      if (sub === "update") {
+         return this.update(args.slice(1));
+      }
+      if (sub === "delete") {
+         return this.delete(args.slice(1));
+      }
       console.error("Usage: category <create ...|update ...|delete <index>>");
    }
 }

@@ -21,6 +21,7 @@ const namingConvention = [
 const commonRules = {
    "sonarjs/no-commented-code": "off",
    "sonarjs/constructor-for-side-effects": "off",
+   curly: ['error', 'all'],
    'comment-length/limit-single-line-comments': ['error', { maxLength: 100 }],
    'comment-length/limit-multi-line-comments': ['error', { maxLength: 100 }],
    'jsdoc/multiline-blocks': ['error', { noSingleLineBlocks: true }],

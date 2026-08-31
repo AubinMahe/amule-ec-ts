@@ -39,7 +39,9 @@ function partFileTag(fields: {
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_FULL, fields.sizeFull),
       new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PARTFILE_SIZE_DONE, fields.sizeDone),
    ];
-   if (fields.sourceNames) children.push(fields.sourceNames);
+   if (fields.sourceNames) {
+      children.push(fields.sourceNames);
+   }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_PARTFILE, fields.ecid, children);
 }
 

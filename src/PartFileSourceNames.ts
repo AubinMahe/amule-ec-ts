@@ -20,11 +20,15 @@ export interface SourceName {
  */
 export function parseSourceNames(tag: ECTag): ReadonlyMap<bigint, SourceName> | undefined {
    const container = tag.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES);
-   if (!container) return undefined;
+   if (!container) {
+      return undefined;
+   }
    const names = new Map<bigint, SourceName>();
    for (const entry of container.children) {
       const id = entry.intValue;
-      if (id === undefined) continue;
+      if (id === undefined) {
+         continue;
+      }
       const count = entry.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS) ?? 0n;
       const name = entry.findChild(ECTagNames.EC_TAG_PARTFILE_SOURCE_NAMES)?.stringValue;
       names.set(id, { name, count });
@@ -42,7 +46,9 @@ export function mergeSourceNames(
    base: ReadonlyMap<bigint, SourceName> | undefined,
    update: ReadonlyMap<bigint, SourceName> | undefined,
 ): ReadonlyMap<bigint, SourceName> | undefined {
-   if (update === undefined) return base;
+   if (update === undefined) {
+      return base;
+   }
    const merged = new Map(base ?? []);
    for (const [id, entry] of update) {
       if (entry.count === 0n) {
@@ -51,7 +57,9 @@ export function mergeSourceNames(
          merged.set(id, entry);
       } else {
          const existing = merged.get(id);
-         if (existing) merged.set(id, { name: existing.name, count: entry.count });
+         if (existing) {
+            merged.set(id, { name: existing.name, count: entry.count });
+         }
       }
    }
    return merged;
@@ -105,11 +113,15 @@ export function resolveSourceNames(
    ecid: bigint | undefined,
 ): ReadonlyMap<bigint, SourceName> | undefined {
    const delta = parseSourceNames(tag);
-   if (connection === undefined || ecid === undefined) return delta;
+   if (connection === undefined || ecid === undefined) {
+      return delta;
+   }
    const cache = cacheFor(connection);
    if (delta !== undefined) {
       const merged = mergeSourceNames(cache.get(ecid), delta);
-      if (merged !== undefined) cache.set(ecid, merged);
+      if (merged !== undefined) {
+         cache.set(ecid, merged);
+      }
    }
    return cache.get(ecid);
 }

@@ -41,12 +41,16 @@ export class AlternateNamesCache {
    public constructor(private readonly path: string) {}
 
    private async load(): Promise<void> {
-      if (this.loaded) return;
+      if (this.loaded) {
+         return;
+      }
       try {
          const file = JSON.parse(await fs.readFile(this.path, "utf8")) as CacheFile;
          this.content = new Map(Object.entries(file));
       } catch (error) {
-         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+         if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw error;
+         }
          this.content = new Map();
       }
       this.loaded = true;
@@ -83,7 +87,9 @@ export class AlternateNamesCache {
                changed = true;
             }
          }
-         if (changed) await this.persist();
+         if (changed) {
+            await this.persist();
+         }
          debug("init: %d entrie(s) after purge", this.content.size);
       });
    }
@@ -94,15 +100,21 @@ export class AlternateNamesCache {
     * entry unchanged.
     */
    public async add(name: string, altNames: readonly string[]): Promise<void> {
-      if (altNames.length === 0) return;
+      if (altNames.length === 0) {
+         return;
+      }
       await this.mutate(async () => {
          await this.load();
          const existing = new Set(this.content.get(name)?.names ?? []);
          const before = existing.size;
          for (const altName of altNames) {
-            if (altName !== name) existing.add(altName);
+            if (altName !== name) {
+               existing.add(altName);
+            }
          }
-         if (existing.size === before && this.content.has(name)) return;
+         if (existing.size === before && this.content.has(name)) {
+            return;
+         }
          this.content.set(name, { names: [...existing], lastUpdated: new Date().toISOString() });
          await this.persist();
          debug("add: name=%s, +%d altName(s), total=%d", name, altNames.length, existing.size);
@@ -125,7 +137,9 @@ export class AlternateNamesCache {
    public async remove(name: string): Promise<void> {
       await this.mutate(async () => {
          await this.load();
-         if (!this.content.delete(name)) return;
+         if (!this.content.delete(name)) {
+            return;
+         }
          await this.persist();
          debug("remove: name=%s", name);
       });

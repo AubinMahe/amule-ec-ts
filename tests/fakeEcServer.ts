@@ -20,7 +20,9 @@ class SocketReader {
    }
 
    private flush(): void {
-      if (!this.waiting || this.buffer.length < this.waiting.length) return;
+      if (!this.waiting || this.buffer.length < this.waiting.length) {
+         return;
+      }
       const { length, resolve } = this.waiting;
       this.waiting = undefined;
       resolve(this.buffer.subarray(0, length));
@@ -28,7 +30,9 @@ class SocketReader {
    }
 
    public readBytes(length: number): Promise<Buffer> {
-      if (length === 0) return Promise.resolve(Buffer.alloc(0));
+      if (length === 0) {
+         return Promise.resolve(Buffer.alloc(0));
+      }
       return new Promise((resolve) => {
          this.waiting = { length, resolve };
          this.flush();
@@ -54,7 +58,9 @@ function wrapPeer(socket: net.Socket): FakeEcPeer {
          const headerBuffer = await reader.readBytes(ec.TransmissionHeader.SIZE);
          const header = ec.TransmissionHeader.decode(headerBuffer);
          let body = await reader.readBytes(header.bodyLength);
-         if (header.compressed) body = zlib.inflateSync(body);
+         if (header.compressed) {
+            body = zlib.inflateSync(body);
+         }
          const capabilities = new ec.ECCapabilities();
          capabilities.utf8Numbers = header.utf8Numbers;
          capabilities.largeTagCount = header.largeTagCount;
@@ -64,7 +70,9 @@ function wrapPeer(socket: net.Socket): FakeEcPeer {
          const capabilities = options.capabilities ?? new ec.ECCapabilities();
          const compressed = options.compressed ?? false;
          let body = packet.encode(capabilities);
-         if (compressed) body = zlib.deflateSync(body);
+         if (compressed) {
+            body = zlib.deflateSync(body);
+         }
          const flags = ec.ECFlags.create(compressed, capabilities.utf8Numbers, capabilities.largeTagCount);
          const header = new ec.TransmissionHeader(flags, body.length);
          socket.write(Buffer.concat([header.encode(), body]));
@@ -85,7 +93,9 @@ export interface FakeEcServer {
 function createNextPeer(queuedPeers: FakeEcPeer[], waitingResolvers: ((peer: FakeEcPeer) => void)[]): () => Promise<FakeEcPeer> {
    return function nextPeer(): Promise<FakeEcPeer> {
       const queued = queuedPeers.shift();
-      if (queued) return Promise.resolve(queued);
+      if (queued) {
+         return Promise.resolve(queued);
+      }
       return new Promise((resolve) => {
          waitingResolvers.push(resolve);
       });
@@ -102,7 +112,9 @@ function createClose(server: net.Server, openSockets: Set<net.Socket>): () => Pr
          server.close(() => {
             resolve();
          });
-         for (const socket of openSockets) socket.destroy();
+         for (const socket of openSockets) {
+            socket.destroy();
+         }
       });
    };
 }
@@ -123,8 +135,11 @@ export function startFakeEcServer(): Promise<FakeEcServer> {
          });
          const peer = wrapPeer(socket);
          const waiter = waitingResolvers.shift();
-         if (waiter) waiter(peer);
-         else queuedPeers.push(peer);
+         if (waiter) {
+            waiter(peer);
+         } else {
+            queuedPeers.push(peer);
+         }
       });
       server.once("error", reject);
       server.listen(0, "127.0.0.1", () => {

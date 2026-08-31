@@ -130,7 +130,9 @@ export class ServerInfo {
    }
 
    public static fromTag(tag: ECTag): ServerInfo | undefined {
-      if (!(tag instanceof ECIPv4Tag)) return undefined;
+      if (!(tag instanceof ECIPv4Tag)) {
+         return undefined;
+      }
       return new ServerInfo({
          ip: tag.address.join("."),
          port: tag.port,

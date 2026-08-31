@@ -573,7 +573,9 @@ export class Update {
    }
 
    private mergeInto<T extends { ecid: bigint | undefined; mergedWith(update: T): T }>(map: Map<bigint, T>, update: T): void {
-      if (update.ecid === undefined) return;
+      if (update.ecid === undefined) {
+         return;
+      }
       const merged = map.get(update.ecid)?.mergedWith(update) ?? update;
       map.set(update.ecid, merged);
    }

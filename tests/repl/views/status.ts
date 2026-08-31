@@ -2,7 +2,9 @@ import * as ec from "../../../src/index.js";
 import { formatSpeed } from "../format.js";
 
 function formatIdLabel(status: ec.Status): string {
-   if (status.hasLowId === undefined) return "";
+   if (status.hasLowId === undefined) {
+      return "";
+   }
    return status.hasLowId ? " (Low ID)" : " (High ID)";
 }
 
@@ -15,8 +17,12 @@ function formatEd2kState(status: ec.Status): string {
 }
 
 function formatKadState(status: ec.Status): string {
-   if (status.kadConnected) return "connected";
-   if (!status.kadRunning) return "off";
+   if (status.kadConnected) {
+      return "connected";
+   }
+   if (!status.kadRunning) {
+      return "off";
+   }
    return status.kadFirewalled ? "firewalled" : "running";
 }
 
@@ -25,7 +31,9 @@ export function printStatus(status: ec.Status): void {
       console.log(`ed2k: ${formatEd2kState(status)}  kad: ${formatKadState(status)}`);
    }
 
-   if (status.uploadSpeed === undefined && status.downloadSpeed === undefined) return;
+   if (status.uploadSpeed === undefined && status.downloadSpeed === undefined) {
+      return;
+   }
 
    console.log(
       `up: ${formatSpeed(status.uploadSpeed)} (limit ${formatSpeed(status.uploadSpeedLimit)}, queue: ${status.uploadQueueLength ?? "?"})` +

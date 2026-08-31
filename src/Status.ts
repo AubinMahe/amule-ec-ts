@@ -146,9 +146,13 @@ export class Status implements ECFetchable {
     * EC_OP_STATS traffic is a fetch() reply, not this - see class doc).
     */
    public applyNotification(packet: ECPacket): boolean {
-      if (packet.opcode !== ECOpcode.EC_OP_STATS) return false;
+      if (packet.opcode !== ECOpcode.EC_OP_STATS) {
+         return false;
+      }
       const connStateTag = packet.find(ECTagNames.EC_TAG_CONNSTATE);
-      if (!connStateTag) return false;
+      if (!connStateTag) {
+         return false;
+      }
       this.applySnapshot(undefined, connStateTag);
       debug("applyNotification: ed2kConnected=%s, kadConnected=%s", this.ed2kConnected, this.kadConnected);
       return true;
@@ -175,7 +179,9 @@ export class Status implements ECFetchable {
          this.tempFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_TEMP_FREE_SPACE)?.intValue;
          this.incomingFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_INCOMING_FREE_SPACE)?.intValue;
       }
-      if (!connStateTag) return;
+      if (!connStateTag) {
+         return;
+      }
       const bitmask = connStateTag.intValue ?? 0n;
       this.ed2kConnected = (bitmask & 0x01n) !== 0n;
       this.ed2kConnecting = (bitmask & 0x02n) !== 0n;

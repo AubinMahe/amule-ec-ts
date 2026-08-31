@@ -19,9 +19,13 @@ export class ServersController {
       const options: { static?: boolean; prio?: ec.ServerPriority } = {};
       for (const token of args.slice(1)) {
          const lower = token.toLowerCase();
-         if (lower === "static") options.static = true;
-         else if (lower === "nostatic") options.static = false;
-         else if (lower in SERVER_PRIORITY_NAMES) options.prio = SERVER_PRIORITY_NAMES[lower];
+         if (lower === "static") {
+            options.static = true;
+         } else if (lower === "nostatic") {
+            options.static = false;
+         } else if (lower in SERVER_PRIORITY_NAMES) {
+            options.prio = SERVER_PRIORITY_NAMES[lower];
+         }
       }
       if (!ecidText || (options.static === undefined && options.prio === undefined)) {
          console.error(`Usage: server priority <ecid> [static|nostatic] [${Object.keys(SERVER_PRIORITY_NAMES).join("|")}]`);
@@ -31,8 +35,12 @@ export class ServersController {
       // SetStaticServer()/SetServerPrio(), never combined) - this command accepts both tokens on
       // one line purely for REPL convenience, issuing one call per token actually given.
       const ecid = BigInt(ecidText);
-      if (options.static !== undefined) await this.servers.setStatic(ecid, options.static);
-      if (options.prio !== undefined) await this.servers.setPriority(ecid, options.prio);
+      if (options.static !== undefined) {
+         await this.servers.setStatic(ecid, options.static);
+      }
+      if (options.prio !== undefined) {
+         await this.servers.setPriority(ecid, options.prio);
+      }
       console.log(`Server priority updated: ecid=${ecidText}.`);
    }
 
@@ -78,9 +86,15 @@ export class ServersController {
          await this.priority(args.slice(1));
          return;
       }
-      if (sub === "remove") return this.remove(args.slice(1));
-      if (sub === "add") return this.add(args.slice(1));
-      if (sub === "update") return this.updateFromUrl(args.slice(1));
+      if (sub === "remove") {
+         return this.remove(args.slice(1));
+      }
+      if (sub === "add") {
+         return this.add(args.slice(1));
+      }
+      if (sub === "update") {
+         return this.updateFromUrl(args.slice(1));
+      }
       console.error("Usage: server <disconnect|priority ...|remove <ip:port>|add <ip:port> [name]|update <url>>");
    }
 }

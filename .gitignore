@@ -1,5 +1,6 @@
 *.tgz
 *.tsbuildinfo
+commit-message.md
 coverage/
 dist/
 node_modules/
