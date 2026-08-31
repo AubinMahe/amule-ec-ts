@@ -9,6 +9,25 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-08-31
+
+### Added
+
+- `Chat.fetchHistory(clientId, cursor?)`, `Chat.sendToSession(clientId, text)`/`.sendToClient(clientEcid, text)`/
+  `.sendToFriend(friendEcid, text)`, and `Chat.closeSession(clientId)`, wrapping the upstream chat session store
+  (`EC_OP_GET_CHAT_SESSIONS`/`EC_OP_CHAT_SESSIONS`/`EC_OP_CHAT_SEND`/`EC_OP_CHAT_CLOSE_SESSION`) - a real client opt-in
+  (`ECEngineStartOptions.chatSessions`/`ECCapabilities.chatSessions`), unlike most other capability-gated features here. New
+  `chat send <session|client|friend> <id> <text>`/`chat close <client-id>`/`chat history <client-id> [cursor]` REPL commands.
+
+### Changed
+
+- **Breaking**: `Chat.fetch()` now polls `EC_OP_GET_CHAT_SESSIONS` and populates `Chat.sessions: readonly ChatSession[]` instead of
+  `Chat.messages: readonly ChatMessage[]`. `ChatMessage` drops `senderId` and gains `id`/`direction`/`timestamp`; a message is only
+  reached through its parent `ChatSession` now, never bare. Forced by upstream: it re-specified `EC_OP_GET_CHAT_MESSAGES` itself
+  from a destructive, tag-less drain into the non-destructive backfill of one named session (see `Chat.ts`'s class doc and
+  `amule-cpp-sync.md`), removing the old queue outright with no compatible shape left to wrap - live-tested against a rebuilt
+  daemon, the previous `Chat.fetch()` now fails with `EC_OP_FAILED` ("Missing chat session id") instead of returning anything.
+
 ## [2.27.0] - 2026-08-31
 
 ### Added

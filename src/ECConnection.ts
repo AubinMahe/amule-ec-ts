@@ -202,11 +202,14 @@ export class ECConnection extends events.EventEmitter {
     * EC_TAG_CAN_NOTIFY off our own EC_OP_AUTH_REQ and registers the socket
     * with ECNotifier unconditionally if present, with no acknowledgement.
     */
-   public async authenticateWithHash(passwordHash: string): Promise<void> {
-      const authRequest = new ECPacket(ECOpcode.EC_OP_AUTH_REQ);
-      authRequest.add(new ECUInt16Tag(ECTagNames.EC_TAG_PROTOCOL_VERSION, ECVersion.PROTOCOL));
-      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_NAME, ECVersion.CLIENT_NAME));
-      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_VERSION, ECVersion.CLIENT_VERSION));
+   /**
+    * Adds this connection's client-opt-in capability tags to `authRequest` - the ones with a
+    * `localCapabilities` flag to gate on, unlike the unconditional version-probes
+    * `authenticateWithHash()` adds itself (see ECCapabilities.sharedDirsConfig's doc). Split out
+    * purely to keep authenticateWithHash() under the cognitive-complexity limit - these seven
+    * independent `if`s don't interact with anything else in that function.
+    */
+   private addOptionalCapabilityTags(authRequest: ECPacket): void {
       if (this.localCapabilities.zlib) {
          authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_ZLIB, new Uint8Array()));
       }
@@ -225,6 +228,17 @@ export class ECConnection extends events.EventEmitter {
       if (this.localCapabilities.multiSearch) {
          authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_MULTI_SEARCH, new Uint8Array()));
       }
+      if (this.localCapabilities.chatSessions) {
+         authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS, new Uint8Array()));
+      }
+   }
+
+   public async authenticateWithHash(passwordHash: string): Promise<void> {
+      const authRequest = new ECPacket(ECOpcode.EC_OP_AUTH_REQ);
+      authRequest.add(new ECUInt16Tag(ECTagNames.EC_TAG_PROTOCOL_VERSION, ECVersion.PROTOCOL));
+      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_NAME, ECVersion.CLIENT_NAME));
+      authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_VERSION, ECVersion.CLIENT_VERSION));
+      this.addOptionalCapabilityTags(authRequest);
       // Unconditional, unlike every capability above - no client-side
       // preference exists to gate it on, see ECCapabilities.sharedDirsConfig's doc.
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG, new Uint8Array()));
@@ -265,6 +279,8 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.largeTagCount =
          this.localCapabilities.largeTagCount && reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
       this.remoteCapabilities.multiSearch = this.localCapabilities.multiSearch && reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
+      this.remoteCapabilities.chatSessions =
+         this.localCapabilities.chatSessions && reply.has(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS);
       // Unconditional request above, so no ANDing with a local flag here -
       // see ECCapabilities.sharedDirsConfig's doc.
       this.remoteCapabilities.sharedDirsConfig = reply.has(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG);

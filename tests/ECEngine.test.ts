@@ -38,7 +38,7 @@ describe("armReconnect", () => {
       const [connection, firstPeer] = await Promise.all([ec.ECConnection.connect("127.0.0.1", server.port), server.nextPeer()]);
       await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(firstPeer)]);
 
-      ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false, false);
+      ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false, false, false);
 
       const secondPeerPromise = server.nextPeer();
       firstPeer.socket.destroy();

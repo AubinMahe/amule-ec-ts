@@ -71,7 +71,7 @@ function parseArgs(argv: string[]): CliOptions {
 async function main(): Promise<void> {
    const options = parseArgs(process.argv.slice(2));
    const { port, passwordHash } = readExternalConnectSettings();
-   await ec.ECEngine.start({ host: HOST, port, passwordHash, notify: options.notify, multiSearch: true });
+   await ec.ECEngine.start({ host: HOST, port, passwordHash, notify: options.notify, multiSearch: true, chatSessions: true });
    const repl = new Repl(ec.ECEngine.connection);
    try {
       await repl.run();

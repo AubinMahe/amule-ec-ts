@@ -45,6 +45,8 @@ export enum ECTagNames {
    EC_TAG_SESSION_ID = 0x0025,
    // Unconditionally echoed on AUTH_OK - see ECCapabilities.clientHistory's doc.
    EC_TAG_CAN_CLIENT_HISTORY = 0x0026,
+   // Client opt-in, echoed only if requested - see ECCapabilities.chatSessions's doc.
+   EC_TAG_CAN_CHAT_SESSIONS = 0x0027,
    EC_TAG_CLIENT_NAME = 0x0100,
    EC_TAG_CLIENT_VERSION = 0x0101,
    EC_TAG_CLIENT_MOD = 0x0102,
@@ -258,6 +260,12 @@ export enum ECTagNames {
    EC_TAG_FRIEND_SHARED = 0x0809,
    EC_TAG_CHAT = 0x0900,
    EC_TAG_CHAT_CLIENT_ID = 0x0901,
+   EC_TAG_CHAT_SESSION = 0x0902,
+   EC_TAG_CHAT_MESSAGE = 0x0903,
+   EC_TAG_CHAT_MSG_ID = 0x0904,
+   EC_TAG_CHAT_DIRECTION = 0x0905,
+   EC_TAG_CHAT_TIMESTAMP = 0x0906,
+   EC_TAG_CHAT_PEER_NAME = 0x0907,
    EC_TAG_SELECT_PREFS = 0x1000,
    EC_TAG_PREFS_CATEGORIES = 0x1100,
    EC_TAG_CATEGORY = 0x1101,
