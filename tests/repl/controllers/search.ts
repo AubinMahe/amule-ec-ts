@@ -16,9 +16,13 @@ export class SearchController {
    public async more(args: string[]): Promise<void> {
       const idText = args[0];
       const id = idText ? BigInt(idText) : this.currentSearch?.id;
-      await this.search.requestMore(id);
+      const reaskable = await this.search.requestMore(id);
       const suffix = id !== undefined ? `: search ${id}` : "";
-      console.log(`More results requested${suffix}.`);
+      let reaskableText = "unknown (daemon predates this)";
+      if (reaskable !== undefined) {
+         reaskableText = reaskable ? "yes" : "no";
+      }
+      console.log(`More results requested${suffix}. Still reaskable: ${reaskableText}.`);
    }
 
    /**

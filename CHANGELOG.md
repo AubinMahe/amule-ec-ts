@@ -9,6 +9,22 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-08-31
+
+### Added
+
+- `UploadClient.friendSlot` (`EC_TAG_CLIENT_FRIEND_SLOT`) - whether this client holds the upload slot reserved for a friend, already
+  declared but never decoded; already present at the `EC_DETAIL_CMD` level `Uploads.fetch()` requests.
+- `Downloads.setA4AFAuto(hash, value)`, wrapping the upstream `EC_OP_PARTFILE_SET_A4AF_AUTO` opcode: sets (rather than flips) a
+  download's A4AF-auto flag, complementing the existing flip-only `swapA4AFThisAuto()`. New `a4afauto <hash> <on|off>` REPL command.
+
+### Changed
+
+- `Search.requestMore()` now returns `Promise<boolean | undefined>` instead of `Promise<void>`, decoding the new
+  `EC_TAG_SEARCH_MORE_REASKABLE` reply tag: whether a _later_ "More" press could still widen the search. `undefined` when the tag is
+  absent (a daemon predating it), which must read as "not reported", not "exhausted" - existing callers that ignore the return value
+  are unaffected.
+
 ## [2.26.0] - 2026-08-31
 
 ### Added

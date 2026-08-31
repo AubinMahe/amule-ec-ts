@@ -122,6 +122,7 @@ export class Repl {
       priority: (args) => this.downloadsController.priority(args),
       addlink: (args) => this.downloadsController.addLink(args),
       swap: (args) => this.downloadsController.swap(args),
+      a4afauto: (args) => this.downloadsController.setA4AFAuto(args),
       setcat: (args) => this.downloadsController.setCategory(args),
       rename: (args) => this.downloadsController.rename(args),
       category: (args) => this.categoriesController.dispatch(args),
