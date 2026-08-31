@@ -46,4 +46,16 @@ export class ECCapabilities {
     * the EC_OP_FAILED path - see ClientHistory.fetch()'s doc.
     */
    public clientHistory = false;
+   /**
+    * Whether this connection negotiated the chat session store
+    * (EC_OP_GET_CHAT_SESSIONS and friends) - a real client opt-in, unlike
+    * clientHistory/sharedDirsConfig/searchList: EC_TAG_CAN_CHAT_SESSIONS is
+    * only echoed back if this connection's own AUTH_REQ advertised it
+    * first (see Chat's class doc for why - a daemon that already echoes
+    * the older EC_TAG_CAN_CHAT for an unrelated reason must not be
+    * mistaken for one that speaks these ops). Set
+    * ECEngineStartOptions.chatSessions/localCapabilities.chatSessions
+    * before authenticating, same timing constraint as multiSearch.
+    */
+   public chatSessions = false;
 }

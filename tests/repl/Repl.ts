@@ -142,6 +142,7 @@ export class Repl {
       comment: (args) => this.sharedFilesController.comment(args),
       kadnotes: (args) => this.sharedFilesController.kadNotes(args),
       refreshmedia: (args) => this.sharedFilesController.refreshMedia(args),
+      chat: (args) => this.chatController.dispatch(args),
       sharedprio: (args) => this.sharedFilesController.sharedPrio(args),
       shareddir: (args) => this.sharedFilesController.sharedDirDispatch(args),
    };

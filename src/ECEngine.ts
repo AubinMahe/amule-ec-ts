@@ -61,6 +61,13 @@ export interface ECEngineStartOptions {
     */
    multiSearch?: boolean;
    /**
+    * Sets connection.localCapabilities.chatSessions before authenticating - same timing
+    * constraint as `notify`/`multiSearch`: ECConnection.authenticateWithHash() negotiates
+    * EC_TAG_CAN_CHAT_SESSIONS as part of the AUTH_REQ packet itself. See Chat.ts's class doc for
+    * what this unlocks and why it's opt-in rather than an unconditional version probe.
+    */
+   chatSessions?: boolean;
+   /**
     * Path to a JSON file persisting alternate filenames observed for downloads - see
     * AlternateNamesCache's doc for what it stores and why, Downloads.ts's
     * cacheAltNamesIfEligible() for the population policy (progress threshold, fetch()/notification
@@ -90,10 +97,11 @@ export function armReconnect(
    passwordHash: string,
    notify: boolean,
    multiSearch: boolean,
+   chatSessions: boolean,
 ): void {
    connection.once("disconnected", () => {
       console.error("amule-ec: connection to amuled lost, reconnecting...");
-      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch);
+      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch, chatSessions);
    });
 }
 
@@ -104,6 +112,7 @@ async function reconnectLoop(
    passwordHash: string,
    notify: boolean,
    multiSearch: boolean,
+   chatSessions: boolean,
 ): Promise<void> {
    let delayMs = RECONNECT_INITIAL_DELAY_MS;
    for (let attempt = 1; ; attempt++) {
@@ -113,9 +122,10 @@ async function reconnectLoop(
          await connection.reconnect(host, port);
          connection.localCapabilities.notify = notify;
          connection.localCapabilities.multiSearch = multiSearch;
+         connection.localCapabilities.chatSessions = chatSessions;
          await connection.authenticateWithHash(passwordHash);
          console.log("amule-ec: reconnected to amuled.");
-         armReconnect(connection, host, port, passwordHash, notify, multiSearch);
+         armReconnect(connection, host, port, passwordHash, notify, multiSearch, chatSessions);
          return;
       } catch (error) {
          console.error("amule-ec: reconnect attempt failed, retrying...", error);
@@ -138,16 +148,18 @@ export const ECEngine = {
       const host = options.host ?? DEFAULT_HOST;
       const notify = options.notify ?? false;
       const multiSearch = options.multiSearch ?? false;
+      const chatSessions = options.chatSessions ?? false;
       const connection = await ECConnection.connect(host, options.port);
       connection.localCapabilities.notify = notify;
       connection.localCapabilities.multiSearch = multiSearch;
+      connection.localCapabilities.chatSessions = chatSessions;
       await connection.authenticateWithHash(options.passwordHash);
       instance = connection;
       altNamesCacheInstance = options.altNamesCachePath ? new AlternateNamesCache(options.altNamesCachePath) : undefined;
       if (altNamesCacheInstance) {
          await altNamesCacheInstance.init(ALT_NAMES_CACHE_MAX_AGE_MS);
       }
-      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch);
+      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch, chatSessions);
    },
 
    get connection(): ECConnection {

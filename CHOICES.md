@@ -3,23 +3,30 @@
 This document records design decisions and why they were made - including ones considered and discarded. Unlike `TODO.md` (issues
 still to address), this file isn't meant to shrink over time: it's a reference, not a task list.
 
-## Chat: receive only, no sending
+## Chat: session store replaced the old receive-only queue
 
-`Chat.ts` only drains buffered incoming messages from the daemon (`EC_OP_GET_CHAT_MESSAGES`/ `EC_OP_CHAT_MESSAGES`) - there is no EC
-opcode to _send_ a chat message. Messages reach the daemon over the raw ed2k client protocol from other peers; the EC layer is only
-a poll of what's already queued there, each call draining the daemon's queue. This isn't a gap on `amule-ec-ts`'s side but a
-limitation of the EC protocol itself - already documented in `Chat.ts`'s docstring. Confirmed by auditing the C++ source (commit
-`6e3814e48`): no send opcode exists on the EC side.
+Until upstream's chat-parity work (#1053), `Chat.ts` only drained a per-connection queue of buffered _incoming_ messages
+(`EC_OP_GET_CHAT_MESSAGES`/`EC_OP_CHAT_MESSAGES`) - there was no opcode to send one at all, confirmed by auditing the C++ source
+(commit `6e3814e48`). That queue and both opcodes' old semantics are gone: the core now owns a persistent, session-based chat store
+(`EC_OP_GET_CHAT_SESSIONS`/`EC_OP_CHAT_SESSIONS`, `EC_OP_CHAT_SEND`, `EC_OP_CHAT_CLOSE_SESSION`), and `EC_OP_GET_CHAT_MESSAGES` was
+re-specified as a non-destructive backfill of one named session rather than removed - see `Chat.ts`'s class doc and
+`amule-cpp-sync.md`'s 2026-08-31 entry for how this was discovered (a live regression against a daemon built from current master,
+not a mechanical addition). `Chat.ts` was redesigned around this model rather than patched, since upstream removed the old shape
+outright with no compatible middle ground.
+
+Guarded on a genuine client opt-in (`EC_TAG_CAN_CHAT_SESSIONS`), unlike most other capability-gated features in this library (see
+`ECCapabilities.chatSessions`'s doc) - upstream's own history includes a follow-up fix for exactly the hazard of reusing an
+already-echoed capability tag for a new meaning, which is why this one gets its own number instead.
 
 ## Protocol/REPL coverage
 
-`ECOpcode.ts` declares 92 opcodes. The library wraps all 92 of them; all 92 are covered by a unit test. Only 6 (the auth handshake +
+`ECOpcode.ts` declares 96 opcodes. The library wraps all 96 of them; all 96 are covered by a unit test. Only 6 (the auth handshake +
 `NOOP`) are exercised through the full wire-level fake TCP server (`tests/fakeEcServer.ts`, byte-for-byte
 framing/compression/capabilities) - every other tested opcode goes through the lighter in-memory `FakeConnection` stub in
 `testUtils.ts` (queued replies, no real socket). Extending the fake server past auth+`NOOP` was considered and rejected: live
 `amuled` smoke tests are preferred over more wire-level test scaffolding for the remaining opcodes.
 
-The REPL column below reflects the 88 opcodes reachable on a REPL command's golden (success) path - see the command list further
+The REPL column below reflects the 92 opcodes reachable on a REPL command's golden (success) path - see the command list further
 down. `N/A` marks the two opcodes (`AUTH_FAIL`, `FAILED`) that are inherently error-path-only replies - no REPL command could ever
 deliberately target them on a success path.
 
@@ -107,14 +114,18 @@ deliberately target them on a success path.
 |0x58|`VERSION_CHECK`|Triggers an on-demand check for a new aMule release (result relayed later via preferences/stats)|✓|✓||✓|
 |0x59|`SHARED_FILE_SEARCH_KAD_NOTES`|Searches Kad notes for a shared file|✓|✓||✓|
 |0x5a|`VERIFY_LOCAL_DATA`|Verifies a shared file's local data (hash check)|✓|✓||✓|
-|0x5b|`GET_CHAT_MESSAGES`|Requests buffered chat messages|✓|✓||✓|
-|0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES, draining buffered incoming chat|✓|✓||✓|
+|0x5b|`GET_CHAT_MESSAGES`|Backfills one chat session's messages (non-destructive)|✓|✓||✓|
+|0x5c|`CHAT_MESSAGES`|Reply to GET_CHAT_MESSAGES|✓|✓||✓|
 |0x5d|`GET_SHARED_DIRS`|Requests the list of shared directories|✓|✓||✓|
 |0x5e|`SET_SHARED_DIRS`|Sets the list of shared directories|✓|✓||✓|
 |0x5f|`SEARCH_REQUEST_MORE`|Kad-only: re-asks already-queried peers for more results on a multi-search-addressed search|✓|✓||✓|
 |0x60|`SEARCH_LIST`|Lists every search the daemon currently holds, from any source (not just this connection's)|✓|✓||✓|
 |0x61|`GET_CLIENT_HISTORY`|Requests the daemon's known-clients history (credit store)|✓|✓|||
 |0x62|`CLIENT_HISTORY`|Reply to GET_CLIENT_HISTORY|✓|✓|||
+|0x63|`GET_CHAT_SESSIONS`|Polls the chat session store, with a resume cursor|✓|✓||✓|
+|0x64|`CHAT_SESSIONS`|Reply to GET_CHAT_SESSIONS|✓|✓||✓|
+|0x65|`CHAT_SEND`|Sends a chat message, addressed by session/client/friend id|✓|✓||✓|
+|0x66|`CHAT_CLOSE_SESSION`|Closes a chat session globally|✓|✓||✓|
 |0x67|`REFRESH_MEDIA_METADATA`|Re-extracts audio/video metadata for one shared file, or the whole share|✓|✓||✓|
 |0x68|`PARTFILE_SET_A4AF_AUTO`|Sets (rather than flips) a download's A4AF-auto flag|✓|✓||✓|
 
@@ -123,7 +134,8 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
 - `Downloads`, `Uploads`, `SharedFiles`, `Status`, `StatsGraphs`, `Servers`, `Search`, `Log`, `Kad`, `ServerLog`, `Daemon`,
   `DebugLog`, `Friends`, `Chat`, `Categories`, `IPFilter`, `Preferences`, `Update` and `StatsTree`
 - REPL commands : `show dl`, `show ul`, `show shared`, `show servers`, `show log`, `reset log`, `show log last`, `addlog <text>`,
-  `show debug log`, `reset debug log`, `adddebuglog <text>`, `show server log`, `reset server log`, `show chat`, `status`,
+  `show debug log`, `reset debug log`, `adddebuglog <text>`, `show server log`, `reset server log`, `show chat`,
+  `chat send <session|client|friend> <id> <text>`, `chat close <client-id>`, `chat history <client-id> [cursor]`, `status`,
   `show statsgraphs`, `connect <ip:port>`, `connect`, `disconnect`, `server disconnect`,
   `server priority <ecid> [static|nostatic] [normal|high|low]`, `server remove <ip:port>`, `server add <ip:port> [name]`,
   `server update <url>`, `search <keywords>`, `search stop`, `search more [id]`, `show searches`, `download <hash>...`,

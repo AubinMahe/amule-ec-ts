@@ -26,6 +26,17 @@ the double-precision fix (#879) and the client-version-rendering fix (#1131) are
 library's decode logic; the Nagle fix (#1142) is a server-socket option, invisible to any client. No action needed on any of these
 three.
 
+**Correction, same day**: the chat-session-store commit (`2d07705d6`, #1053) was filed above as purely new/unported surface, but it
+also re-specifies `EC_OP_GET_CHAT_MESSAGES` (0x5B) - an opcode this library already implemented as `Chat.fetch()`. The op changed
+from a destructive, tag-less drain of a per-connection queue into the non-destructive backfill of one named session, requiring an
+`EC_TAG_CHAT_CLIENT_ID` request tag; a request built the old way now gets `EC_OP_FAILED` ("Missing chat session id") instead of a
+message list - confirmed live against the rebuilt daemon. This is exactly the "behavior change on protocol already ported" case the
+commit-by-commit pass is meant to catch, missed here because the mechanical opcode/tag diff flagged this commit only for its _new_
+opcodes and the follow-up review didn't separately check whether it also touched already-ported ones. `Chat.ts` was redesigned
+around the session-store model (`ChatSession`/`ChatMessage`, `fetch()`/`fetchHistory()`/`sendToSession()`/`sendToClient()`/
+`sendToFriend()`/`closeSession()`) rather than patched, since upstream itself removed the old queue with no compatible shape to
+preserve.
+
 ## 2026-08-15
 
 Reviewed every commit (~90) touching the EC protocol in the local C++ repo (`/home/aubin/Dev/git/amule`, up-to-date clone of the
