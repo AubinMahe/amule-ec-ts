@@ -46,6 +46,20 @@ export class SharedFilesController {
       console.log(`Comment set: ${hash}.`);
    }
 
+   /**
+    * `refreshmedia` (no args) re-probes the whole share; `refreshmedia <hash>` re-probes one file.
+    */
+   public async refreshMedia(args: string[]): Promise<void> {
+      const hash = args[0];
+      if (!hash) {
+         const queued = await this.sharedFiles.refreshAllMediaMetadata();
+         console.log(`Media metadata refresh requested for the whole share: ${queued} probe(s) queued.`);
+         return;
+      }
+      await this.sharedFiles.refreshMediaMetadata(hash);
+      console.log(`Media metadata refresh requested: ${hash}.`);
+   }
+
    public async kadNotes(args: string[]): Promise<void> {
       const hash = args[0];
       if (!hash) {

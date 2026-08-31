@@ -546,6 +546,67 @@ export class SharedFiles implements ECFetchable {
    }
 
    /**
+    * Re-extracts one shared file's audio/video metadata (EC_TAG_KNOWNFILE_MEDIA_* - see
+    * MediaMetadata's doc), by hash - EC_OP_REFRESH_MEDIA_METADATA.
+    *
+    * Confirmed against ExternalConn.cpp's EC_OP_REFRESH_MEDIA_METADATA case
+    * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L4308-L4357): the request
+    * carries a single EC_TAG_KNOWNFILE (hash) tag; the daemon queues the re-probe on its
+    * media-probe worker and answers immediately, so nothing has been re-extracted yet by the time
+    * this resolves - watch for the file's `media` changing on a later fetch()/poll. Not
+    * capability-gated: a daemon that predates this opcode answers EC_OP_FAILED for an unknown
+    * opcode, indistinguishable here from the two real failure reasons below.
+    *
+    * Replies EC_OP_FAILED (EC_TAG_STRING reason) if media metadata extraction is disabled in
+    * preferences, or if this hash isn't eligible (not an audio/video file, or an incomplete
+    * download) - EC_OP_NOOP with EC_TAG_KNOWNFILE_MEDIA_QUEUED=1 otherwise (always 1 for a single
+    * eligible hash, so that count isn't surfaced here - see refreshAllMediaMetadata() for the case
+    * where it varies).
+    */
+   public async refreshMediaMetadata(hash: string): Promise<void> {
+      const request = new ECPacket(ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to refresh media metadata for ${hash}.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      debug("refreshMediaMetadata: hash=%s", hash);
+   }
+
+   /**
+    * Re-extracts audio/video metadata for every eligible file in the whole share -
+    * EC_OP_REFRESH_MEDIA_METADATA sent with no EC_TAG_KNOWNFILE tag.
+    *
+    * Confirmed against the same ExternalConn.cpp case as refreshMediaMetadata() (see its doc): the
+    * empty-request form re-probes the whole share instead of one file, and its EC_TAG_KNOWNFILE_
+    * MEDIA_QUEUED reply genuinely varies (0 is a legitimate answer - a share with no media in it
+    * queues nothing), unlike the always-1 single-hash case. Replies EC_OP_FAILED (EC_TAG_STRING
+    * reason) only if media metadata extraction is disabled in preferences.
+    */
+   public async refreshAllMediaMetadata(): Promise<number> {
+      const request = new ECPacket(ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
+      await this.connection.send(request);
+      const reply = await this.connection.receive();
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to refresh media metadata.";
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      const queued = Number(reply.find(ECTagNames.EC_TAG_KNOWNFILE_MEDIA_QUEUED)?.intValue ?? 0n);
+      debug("refreshAllMediaMetadata: queued=%d", queued);
+      return queued;
+   }
+
+   /**
     * Requests the daemon's shared-directory configuration -
     * EC_OP_GET_SHARED_DIRS.
     *

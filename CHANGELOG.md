@@ -9,6 +9,17 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-08-31
+
+### Added
+
+- `SharedFiles.refreshMediaMetadata(hash)`/`.refreshAllMediaMetadata()`, wrapping the upstream `EC_OP_REFRESH_MEDIA_METADATA` opcode
+  (added since this library's last upstream sync): re-extracts `EC_TAG_KNOWNFILE_MEDIA_*` metadata (see `MediaMetadata`) for one
+  shared file or the whole share. Not capability-gated on the daemon side, so a daemon predating it answers `EC_OP_FAILED` like any
+  other rejection. `refreshAllMediaMetadata()` returns the number of probes queued (0 is legitimate - a share with no media queues
+  nothing); the single-hash form returns `void` since a successful queue there is always exactly one. Live-tested against a real
+  daemon.
+
 ## [2.25.0] - 2026-08-21
 
 ### Added

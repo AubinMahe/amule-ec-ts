@@ -210,6 +210,76 @@ describe("SharedFiles.setPriority", () => {
    });
 });
 
+describe("SharedFiles.refreshMediaMetadata", () => {
+   it("sends the hash as a single EC_TAG_KNOWNFILE tag and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP);
+      reply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE_MEDIA_QUEUED, 1));
+      fake.queueReply(reply);
+
+      await sharedFiles.refreshMediaMetadata(hexHash("a"));
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
+      const hashTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE);
+      expect(Buffer.from((hashTag as ec.ECHash16Tag).value).toString("hex")).to.equal(hexHash("a"));
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED (disabled in preferences, or ineligible file)", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      reply.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "File is not eligible for media metadata extraction"));
+      fake.queueReply(reply);
+
+      await expectRejection(sharedFiles.refreshMediaMetadata(hexHash("a")), /not eligible/);
+   });
+
+   it("throws a generic error on any other unexpected opcode", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES));
+
+      await expectRejection(sharedFiles.refreshMediaMetadata(hexHash("a")), /EC_OP_NOOP/);
+   });
+});
+
+describe("SharedFiles.refreshAllMediaMetadata", () => {
+   it("sends EC_OP_REFRESH_MEDIA_METADATA with no tags and returns the queued count", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP);
+      reply.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KNOWNFILE_MEDIA_QUEUED, 42));
+      fake.queueReply(reply);
+
+      const queued = await sharedFiles.refreshAllMediaMetadata();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
+      expect(fake.sent[0]?.tags).to.have.lengthOf(0);
+      expect(queued).to.equal(42);
+   });
+
+   it("returns 0 when the reply carries no EC_TAG_KNOWNFILE_MEDIA_QUEUED tag", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      const queued = await sharedFiles.refreshAllMediaMetadata();
+
+      expect(queued).to.equal(0);
+   });
+
+   it("throws the daemon's reason on EC_OP_FAILED (disabled in preferences)", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      reply.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Media metadata extraction is disabled in preferences"));
+      fake.queueReply(reply);
+
+      await expectRejection(sharedFiles.refreshAllMediaMetadata(), /disabled/);
+   });
+});
+
 describe("SharedFiles.getSharedDirs", () => {
    it("throws when the daemon never confirmed EC_TAG_CAN_SHAREDDIRS_CONFIG, without sending anything", async () => {
       const fake = createFakeConnection();

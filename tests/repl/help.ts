@@ -116,6 +116,7 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["friend slot <ecid> <on|off>", "reserve/clear a friend's upload slot"],
    ["comment <hash> <rating 0-5> <text>", "set a shared file's comment/rating"],
    ["kadnotes <hash>", "search Kad for a file's community notes"],
+   ["refreshmedia [hash]", "re-extract audio/video metadata for one shared file, or the whole share"],
    ["show chat", "drain buffered incoming chat messages"],
    ["quit / exit / Ctrl-D", "leave the REPL"],
 ];
