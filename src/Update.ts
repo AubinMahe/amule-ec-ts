@@ -380,8 +380,7 @@ export class ServerUpdate {
  * One `EC_TAG_FRIEND` entry from an `EC_OP_GET_UPDATE` reply - the only
  * way to list the daemon's known friends over EC (there is no dedicated
  * `GET_FRIEND_LIST` opcode; `Friends.ts` only covers the `add`/`remove`/
- * `slot` mutations). Confirmed against `CEC_Friend_Tag`
- * (https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L568-L577).
+ * `slot` mutations). Confirmed against `CEC_Friend_Tag`.
  * `linkedClientEcid` is `0n` when this friend isn't currently connected
  * (`linkedClient.IsLinked() ? linkedClient.ECID() : 0`), never `undefined`
  * for that reason - `undefined` here means genuinely omitted (unchanged
@@ -394,6 +393,12 @@ export class FriendInfo {
    public readonly ip: string | undefined;
    public readonly port: bigint | undefined;
    public readonly linkedClientEcid: bigint | undefined;
+   /**
+    * Whether this friend has a reserved upload slot - `EC_TAG_FRIEND_FRIENDSLOT`, the same tag
+    * `Friends.setFriendSlot()` writes. `CEC_Friend_Tag` emits this unconditionally, alongside every
+    * other field above.
+    */
+   public readonly friendSlot: boolean | undefined;
 
    private constructor(fields: {
       ecid: bigint;
@@ -402,6 +407,7 @@ export class FriendInfo {
       ip: string | undefined;
       port: bigint | undefined;
       linkedClientEcid: bigint | undefined;
+      friendSlot: boolean | undefined;
    }) {
       this.ecid = fields.ecid;
       this.name = fields.name;
@@ -409,6 +415,7 @@ export class FriendInfo {
       this.ip = fields.ip;
       this.port = fields.port;
       this.linkedClientEcid = fields.linkedClientEcid;
+      this.friendSlot = fields.friendSlot;
    }
 
    public static fromTag(tag: ECTag): FriendInfo {
@@ -420,6 +427,7 @@ export class FriendInfo {
          ip: ipFromTag(tag, ECTagNames.EC_TAG_FRIEND_IP),
          port: tag.childInt(ECTagNames.EC_TAG_FRIEND_PORT),
          linkedClientEcid: tag.childInt(ECTagNames.EC_TAG_FRIEND_CLIENT),
+         friendSlot: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_FRIEND_FRIENDSLOT)),
       });
    }
 
@@ -435,6 +443,7 @@ export class FriendInfo {
          ip: update.ip ?? this.ip,
          port: update.port ?? this.port,
          linkedClientEcid: update.linkedClientEcid ?? this.linkedClientEcid,
+         friendSlot: update.friendSlot ?? this.friendSlot,
       });
    }
 }

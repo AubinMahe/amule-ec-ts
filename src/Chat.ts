@@ -214,7 +214,8 @@ export class Chat implements ECFetchable {
       const reply = await this.connection.receive();
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to fetch chat history for session ${clientId}.`;
+         const reason =
+            reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to fetch chat history for session ${clientId}.`;
          throw new Error(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_CHAT_MESSAGES) {

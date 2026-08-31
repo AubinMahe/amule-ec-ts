@@ -5,7 +5,7 @@ import { formatPercent, formatSize, formatSpeed } from "../format.js";
  * Shared by printDownloadFile/printSharedFile/printSearchResult - prints the Kad-notes-searching
  * flag and each community comment, if any.
  */
-export function printFileComments(comments: readonly ec.FileComment[] | undefined, kadCommentSearching: boolean | undefined): void {
+export function printFileComments(comments: readonly ec.FileComment[] | undefined, kadCommentSearching: boolean): void {
    if (kadCommentSearching) {
       console.log("  Kad notes search in progress...");
    }
@@ -23,7 +23,7 @@ export function printDownloadFile(file: ec.DownloadFile): void {
    console.log(`${file.name ?? "(unknown name)"}  [${file.hash ?? "unknown hash"}]`);
    console.log(
       `  ${formatPercent(file.sizeDone, file.sizeFull)}  ${formatSize(file.sizeDone)} / ${formatSize(file.sizeFull)}` +
-         `  @ ${formatSpeed(file.speed)}  sources: ${file.sources ?? "?"}  prio: ${file.priorityText}  status: ${file.statusText}`,
+         `  @ ${formatSpeed(file.speed)}  sources: ${file.sources}  prio: ${file.priorityText}  status: ${file.statusText}`,
    );
    if (file.partMetName) {
       console.log(`  temp file: ${file.partMetName}`);

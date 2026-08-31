@@ -9,6 +9,33 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-08-31
+
+### Added
+
+- `DownloadFile.isA4AFAuto` (`EC_TAG_PARTFILE_A4AFAUTO`) - whether A4AF sources swap to this file automatically, the read side of
+  the tag `Downloads.setA4AFAuto()` already writes. Already declared and already emitted unconditionally by the daemon (present at
+  every detail level `Downloads.fetch()`/notifications use), just never decoded onto `DownloadFile` - live-tested against a real
+  daemon (set true, read back true; reverted to false, read back false).
+- `FriendInfo.friendSlot` (`Update.ts`) - whether a friend currently holds the reserved upload slot, the read side of the same
+  `EC_TAG_FRIEND_FRIENDSLOT` tag `Friends.setFriendSlot()` already writes.
+- `DownloadFile.category` (`EC_TAG_PARTFILE_CAT`) - the read side of `Downloads.setCategory()`, unconditionally emitted alongside
+  `stopped`/`isA4AFAuto` but never previously decoded.
+- `SharedFile.comment`/`.rating` (`EC_TAG_KNOWNFILE_COMMENT`/`_RATING`) - the read side of `SharedFiles.setComment()`, distinct from
+  `SharedFile.comments` (the Kad/community-notes container). Corrects `setComment()`'s own doc comment, which incorrectly claimed
+  the value set this way could never be read back over EC - live-tested against a real daemon.
+
+### Changed
+
+- Removed artificial `| undefined` typing from fields the daemon always sends: `SharedFile.uploadedTotal`/`.uploadSpeed`/
+  `.uploadingCount`/`.requestsTotal`/`.prio`/`.kadCommentSearching`/`.hashedPartCount`/`.lastUpload`; `DownloadFile.status`/
+  `.sources`/`.prio`/`.sourcesXfer`; `UploadClient.software`/`.softwareVersion`/`.speedUp`/`.sessionUp`/`.totalUp`/`.uploadState`/
+  `.ecid`/`.uploadFileEcid`/`.friendSlot`; `ClientHistoryEntry.uploadTotal`/`.downloadTotal`/`.lastSeen`; and
+  `ServerInfo.name`/`.priority`/`.isStatic`/`.filesSoft`/`.filesHard`/`.tcpFlags`/`.udpFlags`. Each was confirmed unconditionally
+  present on the wire for the request this library actually sends, and now decodes with its real default (`0n`/`false`/`""`/
+  `SRV_PR_NORMAL`) instead of `undefined` - not a compile-breaking change for readers (`T` is still assignable where `T | undefined`
+  was), but a caller relying on `=== undefined` to mean "not yet reported" will see a different value now.
+
 ## [2.28.0] - 2026-08-31
 
 ### Added

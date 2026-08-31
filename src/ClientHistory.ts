@@ -31,12 +31,12 @@ export class ClientHistoryEntry {
     * The peer's ed2k user hash, hex - `EC_TAG_CLIENT`'s own data (see class doc).
     */
    public readonly hash: string;
-   public readonly uploadTotal: bigint | undefined;
-   public readonly downloadTotal: bigint | undefined;
+   public readonly uploadTotal: bigint;
+   public readonly downloadTotal: bigint;
    /**
     * Unix timestamp (seconds) of the last time this daemon saw this peer.
     */
-   public readonly lastSeen: bigint | undefined;
+   public readonly lastSeen: bigint;
    /**
     * Unix timestamp (seconds) of the first time this daemon ever saw this peer - metadata trailer
     * only.
@@ -75,9 +75,9 @@ export class ClientHistoryEntry {
    public constructor(tag: ECTag) {
       const hashTag = tag instanceof ECHash16Tag ? tag : undefined;
       this.hash = hashTag ? Buffer.from(hashTag.value).toString("hex") : "";
-      this.uploadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL);
-      this.downloadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_DOWNLOAD_TOTAL);
-      this.lastSeen = tag.childInt(ECTagNames.EC_TAG_CLIENT_LAST_SEEN);
+      this.uploadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL) ?? 0n;
+      this.downloadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_DOWNLOAD_TOTAL) ?? 0n;
+      this.lastSeen = tag.childInt(ECTagNames.EC_TAG_CLIENT_LAST_SEEN) ?? 0n;
       this.firstSeen = tag.childInt(ECTagNames.EC_TAG_CLIENT_FIRST_SEEN);
       this.sessions = tag.childInt(ECTagNames.EC_TAG_CLIENT_SESSIONS);
       this.name = tag.childString(ECTagNames.EC_TAG_CLIENT_NAME);

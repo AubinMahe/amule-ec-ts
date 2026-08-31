@@ -180,9 +180,20 @@ export class DownloadFile {
    public readonly sizeFull: bigint | undefined;
    public readonly sizeDone: bigint | undefined;
    public readonly speed: bigint | undefined;
-   public readonly sources: bigint | undefined;
-   public readonly status: bigint | undefined;
-   public readonly prio: bigint | undefined;
+   /**
+    * `EC_TAG_PARTFILE_SOURCE_COUNT` - added unconditionally in `CEC_PartFile_Tag`, before its
+    * `EC_DETAIL_UPDATE` early-return - defaults to `0n`, not "unknown", on the rare tag actually
+    * built at that bare level.
+    */
+   public readonly sources: bigint;
+   /**
+    * `EC_TAG_PARTFILE_STATUS` - same "unconditional, defaults to 0n" shape as `sources`.
+    */
+   public readonly status: bigint;
+   /**
+    * `EC_TAG_PARTFILE_PRIO` - same "unconditional, defaults to 0n" shape as `sources`.
+    */
+   public readonly prio: bigint;
    /**
     * True for a removal push notification (see class doc) - every other field is then unavailable.
     */
@@ -203,20 +214,34 @@ export class DownloadFile {
     */
    public readonly stopped: boolean;
    /**
-    * Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER`
-    * (ECSpecialCoreTags.cpp:179), used by statusText to tell "Downloading" from "Waiting".
+    * Whether A4AF sources swap to this file automatically - `EC_TAG_PARTFILE_A4AFAUTO`
+    * (`file->IsA4AFAuto()`), the same tag `setA4AFAuto()` writes. Added unconditionally, alongside
+    * `stopped` above, so present at every detail level including a "dirty" `EC_DETAIL_UPDATE` push.
     */
-   public readonly sourcesXfer: bigint | undefined;
+   public readonly isA4AFAuto: boolean;
+   /**
+    * The download category index this file is assigned to, 0 meaning "no category" - correlate
+    * against `Preferences.listCategories()`. `EC_TAG_PARTFILE_CAT` (`file->GetCategory()`), the
+    * same tag `setCategory()` writes, added unconditionally in the same block as
+    * `stopped`/`isA4AFAuto`.
+    */
+   public readonly category: bigint;
+   /**
+    * Sources currently transferring - `EC_TAG_PARTFILE_SOURCE_COUNT_XFER`, used by statusText to
+    * tell "Downloading" from "Waiting". Same "unconditional, defaults to 0n" shape as `sources`.
+    */
+   public readonly sourcesXfer: bigint;
    /**
     * Community ratings/comments (own source comments + Kad NOTES) - see
     * FileComment/parseFileComments' doc.
     */
    public readonly comments: readonly FileComment[] | undefined;
    /**
-    * Whether a searchKadNotes() lookup is currently in flight for this file -
-    * EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING.
+    * Whether a searchKadNotes() lookup is currently in flight for this file - see
+    * `parseKadCommentSearching()`'s doc for why this defaults to `false` rather than being
+    * optional.
     */
-   public readonly kadCommentSearching: boolean | undefined;
+   public readonly kadCommentSearching: boolean;
    /**
     * The on-disk directory - `EC_TAG_KNOWNFILE_PATH`, confirmed against
     * amule-remote-gui.cpp's `DirectoryPath()` decode
@@ -263,16 +288,18 @@ export class DownloadFile {
       sizeFull: bigint | undefined;
       sizeDone: bigint | undefined;
       speed: bigint | undefined;
-      sources: bigint | undefined;
-      status: bigint | undefined;
-      prio: bigint | undefined;
+      sources: bigint;
+      status: bigint;
+      prio: bigint;
       removed: boolean;
       ecid: bigint | undefined;
       partMetId: bigint | undefined;
       stopped: boolean;
-      sourcesXfer: bigint | undefined;
+      isA4AFAuto: boolean;
+      category: bigint;
+      sourcesXfer: bigint;
       comments: readonly FileComment[] | undefined;
-      kadCommentSearching: boolean | undefined;
+      kadCommentSearching: boolean;
       path: string | undefined;
       media: MediaMetadata | undefined;
       sourceNames: ReadonlyMap<bigint, SourceName> | undefined;
@@ -292,6 +319,8 @@ export class DownloadFile {
       this.ecid = fields.ecid;
       this.partMetId = fields.partMetId;
       this.stopped = fields.stopped;
+      this.isA4AFAuto = fields.isA4AFAuto;
+      this.category = fields.category;
       this.sourcesXfer = fields.sourcesXfer;
       this.comments = fields.comments;
       this.kadCommentSearching = fields.kadCommentSearching;
@@ -327,14 +356,16 @@ export class DownloadFile {
          sizeFull: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL),
          sizeDone: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_DONE),
          speed: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SPEED),
-         sources: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT),
-         status: tag.childInt(ECTagNames.EC_TAG_PARTFILE_STATUS),
-         prio: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PRIO),
+         sources: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n,
+         status: tag.childInt(ECTagNames.EC_TAG_PARTFILE_STATUS) ?? 0n,
+         prio: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PRIO) ?? 0n,
          removed,
          ecid,
          partMetId: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PARTMETID),
          stopped: (tag.childInt(ECTagNames.EC_TAG_PARTFILE_STOPPED) ?? 0n) !== 0n,
-         sourcesXfer: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER),
+         isA4AFAuto: (tag.childInt(ECTagNames.EC_TAG_PARTFILE_A4AFAUTO) ?? 0n) !== 0n,
+         category: tag.childInt(ECTagNames.EC_TAG_PARTFILE_CAT) ?? 0n,
+         sourcesXfer: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER) ?? 0n,
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
@@ -357,16 +388,18 @@ export class DownloadFile {
          sizeFull: update.sizeFull ?? this.sizeFull,
          sizeDone: update.sizeDone ?? this.sizeDone,
          speed: update.speed ?? this.speed,
-         sources: update.sources ?? this.sources,
-         status: update.status ?? this.status,
-         prio: update.prio ?? this.prio,
+         sources: update.sources,
+         status: update.status,
+         prio: update.prio,
          removed: update.removed,
          ecid: update.ecid ?? this.ecid,
          partMetId: update.partMetId ?? this.partMetId,
          stopped: update.stopped,
-         sourcesXfer: update.sourcesXfer ?? this.sourcesXfer,
+         isA4AFAuto: update.isA4AFAuto,
+         category: update.category,
+         sourcesXfer: update.sourcesXfer,
          comments: update.comments ?? this.comments,
-         kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
+         kadCommentSearching: update.kadCommentSearching,
          path: update.path ?? this.path,
          media: update.media ?? this.media,
          sourceNames: mergeSourceNames(this.sourceNames, update.sourceNames),
@@ -392,9 +425,6 @@ export class DownloadFile {
     * class doc for the "+10 means auto" wire encoding this decodes.
     */
    public get priorityText(): string {
-      if (this.prio === undefined) {
-         return "Unknown";
-      }
       const raw = Number(this.prio);
       const isAuto = raw >= 10;
       const base: ECDownloadPriority = isAuto ? raw - 10 : raw;
@@ -434,9 +464,6 @@ export class DownloadFile {
     * connected), and a stopped file reads "Stopped" unless already complete.
     */
    public get statusText(): string {
-      if (this.status === undefined) {
-         return "Unknown";
-      }
       const status: ECPartFileStatus = Number(this.status);
       if (status === ECPartFileStatus.PS_HASHING || status === ECPartFileStatus.PS_WAITING_FOR_HASH) {
          return "Hashing";
@@ -462,7 +489,7 @@ export class DownloadFile {
             text = "Insufficient disk space";
             break;
          default:
-            text = (this.sourcesXfer ?? 0n) > 0n ? "Downloading" : "Waiting";
+            text = this.sourcesXfer > 0n ? "Downloading" : "Waiting";
       }
       if (this.stopped && status !== ECPartFileStatus.PS_COMPLETE) {
          text = "Stopped";
@@ -705,7 +732,8 @@ export class Downloads implements ECFetchable {
     * (https://github.com/amule-org/amule/blob/master/src/TextClient.cpp#L737-L738): the request's
     * EC_TAG_PARTFILE tag (own data: MD4 hash) carries one EC_TAG_PARTFILE_CAT
     * child (uint32) - the target category's index, 0 meaning "no category".
-    * Replies EC_OP_FAILED/EC_OP_NOOP exactly like pause()/resume()/stop().
+    * Replies EC_OP_FAILED/EC_OP_NOOP exactly like pause()/resume()/stop(). Readable back as
+    * `DownloadFile.category`.
     */
    public async setCategory(hash: string, categoryIndex: number): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_SET_CAT);

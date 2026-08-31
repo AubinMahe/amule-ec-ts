@@ -96,11 +96,10 @@ describe("parseKadCommentSearching", () => {
       expect(ec.parseKadCommentSearching(idle)).to.equal(false);
    });
 
-   it("returns undefined when absent", () => {
+   it("defaults to false when absent", () => {
       const tag = sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi" });
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
-      expect(ec.parseKadCommentSearching(tag)).to.be.undefined;
+      expect(ec.parseKadCommentSearching(tag)).to.equal(false);
    });
 });
 
@@ -497,7 +496,7 @@ describe("SharedFileTracker", () => {
       expect(tracker.files[0]?.name).to.equal("one.avi");
    });
 
-   it("apply() keeps previously known comments/kadCommentSearching when a later push omits them", () => {
+   it("apply() keeps previously known comments when a later push omits the container (kadCommentSearching, unconditional on the wire, reverts to its false default instead)", () => {
       const tracker = new ec.SharedFileTracker();
       const withComments = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
       withComments.add(
@@ -515,7 +514,7 @@ describe("SharedFileTracker", () => {
       dirtyPush.add(sharedFileTag({ ecid: 1, hash: hexHash("a"), name: "one.avi" }));
       tracker.apply(dirtyPush);
 
-      expect(tracker.files[0]?.kadCommentSearching).to.equal(true);
+      expect(tracker.files[0]?.kadCommentSearching).to.equal(false);
       expect(tracker.files[0]?.comments).to.have.lengthOf(1);
    });
 });

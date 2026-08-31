@@ -22,39 +22,43 @@ export enum ServerPriority {
    SRV_PR_LOW = 2,
 }
 
-function numberOrUndefined(value: bigint | undefined): number | undefined {
-   return value === undefined ? undefined : Number(value);
-}
-
-function boolOrUndefined(value: bigint | undefined): boolean | undefined {
-   return value === undefined ? undefined : value !== 0n;
-}
-
 /**
  * One EC_TAG_SERVER entry from an EC_OP_SERVER_LIST reply.
  *
  * Confirmed against
- * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L48-L113
+ * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L48-L131
  * (CEC_Server_Tag's status-report constructor, the one Get_EC_Response
  * uses for EC_OP_GET_SERVER_LIST): the tag's own data is an EC_IPv4_t
  * (IP + port), not a wrapper. Which children are present depends on the
  * requested detail level - at EC_DETAIL_CMD only EC_TAG_SERVER_NAME (and
  * EC_TAG_SERVER_COUNTRY if IP2Country is enabled server-side) are added;
- * ping/users/usersMax/files/priority/isStatic (among others not decoded
- * here: failed, version, desc, country) only appear from EC_DETAIL_WEB/FULL
- * onward - see fetch()'s doc for why this client requests EC_DETAIL_FULL.
- * Each of ping/users/usersMax/files is omitted entirely by the daemon
- * when its own value is zero (`if ((tmpInt = server->GetPing()) != 0)`,
- * ECSpecialCoreTags.cpp:62-96) - a real zero and "not reported" are
- * indistinguishable on the wire, so these read as `undefined` rather than
- * `0n` when absent. priority/isStatic use the same `numberOrUndefined`/
- * `boolOrUndefined` decoding `ServerUpdate` (Update.ts) already applies to
- * the identical EC_TAG_SERVER_PRIO/EC_TAG_SERVER_STATIC tags there.
+ * ping/users/usersMax/files/priority/isStatic/filesSoft/filesHard/tcpFlags/
+ * udpFlags (among others not decoded here: failed, version, desc, country)
+ * only appear from EC_DETAIL_WEB/FULL onward - see fetch()'s doc for why
+ * this client requests EC_DETAIL_FULL. This constructor never receives a
+ * `CValueMap` (that's the separate, `EC_DETAIL_INC_UPDATE`-only constructor
+ * `ServerUpdate`, Update.ts, decodes), so every omission below reflects the
+ * field's own real value, not a delta-tracking skip.
+ *
+ * name/ping/users/usersMax/files are each omitted whenever the underlying
+ * value itself is empty/zero (`if ((tmpInt = server->GetPing()) != 0)`,
+ * ECSpecialCoreTags.cpp:62-96) - for name this is unambiguous (no name
+ * assigned), decoded as `""`; for ping/users/usersMax/files a real zero and
+ * "never measured" are indistinguishable on the wire, so these stay
+ * `undefined` rather than `0n` when absent. priority/isStatic/filesSoft/
+ * filesHard/tcpFlags/udpFlags are also omitted only at their own real
+ * default (`SRV_PR_NORMAL`/`false`/`0`/`0`/`0`/`0` respectively) - unlike
+ * ping et al., these defaults are themselves meaningful domain values (a
+ * server not explicitly prioritized/pinned/limited/flagged), confirmed by
+ * the sibling valuemap constructor's own comment on
+ * `EC_TAG_SERVER_FILES_SOFT`/`_HARD` (ECSpecialCoreTags.cpp:149-152, "Zero
+ * here means it has not told us yet") - so these decode with that same
+ * zero/false default instead of `undefined`.
  */
 export class ServerInfo {
    public readonly ip: string;
    public readonly port: number;
-   public readonly name: string | undefined;
+   public readonly name: string;
    /**
     * Round-trip latency in milliseconds, if known.
     */
@@ -72,39 +76,39 @@ export class ServerInfo {
     */
    public readonly files: bigint | undefined;
    /**
-    * This server's own priority, if known - see Servers.setPriority() to change it.
+    * This server's own priority - see Servers.setPriority() to change it.
     */
-   public readonly priority: ServerPriority | undefined;
+   public readonly priority: ServerPriority;
    /**
-    * Whether this server is pinned ("static"), if known - see Servers.setStatic() to change it.
+    * Whether this server is pinned ("static") - see Servers.setStatic() to change it.
     */
-   public readonly isStatic: boolean | undefined;
+   public readonly isStatic: boolean;
    /**
-    * Per-user shared-file publishing soft/hard limits this server advertises, 0/undefined meaning
-    * "not told us yet".
+    * Per-user shared-file publishing soft/hard limits this server advertises, `0n` meaning "not
+    * told us yet" (aMule's own sentinel for this, not this library's).
     */
-   public readonly filesSoft: bigint | undefined;
-   public readonly filesHard: bigint | undefined;
+   public readonly filesSoft: bigint;
+   public readonly filesHard: bigint;
    /**
     * Wire capability flag bitmasks - diagnostics, hidden by default in the reference GUI too.
     */
-   public readonly tcpFlags: bigint | undefined;
-   public readonly udpFlags: bigint | undefined;
+   public readonly tcpFlags: bigint;
+   public readonly udpFlags: bigint;
 
    private constructor(fields: {
       ip: string;
       port: number;
-      name: string | undefined;
+      name: string;
       ping: bigint | undefined;
       users: bigint | undefined;
       usersMax: bigint | undefined;
       files: bigint | undefined;
-      priority: ServerPriority | undefined;
-      isStatic: boolean | undefined;
-      filesSoft: bigint | undefined;
-      filesHard: bigint | undefined;
-      tcpFlags: bigint | undefined;
-      udpFlags: bigint | undefined;
+      priority: ServerPriority;
+      isStatic: boolean;
+      filesSoft: bigint;
+      filesHard: bigint;
+      tcpFlags: bigint;
+      udpFlags: bigint;
    }) {
       this.ip = fields.ip;
       this.port = fields.port;
@@ -136,17 +140,17 @@ export class ServerInfo {
       return new ServerInfo({
          ip: tag.address.join("."),
          port: tag.port,
-         name: tag.childString(ECTagNames.EC_TAG_SERVER_NAME),
+         name: tag.childString(ECTagNames.EC_TAG_SERVER_NAME) ?? "",
          ping: tag.childInt(ECTagNames.EC_TAG_SERVER_PING),
          users: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS),
          usersMax: tag.childInt(ECTagNames.EC_TAG_SERVER_USERS_MAX),
          files: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES),
-         priority: numberOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO)),
-         isStatic: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC)),
-         filesSoft: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_SOFT),
-         filesHard: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_HARD),
-         tcpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_TCP_FLAGS),
-         udpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_UDP_FLAGS),
+         priority: Number(tag.childInt(ECTagNames.EC_TAG_SERVER_PRIO) ?? 0n),
+         isStatic: (tag.childInt(ECTagNames.EC_TAG_SERVER_STATIC) ?? 0n) !== 0n,
+         filesSoft: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_SOFT) ?? 0n,
+         filesHard: tag.childInt(ECTagNames.EC_TAG_SERVER_FILES_HARD) ?? 0n,
+         tcpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_TCP_FLAGS) ?? 0n,
+         udpFlags: tag.childInt(ECTagNames.EC_TAG_SERVER_UDP_FLAGS) ?? 0n,
       });
    }
 }

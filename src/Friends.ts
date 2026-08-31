@@ -152,7 +152,8 @@ export class Friends {
     * known friend falls through to the generic EC_OP_FAILED "OOPS!"
     * reason - reproduced live against a real amuled while testing this
     * method, which is exactly what led to documenting the ECID-space
-    * gotcha on the class doc.
+    * gotcha on the class doc. Readable back as `FriendInfo.friendSlot` (`Update.fetch()` -
+    * `Friends.ts` itself has no read/list method, see `FriendInfo`'s own doc).
     */
    public async setFriendSlot(ecid: bigint, enabled: boolean): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_FRIEND);

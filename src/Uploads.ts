@@ -9,10 +9,6 @@ import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:uploads");
 
-function boolOrUndefined(value: bigint | undefined): boolean | undefined {
-   return value === undefined ? undefined : value !== 0n;
-}
-
 /**
  * A client's `EC_TAG_CLIENT_SOFTWARE` value - the ed2k protocol's client-software identifier.
  * Confirmed against `EClientSoftware`
@@ -48,62 +44,67 @@ export enum ECClientSoftware {
  * ECID (`CECTag(EC_TAG_CLIENT, client->ECID())`), not its user hash - the
  * hash and the other properties used below are children, added
  * unconditionally before the `detail_level == EC_DETAIL_UPDATE`
- * early-return, so they are all present at the EC_DETAIL_CMD level
- * requested by Uploads.fetch(). The uploaded file's name (EC_TAG_PARTFILE_NAME)
- * is only added when the client actually has an upload file assigned
- * (`client->GetUploadFile()`); it is left undefined otherwise.
+ * early-return (via `AddDiffTag`, which only omits a tag when called with a
+ * non-null `CValueMap` - Uploads.fetch() never passes one, only the
+ * `EC_OP_GET_UPDATE` incremental-poll path does), so they are all present at
+ * the EC_DETAIL_CMD level requested by Uploads.fetch(). The uploaded file's
+ * name (EC_TAG_PARTFILE_NAME) and its ECID's own presence
+ * (EC_TAG_CLIENT_UPLOAD_FILE, see `uploadFileEcid`'s doc) are the two
+ * exceptions decoded here with different rules.
  */
 export class UploadClient {
    public readonly hash: string;
    public readonly name: string;
-   public readonly software: bigint | undefined;
+   public readonly software: bigint;
    /**
     * Version-only string the daemon composes itself (e.g. "v0.50a", never the software name -
     * see `softwareText` for that) - EC_TAG_CLIENT_SOFT_VER_STR, the same source
     * ClientUpdate.softwareVersion (Update.ts) reads for EC_OP_GET_UPDATE.
     */
-   public readonly softwareVersion: string | undefined;
-   public readonly speedUp: bigint | undefined;
-   public readonly sessionUp: bigint | undefined;
-   public readonly totalUp: bigint | undefined;
-   public readonly uploadState: bigint | undefined;
+   public readonly softwareVersion: string;
+   public readonly speedUp: bigint;
+   public readonly sessionUp: bigint;
+   public readonly totalUp: bigint;
+   public readonly uploadState: bigint;
    public readonly fileName: string | undefined;
    /**
     * The client's internal ECID - EC_TAG_CLIENT's own data (see class doc).
     */
-   public readonly ecid: bigint | undefined;
+   public readonly ecid: bigint;
    /**
     * The uploaded file's own internal ECID - EC_TAG_CLIENT_UPLOAD_FILE's own data, `0n` when the
     * client has no upload file assigned (`client->GetUploadFile()` is null). Confirmed against
-    * `ECSpecialCoreTags.cpp:435-439`: unlike `hash` (the client's user hash), the file itself is
+    * `ECSpecialCoreTags.cpp:485-491`: unlike `hash` (the client's user hash), the file itself is
     * only ever identified here by ECID, not by hash - correlate against `SharedFile.ecid`
-    * (`SharedFiles.files`) to resolve the hash needed by `SharedFiles.searchKadNotes()`.
+    * (`SharedFiles.files`) to resolve the hash needed by `SharedFiles.searchKadNotes()`. Added
+    * unconditionally too, but from the branch *after* the early-return (either the file's real
+    * ECID or the explicit `0` sentinel) rather than the block above it.
     */
-   public readonly uploadFileEcid: bigint | undefined;
+   public readonly uploadFileEcid: bigint;
    /**
     * Whether this client holds the upload slot reserved for a friend - `EC_TAG_CLIENT_FRIEND_SLOT`
     * (`client->GetFriendSlot()`), distinct from friends-list membership
     * (`EC_TAG_CLIENT_IS_FRIEND`, decoded as `ClientUpdate.isFriend` in `Update.ts`, not exposed
     * here). Confirmed against `CEC_UpDownClient_Tag` in `ECSpecialCoreTags.cpp`: added
-    * unconditionally, alongside every other field read below, so it's present at the same
+    * unconditionally, alongside every other field read above, so it's present at the same
     * `EC_DETAIL_CMD` level `Uploads.fetch()` already requests.
     */
-   public readonly friendSlot: boolean | undefined;
+   public readonly friendSlot: boolean;
 
    public constructor(tag: ECTag) {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
       this.hash = hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : "(unknown hash)";
       this.name = tag.childString(ECTagNames.EC_TAG_CLIENT_NAME) ?? "(unknown name)";
-      this.software = tag.childInt(ECTagNames.EC_TAG_CLIENT_SOFTWARE);
-      this.softwareVersion = tag.childString(ECTagNames.EC_TAG_CLIENT_SOFT_VER_STR);
-      this.speedUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UP_SPEED);
-      this.sessionUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_SESSION);
-      this.totalUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL);
-      this.uploadState = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_STATE);
+      this.software = tag.childInt(ECTagNames.EC_TAG_CLIENT_SOFTWARE) ?? 0n;
+      this.softwareVersion = tag.childString(ECTagNames.EC_TAG_CLIENT_SOFT_VER_STR) ?? "";
+      this.speedUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UP_SPEED) ?? 0n;
+      this.sessionUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_SESSION) ?? 0n;
+      this.totalUp = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL) ?? 0n;
+      this.uploadState = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_STATE) ?? 0n;
       this.fileName = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME);
-      this.ecid = tag.intValue;
-      this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE);
-      this.friendSlot = boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT));
+      this.ecid = tag.intValue ?? 0n;
+      this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE) ?? 0n;
+      this.friendSlot = (tag.childInt(ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT) ?? 0n) !== 0n;
    }
 
    /**
@@ -114,9 +115,6 @@ export class UploadClient {
     * decoded client-side from `ECClientSoftware`.
     */
    public get softwareText(): string {
-      if (this.software === undefined) {
-         return "Unknown";
-      }
       const software: ECClientSoftware = Number(this.software);
       switch (software) {
          case ECClientSoftware.SO_OLDEMULE:

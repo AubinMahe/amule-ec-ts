@@ -27,6 +27,10 @@ export enum FileRating {
    EXCELLENT = 5,
 }
 
+function ratingOrUndefined(value: bigint | undefined): FileRating | undefined {
+   return value === undefined ? undefined : Number(value);
+}
+
 /**
  * One community rating/comment entry - `SFileRating`
  * (https://github.com/amule-org/amule/blob/master/src/KnownFile.h#L65-L77):
@@ -81,14 +85,14 @@ export function parseFileComments(fileTag: ECTag): readonly FileComment[] | unde
 }
 
 /**
- * Decodes `EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING` off `fileTag` -
- * undefined if absent (see parseFileComments' callers for what that
- * means on each of the three file types), otherwise whether a
- * `searchKadNotes()` lookup is currently in flight for this file.
+ * Decodes `EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING` off `fileTag` - whether a `searchKadNotes()`
+ * lookup is currently in flight for this file. Added unconditionally in the shared
+ * `CEC_SharedFile_Tag` constructor, before its `EC_DETAIL_UPDATE` early-return - defaults to
+ * `false` on the rare tag actually built at that bare level (e.g. a "dirty" push notification),
+ * not a real "unknown" state.
  */
-export function parseKadCommentSearching(fileTag: ECTag): boolean | undefined {
-   const value = fileTag.childInt(ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING);
-   return value === undefined ? undefined : value !== 0n;
+export function parseKadCommentSearching(fileTag: ECTag): boolean {
+   return (fileTag.childInt(ECTagNames.EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING) ?? 0n) !== 0n;
 }
 
 /**
@@ -172,11 +176,32 @@ export class SharedFile {
    public readonly hash: string | undefined;
    public readonly name: string | undefined;
    public readonly sizeFull: bigint | undefined;
-   public readonly uploadedTotal: bigint | undefined;
-   public readonly uploadSpeed: bigint | undefined;
-   public readonly uploadingCount: bigint | undefined;
-   public readonly requestsTotal: bigint | undefined;
-   public readonly prio: bigint | undefined;
+   /**
+    * All-time uploaded total, in bytes - `EC_TAG_KNOWNFILE_XFERRED_ALL`. Added unconditionally in
+    * `CEC_SharedFile_Tag`, before its `EC_DETAIL_UPDATE` early-return - `0n` by default, not
+    * "unknown", on the rare tag built at that bare level.
+    */
+   public readonly uploadedTotal: bigint;
+   /**
+    * Current upload speed, bytes/s - `EC_TAG_KNOWNFILE_UPLOAD_SPEED`, same "unconditional, defaults
+    * to 0n" shape as `uploadedTotal`.
+    */
+   public readonly uploadSpeed: bigint;
+   /**
+    * Clients currently uploading from this file - `EC_TAG_KNOWNFILE_UPLOADING_COUNT`, same
+    * "unconditional, defaults to 0n" shape as `uploadedTotal`.
+    */
+   public readonly uploadingCount: bigint;
+   /**
+    * All-time upload request count - `EC_TAG_KNOWNFILE_REQ_COUNT_ALL`, same "unconditional,
+    * defaults to 0n" shape as `uploadedTotal`.
+    */
+   public readonly requestsTotal: bigint;
+   /**
+    * Upload priority - `EC_TAG_KNOWNFILE_PRIO`, same "unconditional, defaults to 0n" shape as
+    * `uploadedTotal`.
+    */
+   public readonly prio: bigint;
    /**
     * True for a removal push notification (see class doc) - every other field is then unavailable.
     */
@@ -192,10 +217,21 @@ export class SharedFile {
     */
    public readonly comments: readonly FileComment[] | undefined;
    /**
-    * Whether a searchKadNotes() lookup is currently in flight for this file -
-    * EC_TAG_PARTFILE_KAD_COMMENT_SEARCHING.
+    * Whether a searchKadNotes() lookup is currently in flight for this file - see
+    * `parseKadCommentSearching()`'s doc for why this defaults to `false` rather than being
+    * optional.
     */
-   public readonly kadCommentSearching: boolean | undefined;
+   public readonly kadCommentSearching: boolean;
+   /**
+    * This file's own comment/rating, as set by `setComment()` - `EC_TAG_KNOWNFILE_COMMENT`/
+    * `EC_TAG_KNOWNFILE_RATING`, distinct from `comments` (the Kad/community-notes container,
+    * `EC_TAG_PARTFILE_COMMENTS`). Added in the shared `CEC_SharedFile_Tag` constructor, alongside
+    * `path`/`media`/`sharedSince` above - present at `EC_DETAIL_CMD` (confirmed live: `""`/
+    * `FileRating.NOT_RATED` on a file that never had either set), absent on an `EC_DETAIL_UPDATE`
+    * "dirty" push notification.
+    */
+   public readonly comment: string | undefined;
+   public readonly rating: FileRating | undefined;
    /**
     * The shared directory this file lives in - `EC_TAG_KNOWNFILE_PATH`,
     * confirmed against amule-remote-gui.cpp's `DirectoryPath()` decode
@@ -205,13 +241,16 @@ export class SharedFile {
    public readonly path: string | undefined;
    /**
     * "Verify Local Data" hash-check progress - the part currently being hashed (1-based), 0 while
-    * idle/done.
+    * idle/done. `EC_TAG_KNOWNFILE_HASHED_PART_COUNT`, added unconditionally for a
+    * `EC_TAG_KNOWNFILE` entry (i.e. every `SharedFile`), before `CEC_SharedFile_Tag`'s
+    * `EC_DETAIL_UPDATE` early-return.
     */
-   public readonly hashedPartCount: bigint | undefined;
+   public readonly hashedPartCount: bigint;
    /**
-    * Unix timestamp (seconds) of the last time this file was uploaded from.
+    * Unix timestamp (seconds) of the last time this file was uploaded from -
+    * `EC_TAG_KNOWNFILE_LAST_UPLOAD`, same "unconditional, defaults to 0n" shape as `uploadedTotal`.
     */
-   public readonly lastUpload: bigint | undefined;
+   public readonly lastUpload: bigint;
    /**
     * Unix timestamp (seconds) of when this file started being shared.
     */
@@ -225,20 +264,22 @@ export class SharedFile {
       hash: string | undefined;
       name: string | undefined;
       sizeFull: bigint | undefined;
-      uploadedTotal: bigint | undefined;
-      uploadSpeed: bigint | undefined;
-      uploadingCount: bigint | undefined;
-      requestsTotal: bigint | undefined;
-      prio: bigint | undefined;
+      uploadedTotal: bigint;
+      uploadSpeed: bigint;
+      uploadingCount: bigint;
+      requestsTotal: bigint;
+      prio: bigint;
       removed: boolean;
       ecid: bigint | undefined;
       comments: readonly FileComment[] | undefined;
-      kadCommentSearching: boolean | undefined;
+      kadCommentSearching: boolean;
       path: string | undefined;
-      hashedPartCount: bigint | undefined;
-      lastUpload: bigint | undefined;
+      hashedPartCount: bigint;
+      lastUpload: bigint;
       sharedSince: bigint | undefined;
       media: MediaMetadata | undefined;
+      comment: string | undefined;
+      rating: FileRating | undefined;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -257,6 +298,8 @@ export class SharedFile {
       this.lastUpload = fields.lastUpload;
       this.sharedSince = fields.sharedSince;
       this.media = fields.media;
+      this.comment = fields.comment;
+      this.rating = fields.rating;
    }
 
    /**
@@ -281,20 +324,22 @@ export class SharedFile {
          hash: hashTag ? Buffer.from(hashTag.value).toString("hex") : undefined,
          name: tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME),
          sizeFull: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL),
-         uploadedTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_XFERRED_ALL),
-         uploadSpeed: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOAD_SPEED),
-         uploadingCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOADING_COUNT),
-         requestsTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_REQ_COUNT_ALL),
-         prio: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_PRIO),
+         uploadedTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_XFERRED_ALL) ?? 0n,
+         uploadSpeed: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOAD_SPEED) ?? 0n,
+         uploadingCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_UPLOADING_COUNT) ?? 0n,
+         requestsTotal: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_REQ_COUNT_ALL) ?? 0n,
+         prio: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_PRIO) ?? 0n,
          removed,
          ecid,
          comments: parseFileComments(tag),
          kadCommentSearching: parseKadCommentSearching(tag),
          path: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_PATH),
-         hashedPartCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_HASHED_PART_COUNT),
-         lastUpload: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_LAST_UPLOAD),
+         hashedPartCount: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_HASHED_PART_COUNT) ?? 0n,
+         lastUpload: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_LAST_UPLOAD) ?? 0n,
          sharedSince: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_SHARED_SINCE),
          media: parseMediaMetadata(tag),
+         comment: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_COMMENT),
+         rating: ratingOrUndefined(tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_RATING)),
       });
    }
 
@@ -307,20 +352,22 @@ export class SharedFile {
          hash: update.hash ?? this.hash,
          name: update.name ?? this.name,
          sizeFull: update.sizeFull ?? this.sizeFull,
-         uploadedTotal: update.uploadedTotal ?? this.uploadedTotal,
-         uploadSpeed: update.uploadSpeed ?? this.uploadSpeed,
-         uploadingCount: update.uploadingCount ?? this.uploadingCount,
-         requestsTotal: update.requestsTotal ?? this.requestsTotal,
-         prio: update.prio ?? this.prio,
+         uploadedTotal: update.uploadedTotal,
+         uploadSpeed: update.uploadSpeed,
+         uploadingCount: update.uploadingCount,
+         requestsTotal: update.requestsTotal,
+         prio: update.prio,
          removed: update.removed,
          ecid: update.ecid ?? this.ecid,
          comments: update.comments ?? this.comments,
-         kadCommentSearching: update.kadCommentSearching ?? this.kadCommentSearching,
+         kadCommentSearching: update.kadCommentSearching,
          path: update.path ?? this.path,
-         hashedPartCount: update.hashedPartCount ?? this.hashedPartCount,
-         lastUpload: update.lastUpload ?? this.lastUpload,
+         hashedPartCount: update.hashedPartCount,
+         lastUpload: update.lastUpload,
          sharedSince: update.sharedSince ?? this.sharedSince,
          media: update.media ?? this.media,
+         comment: update.comment ?? this.comment,
+         rating: update.rating ?? this.rating,
       });
    }
 }
@@ -474,12 +521,8 @@ export class SharedFiles implements ECFetchable {
     * replies EC_OP_NOOP, silently no-op if the hash isn't a known shared
     * file.
     *
-    * Still write-only: confirmed against `CKnownFile::GetFileComment()`/
-    * `UserRating()` (`KnownFile.h:191-196`) that the value set here is
-    * never referenced anywhere in the EC layer - it doesn't appear in
-    * `SharedFile.comments` (that's Kad NOTES + connected-source comments
-    * only, see `FileComment`'s doc) or anywhere else. There is no way to
-    * read it back over EC, live-tested 2026-08-03.
+    * Readable back as `SharedFile.comment`/`.rating` - distinct from `SharedFile.comments`
+    * (that's Kad NOTES + connected-source comments, see `FileComment`'s doc).
     */
    public async setComment(hash: string, comment: string, rating: FileRating): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SET_COMMENT);

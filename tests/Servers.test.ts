@@ -108,12 +108,10 @@ describe("ServerInfo.fromTag", () => {
       expect(info?.isStatic).to.equal(true);
    });
 
-   it("leaves priority/isStatic undefined when the daemon omits them", () => {
+   it("defaults priority/isStatic to SRV_PR_NORMAL/false when the daemon omits them (their own real default)", () => {
       const info = ec.ServerInfo.fromTag(serverTag([192, 0, 2, 1], 4712, { name: "eMule Security" }));
-      /* eslint-disable @typescript-eslint/no-unused-expressions -- chai's getter-style assertion */
-      expect(info?.priority).to.be.undefined;
-      expect(info?.isStatic).to.be.undefined;
-      /* eslint-enable @typescript-eslint/no-unused-expressions */
+      expect(info?.priority).to.equal(ec.ServerPriority.SRV_PR_NORMAL);
+      expect(info?.isStatic).to.equal(false);
    });
 
    it("decodes isStatic as false (not undefined) when EC_TAG_SERVER_STATIC is present but zero", () => {
@@ -137,14 +135,17 @@ describe("ServerInfo.fromTag", () => {
       expect(info?.udpFlags).to.equal(2n);
    });
 
-   it("leaves filesSoft/filesHard/tcpFlags/udpFlags undefined when the daemon omits them", () => {
+   it("defaults filesSoft/filesHard/tcpFlags/udpFlags to 0n when the daemon omits them (their own real default)", () => {
       const info = ec.ServerInfo.fromTag(serverTag([192, 0, 2, 1], 4712, { name: "eMule Security" }));
-      /* eslint-disable @typescript-eslint/no-unused-expressions -- chai's getter-style assertion */
-      expect(info?.filesSoft).to.be.undefined;
-      expect(info?.filesHard).to.be.undefined;
-      expect(info?.tcpFlags).to.be.undefined;
-      expect(info?.udpFlags).to.be.undefined;
-      /* eslint-enable @typescript-eslint/no-unused-expressions */
+      expect(info?.filesSoft).to.equal(0n);
+      expect(info?.filesHard).to.equal(0n);
+      expect(info?.tcpFlags).to.equal(0n);
+      expect(info?.udpFlags).to.equal(0n);
+   });
+
+   it('defaults name to "" when EC_TAG_SERVER_NAME is absent', () => {
+      const info = ec.ServerInfo.fromTag(serverTag([192, 0, 2, 1], 4712, {}));
+      expect(info?.name).to.equal("");
    });
 });
 
