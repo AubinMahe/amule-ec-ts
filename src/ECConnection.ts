@@ -279,8 +279,7 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.largeTagCount =
          this.localCapabilities.largeTagCount && reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
       this.remoteCapabilities.multiSearch = this.localCapabilities.multiSearch && reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
-      this.remoteCapabilities.chatSessions =
-         this.localCapabilities.chatSessions && reply.has(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS);
+      this.remoteCapabilities.chatSessions = this.localCapabilities.chatSessions && reply.has(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS);
       // Unconditional request above, so no ANDing with a local flag here -
       // see ECCapabilities.sharedDirsConfig's doc.
       this.remoteCapabilities.sharedDirsConfig = reply.has(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG);

@@ -11,6 +11,37 @@ Points recorded here must be sorted into TODO.md, ISSUES.md, or CHOICES.md.
 Mechanical diff of the `EC_OP_*`/`EC_TAG_*` enums (generated C++ vs `ECOpcode.ts`/ `ECTagNames.ts`) for pure novelties, then
 commit-by-commit review (the actual diff, not just the message) for behavior changes on protocol already ported.
 
+**Blind spot**: neither pass catches a tag that was already declared before the sync window and is used for more than one purpose in
+the C++ source (e.g. read on one struct's encoder, written as a request child elsewhere) when only one of those uses is decoded
+here. The novelty diff only flags tags/opcodes absent from the previous baseline, and the commit-by-commit pass only looks at
+commits landing inside the sync window - a tag's _other_, pre-existing usage sailing right past both. Example:
+`EC_TAG_PARTFILE_A4AFAUTO` (0x0321), already declared before the 2026-08-31 sync, used to decode `Downloads.setA4AFAuto()`'s
+request, but its read-side emission in `CEC_PartFile_Tag` (unconditional, present since long before this session) was never decoded
+onto `DownloadFile` - same root cause as `EC_TAG_CLIENT_FRIEND_SLOT` (see TODO.md's "Tags, declared but not decoded" section).
+Catching the rest of this class systematically requires a different pass: every `ECTagNames.ts` entry checked against every C++ site
+that reads or writes it, not just against the previous sync's enum baseline - see the "Systematic tag audit" entry below.
+
+**Systematic tag audit, 2026-08-31**: every one of the 425 `ECTagNames.ts` entries checked for at least one reference elsewhere in
+`src/` (425 total, 80 with zero hits) via a scripted cross-reference, then each of those 80 checked individually against the C++
+source (`AddTag`/`CECTag` construction sites) to classify it: already tracked (the AEAD tags, `EC_TAG_CAN_SEARCH_PROGRESS_UNION`),
+genuinely dead protocol surface (4 tags with zero C++ references at all, 4 more whose only C++ references are commented-out
+`AddTag()` calls), a case where sending the tag is actively wrong (`EC_TAG_VERSION_ID`), a deliberate non-implementation
+(`EC_TAG_PREFS_STATISTICS`), or a real decode gap - sorted into TODO.md's "Tags, declared but not decoded" section, grouped by the
+`amule-ec-ts` class each would extend (`Status.ts`, `Downloads.ts`, `SharedFiles.ts`, `Update.ts`, `Search.ts`).
+
+A tag _with_ existing usage can still be under-decoded the same way `EC_TAG_PARTFILE_A4AFAUTO`/`EC_TAG_CLIENT_FRIEND_SLOT` were
+(used in one C++ context, silently unread in another) - the pass above only checked the 80 tags with _zero_ usage, not a per-tag
+audit of every C++ emission site for the other 345.
+
+**Second pass, 2026-08-31**: all 345 "used" tags checked for whether that usage is a genuine _read_ - including via helpers not
+matched by simple `child*()`/`find*()` calls (`has()`/`flag()` in `Preferences.ts` and capability negotiation, `ipFromTag()`,
+`switch`/`case` branches) - versus only ever building a _request_ tag, with no read of any reply. The request-only bucket contained
+three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT`, `EC_TAG_PARTFILE_CAT` - all three now decoded
+(`SharedFile.comment`/`.rating`, `FriendInfo.friendSlot`, `DownloadFile.category`). The comment/rating case also contradicted
+`SharedFiles.ts`'s then-existing doc comment (dated 2026-08-03), which stated the value could not be read back over EC at all - that
+comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
+`EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
+
 ## 2026-08-31
 
 Local C++ checkout pulled (HEAD `821e34e8`) and rebuilt the daemon. Diffed `src/libs/ec/abstracts/ECCodes.abstract` against the

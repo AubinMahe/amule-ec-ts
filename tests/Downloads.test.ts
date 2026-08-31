@@ -61,6 +61,7 @@ function partFileTag(fields: {
    status?: number;
    prio?: number;
    stopped?: boolean;
+   isA4AFAuto?: boolean;
    sourcesXfer?: number;
    comments?: ec.ECTag;
    kadCommentSearching?: boolean;
@@ -76,6 +77,9 @@ function partFileTag(fields: {
    }
    if (fields.stopped !== undefined) {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_STOPPED, fields.stopped ? 1 : 0));
+   }
+   if (fields.isA4AFAuto !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_A4AFAUTO, fields.isA4AFAuto ? 1 : 0));
    }
    if (fields.sourcesXfer !== undefined) {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER, fields.sourcesXfer));
@@ -121,9 +125,9 @@ describe("DownloadFile.statusText", () => {
       expect(file.statusText).to.equal("Complete");
    });
 
-   it("reports 'Unknown' when the status field is absent", () => {
+   it("defaults to PS_READY/'Waiting' when the status field is absent (unconditional on the wire)", () => {
       const file = ec.DownloadFile.fromTag(partFileTag({}));
-      expect(file.statusText).to.equal("Unknown");
+      expect(file.statusText).to.equal("Waiting");
    });
 });
 
@@ -138,9 +142,20 @@ describe("DownloadFile.priorityText", () => {
       expect(file.priorityText).to.equal("Auto [Hi]");
    });
 
-   it("reports 'Unknown' when the prio field is absent", () => {
+   it("defaults to PR_LOW/'Low' when the prio field is absent (unconditional on the wire)", () => {
       const file = ec.DownloadFile.fromTag(partFileTag({}));
-      expect(file.priorityText).to.equal("Unknown");
+      expect(file.priorityText).to.equal("Low");
+   });
+});
+
+describe("DownloadFile.isA4AFAuto", () => {
+   it("reads true/false from EC_TAG_PARTFILE_A4AFAUTO", () => {
+      expect(ec.DownloadFile.fromTag(partFileTag({ isA4AFAuto: true })).isA4AFAuto).to.equal(true);
+      expect(ec.DownloadFile.fromTag(partFileTag({ isA4AFAuto: false })).isA4AFAuto).to.equal(false);
+   });
+
+   it("defaults to false when the tag is absent", () => {
+      expect(ec.DownloadFile.fromTag(partFileTag({})).isA4AFAuto).to.equal(false);
    });
 });
 
@@ -171,13 +186,12 @@ describe("DownloadFile comments/kadCommentSearching", () => {
       expect(file.comments?.[0]).to.deep.equal(new ec.FileComment("Alice", "one.avi", ec.FileRating.GOOD, "Nice"));
    });
 
-   it("leaves both undefined when absent", () => {
+   it("comments is undefined and kadCommentSearching is false when absent", () => {
       const file = ec.DownloadFile.fromTag(partFileTag({}));
 
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
       expect(file.comments).to.be.undefined;
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
-      expect(file.kadCommentSearching).to.be.undefined;
+      expect(file.kadCommentSearching).to.equal(false);
    });
 });
 
@@ -980,7 +994,7 @@ describe("DownloadTracker", () => {
       expect(tracker.files).to.have.lengthOf(0);
    });
 
-   it("apply() keeps previously known comments/kadCommentSearching when a later push omits them", () => {
+   it("apply() keeps previously known comments when a later push omits the container (kadCommentSearching, unconditional on the wire, reverts to its false default instead)", () => {
       const tracker = new ec.DownloadTracker();
       const withComments = new ec.ECPacket(ec.ECOpcode.EC_OP_DLOAD_QUEUE);
       withComments.add(
@@ -999,7 +1013,7 @@ describe("DownloadTracker", () => {
       );
       tracker.apply(dirtyPush);
 
-      expect(tracker.files[0]?.kadCommentSearching).to.equal(true);
+      expect(tracker.files[0]?.kadCommentSearching).to.equal(false);
       expect(tracker.files[0]?.comments).to.have.lengthOf(1);
    });
 

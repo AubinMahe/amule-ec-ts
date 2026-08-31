@@ -11,8 +11,8 @@ export function printSharedFile(file: ec.SharedFile): void {
    console.log(`${file.name ?? "(unknown name)"}  [${file.hash ?? "unknown hash"}]`);
    console.log(
       `  size: ${formatSize(file.sizeFull)}  uploaded: ${formatSize(file.uploadedTotal)}` +
-         `  @ ${formatSpeed(file.uploadSpeed)}  uploading to: ${file.uploadingCount ?? "?"}` +
-         `  requests: ${file.requestsTotal ?? "?"}  prio: ${file.prio ?? "?"}`,
+         `  @ ${formatSpeed(file.uploadSpeed)}  uploading to: ${file.uploadingCount}` +
+         `  requests: ${file.requestsTotal}  prio: ${file.prio}`,
    );
    if (file.path) {
       console.log(`  path: ${file.path}`);

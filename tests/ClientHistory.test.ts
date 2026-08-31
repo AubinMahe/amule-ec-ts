@@ -95,6 +95,21 @@ describe("ClientHistory.fetch", () => {
       /* eslint-enable @typescript-eslint/no-unused-expressions */
    });
 
+   it("defaults uploadTotal/downloadTotal to 0n when absent (unconditional on the wire, unlike the metadata trailer)", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.clientHistory = true;
+      const history = new ec.ClientHistory(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_CLIENT_HISTORY);
+      reply.add(clientHistoryTag({ hash: hexHash("a") }));
+      fake.queueReply(reply);
+
+      await history.fetch();
+
+      expect(history.entries[0]?.uploadTotal).to.equal(0n);
+      expect(history.entries[0]?.downloadTotal).to.equal(0n);
+      expect(history.entries[0]?.lastSeen).to.equal(0n);
+   });
+
    it("throws when the daemon replies with an unexpected opcode", async () => {
       const fake = createFakeConnection();
       fake.connection.remoteCapabilities.clientHistory = true;

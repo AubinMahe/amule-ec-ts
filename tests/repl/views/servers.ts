@@ -1,7 +1,7 @@
 import * as ec from "../../../src/index.js";
 
 export function printServer(server: ec.ServerInfo): void {
-   console.log(`${server.name ?? "(unknown name)"}  [${server.ipPort}]`);
+   console.log(`${server.name || "(unknown name)"}  [${server.ipPort}]`);
    console.log(
       `  ping: ${server.ping ?? "?"}ms  users: ${server.users ?? "?"}/${server.usersMax ?? "?"}  files: ${server.files ?? "?"}`,
    );

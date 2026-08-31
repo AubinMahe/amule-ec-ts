@@ -6,7 +6,7 @@ export function printUploadClient(client: ec.UploadClient): void {
    console.log(
       `  file: ${client.fileName ?? "(none)"}` +
          `  @ ${formatSpeed(client.speedUp)}  session: ${formatSpeed(client.sessionUp)}` +
-         `  total: ${client.totalUp ?? "?"}  software: ${client.softwareText}  state: ${client.uploadState ?? "?"}`,
+         `  total: ${client.totalUp}  software: ${client.softwareText}  state: ${client.uploadState}`,
    );
 }
 

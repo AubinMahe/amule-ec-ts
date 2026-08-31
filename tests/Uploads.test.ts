@@ -90,16 +90,15 @@ describe("UploadClient", () => {
       expect(other.friendSlot).to.equal(false);
    });
 
-   it("friendSlot is undefined when the tag is absent", () => {
+   it("friendSlot defaults to false when the tag is absent (unconditional on the wire)", () => {
       const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
-      expect(client.friendSlot).to.be.undefined;
+      expect(client.friendSlot).to.equal(false);
    });
 
    describe("softwareText", () => {
-      it('returns "Unknown" when software is missing', () => {
+      it('defaults to SO_EMULE/"eMule" when the software field is absent (unconditional on the wire)', () => {
          const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
-         expect(client.softwareText).to.equal("Unknown");
+         expect(client.softwareText).to.equal("eMule");
       });
 
       // Confirmed against GetSoftName() (DataToText.cpp#L104-L142) - one case per name it returns,

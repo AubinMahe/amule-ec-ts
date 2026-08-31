@@ -137,7 +137,7 @@ export class SearchResult {
       this.sizeFull = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL) ?? 0n;
       this.sources = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
       this.comments = parseFileComments(tag) ?? [];
-      this.kadCommentSearching = parseKadCommentSearching(tag) ?? false;
+      this.kadCommentSearching = parseKadCommentSearching(tag);
       this.media = parseMediaMetadata(tag);
       this.parent = tag.childInt(ECTagNames.EC_TAG_SEARCH_PARENT);
    }
