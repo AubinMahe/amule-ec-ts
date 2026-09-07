@@ -317,7 +317,7 @@ describe("Servers.disconnect", () => {
 });
 
 describe("Servers.setStatic", () => {
-   it("sends the ECID as a plain EC_TAG_SERVER uint32 (not an IPv4 tag), with only EC_TAG_SERVER_STATIC as a child", async () => {
+   it("sends the ECID as a plain EC_TAG_SERVER uint32 (not an IPv4 tag), with EC_TAG_SERVER_STATIC as a sibling top-level tag, not a child", async () => {
       const fake = createFakeConnection();
       const servers = new ec.Servers(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -325,12 +325,14 @@ describe("Servers.setStatic", () => {
       await servers.setStatic(7n, true);
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
-      expect(tag).to.be.instanceOf(ec.ECUInt32Tag);
-      expect(tag?.intValue).to.equal(7n);
-      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC)?.intValue).to.equal(1n);
+      const serverTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
+      expect(serverTag).to.be.instanceOf(ec.ECUInt32Tag);
+      expect(serverTag?.intValue).to.equal(7n);
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
-      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)).to.be.undefined;
+      expect(serverTag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC)).to.be.undefined;
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_STATIC)?.intValue).to.equal(1n);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_PRIO)).to.be.undefined;
    });
 
    it("throws a generic error on any unexpected opcode", async () => {
@@ -343,7 +345,7 @@ describe("Servers.setStatic", () => {
 });
 
 describe("Servers.setPriority", () => {
-   it("sends the ECID as a plain EC_TAG_SERVER uint32 (not an IPv4 tag), with only EC_TAG_SERVER_PRIO as a child", async () => {
+   it("sends the ECID as a plain EC_TAG_SERVER uint32 (not an IPv4 tag), with EC_TAG_SERVER_PRIO as a sibling top-level tag, not a child", async () => {
       const fake = createFakeConnection();
       const servers = new ec.Servers(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
@@ -351,12 +353,14 @@ describe("Servers.setPriority", () => {
       await servers.setPriority(7n, ec.ServerPriority.SRV_PR_HIGH);
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      const tag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
-      expect(tag).to.be.instanceOf(ec.ECUInt32Tag);
-      expect(tag?.intValue).to.equal(7n);
-      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)?.intValue).to.equal(BigInt(ec.ServerPriority.SRV_PR_HIGH));
+      const serverTag = fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER);
+      expect(serverTag).to.be.instanceOf(ec.ECUInt32Tag);
+      expect(serverTag?.intValue).to.equal(7n);
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
-      expect(tag?.findChild(ec.ECTagNames.EC_TAG_SERVER_STATIC)).to.be.undefined;
+      expect(serverTag?.findChild(ec.ECTagNames.EC_TAG_SERVER_PRIO)).to.be.undefined;
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_PRIO)?.intValue).to.equal(BigInt(ec.ServerPriority.SRV_PR_HIGH));
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_SERVER_STATIC)).to.be.undefined;
    });
 
    it("throws a generic error on any unexpected opcode", async () => {

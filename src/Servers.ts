@@ -328,33 +328,42 @@ export class Servers implements ECFetchable {
    }
 
    /**
-    * Pins or unpins a known server ("static"), by ECID -
-    * EC_OP_SERVER_SET_STATIC_PRIO with only EC_TAG_SERVER_STATIC as a
-    * child. See setPriority() for the sibling call that sets priority
+    * Pins or unpins a known server ("static"), by ECID - EC_OP_SERVER_SET_STATIC_PRIO with
+    * EC_TAG_SERVER and EC_TAG_SERVER_STATIC as two **sibling top-level tags** on the request, not
+    * one nested inside the other. See setPriority() for the sibling call that sets priority
     * instead.
     *
     * Confirmed against ExternalConn.cpp's EC_OP_SERVER_SET_STATIC_PRIO case
     * (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3420-L3434)
     * and amule-remote-gui.cpp's SetStaticServer()/SetServerPrio()
     * (https://github.com/amule-org/amule/blob/master/src/amule-remote-gui.cpp#L1619-L1642):
-    * the daemon's own opcode technically accepts either or both children in
-    * a single packet, but every caller upstream - and every caller of this
-    * wrapper - only ever changes one property at a time, so setStatic()/
-    * setPriority() mirror that rather than exposing a combined-write option
-    * nothing uses. The request's EC_TAG_SERVER tag carries the target's
-    * ECID as a **plain uint32** here - unlike connect()'s EC_TAG_SERVER,
-    * which carries an IP:port (ECIPv4Tag). Same tag name, different wire
-    * type depending on the opcode - see Kad.ts's packBootstrapIp() doc for
-    * the same class of gotcha. Always replies EC_OP_NOOP, even if the ECID
-    * doesn't resolve to a known server - no failure case exists.
+    * the daemon's own opcode technically accepts either or both tags in a single packet, but every
+    * caller upstream - and every caller of this wrapper - only ever changes one property at a
+    * time, so setStatic()/setPriority() mirror that rather than exposing a combined-write option
+    * nothing uses. The request's EC_TAG_SERVER tag carries the target's ECID as a **plain uint32**
+    * here - unlike connect()'s EC_TAG_SERVER, which carries an IP:port (ECIPv4Tag). Same tag name,
+    * different wire type depending on the opcode - see Kad.ts's packBootstrapIp() doc for the same
+    * class of gotcha. Always replies EC_OP_NOOP, even if the ECID doesn't resolve to a known
+    * server - no failure case exists.
+    *
+    * **The sibling-vs-nested distinction is load-bearing, not stylistic**: the daemon's handler
+    * calls `request->GetTagByName(EC_TAG_SERVER_STATIC)`/`GetTagByName(EC_TAG_SERVER_PRIO)`
+    * directly on the request packet (`ExternalConn.cpp`), and `CECTag::GetTagByName()`
+    * (`ECTag.cpp`) only scans its own direct children, never recursing into a tag nested inside
+    * another child - confirmed by reading both. An earlier version of this method added
+    * EC_TAG_SERVER_STATIC/EC_TAG_SERVER_PRIO as a **child of EC_TAG_SERVER** instead of a sibling
+    * of it: `EC_TAG_SERVER` itself was still found (so the ECID resolved and `GetServerByECID()`
+    * succeeded), but the nested static/prio tag was invisible to that top-level scan, so the
+    * daemon's `if (staticTag)`/`if (prioTag)` guard was always false and the actual
+    * `SetStaticServer()`/`SetServerPrio()` call never ran - silently, since EC_OP_NOOP comes back
+    * either way. Found 2026-09-07 by comparing against a live daemon: the official remote GUI
+    * (using the sibling layout above) could change a server's priority/static flag, this library's
+    * previous nested-tag version could not, despite an identical-looking successful reply.
     */
    public async setStatic(ecid: bigint, isStatic: boolean): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      request.add(
-         new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [
-            new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, isStatic ? 1 : 0),
-         ]),
-      );
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid)));
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_STATIC, isStatic ? 1 : 0));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
@@ -364,13 +373,14 @@ export class Servers implements ECFetchable {
    }
 
    /**
-    * Sets a known server's priority, by ECID - EC_OP_SERVER_SET_STATIC_PRIO
-    * with only EC_TAG_SERVER_PRIO as a child. See setStatic() for the
-    * sibling call and shared wire-format notes.
+    * Sets a known server's priority, by ECID - EC_OP_SERVER_SET_STATIC_PRIO with EC_TAG_SERVER and
+    * EC_TAG_SERVER_PRIO as sibling top-level tags. See setStatic() for the shared wire-format
+    * notes, including why sibling (not nested) placement is required.
     */
    public async setPriority(ecid: bigint, prio: ServerPriority): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SERVER_SET_STATIC_PRIO);
-      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid), [new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, prio)]));
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SERVER, Number(ecid)));
+      request.add(new ECUInt8Tag(ECTagNames.EC_TAG_SERVER_PRIO, prio));
       await this.connection.send(request);
       const reply = await this.connection.receive();
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
