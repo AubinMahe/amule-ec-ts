@@ -68,6 +68,16 @@ describe("Categories.update", () => {
 
       await expectRejection(categories.update(2, "Music", "/music"), /index #2.*using "\/old\/music\/path" instead/);
    });
+
+   it("throws the daemon's own reason on EC_OP_FAILED (out-of-range index, amule-org/amule#1228)", async () => {
+      const fake = createFakeConnection();
+      const categories = new ec.Categories(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "No such category."));
+      fake.queueReply(failure);
+
+      await expectRejection(categories.update(99, "Music", "/music"), /No such category\./);
+   });
 });
 
 describe("Categories.delete", () => {
@@ -84,13 +94,24 @@ describe("Categories.delete", () => {
       expect(catTag?.children).to.have.lengthOf(0);
    });
 
-   it("always resolves on EC_OP_NOOP, no failure case", async () => {
+   it("resolves on EC_OP_NOOP (an actual deletion)", async () => {
       const fake = createFakeConnection();
       const categories = new ec.Categories(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
 
-      await categories.delete(99);
+      await categories.delete(2);
 
       expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_DELETE_CATEGORY);
+   });
+
+   it("throws the daemon's own reason on EC_OP_FAILED (amule-org/amule#1232: out-of-range index, index 0, or a malformed request)", async () => {
+      const fake = createFakeConnection();
+      const categories = new ec.Categories(fake.connection);
+      const failure = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      failure.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CATEGORY, 99));
+      failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "No such category."));
+      fake.queueReply(failure);
+
+      await expectRejection(categories.delete(99), /No such category\./);
    });
 });
