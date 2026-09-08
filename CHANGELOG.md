@@ -9,6 +9,8 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.30.0] - 2026-09-08
+
 ### Added
 
 - `UploadClient.connected`/`.modCapabilities` (`Uploads.ts`) and `ClientUpdate.connected`/`.modCapabilities` (`Update.ts`) -
