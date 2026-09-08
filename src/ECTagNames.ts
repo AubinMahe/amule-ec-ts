@@ -36,16 +36,8 @@ export enum ECTagNames {
    EC_TAG_AEAD_SERVER_PUBKEY = 0x0022,
    EC_TAG_AEAD_CLIENT_CONFIRM = 0x0023,
    EC_TAG_AEAD_SERVER_CONFIRM = 0x0024,
-   // Random per-process identifier (uint64), unconditionally echoed on
-   // every AUTH_OK. Detects a daemon restart: ECIDs come from a counter
-   // that restarts with the process, so a client that kept objects across
-   // a reconnect and sees a different session id here knows its ECIDs mean
-   // nothing anymore and should start over instead of quietly mismatching
-   // stale state to new objects.
    EC_TAG_SESSION_ID = 0x0025,
-   // Unconditionally echoed on AUTH_OK - see ECCapabilities.clientHistory's doc.
    EC_TAG_CAN_CLIENT_HISTORY = 0x0026,
-   // Client opt-in, echoed only if requested - see ECCapabilities.chatSessions's doc.
    EC_TAG_CAN_CHAT_SESSIONS = 0x0027,
    EC_TAG_CLIENT_NAME = 0x0100,
    EC_TAG_CLIENT_VERSION = 0x0101,
@@ -78,10 +70,6 @@ export enum ECTagNames {
    EC_TAG_STATS_TOTAL_RECEIVED_BYTES = 0x0219,
    EC_TAG_STATS_SHARED_FILE_COUNT = 0x021a,
    EC_TAG_STATS_KAD_NODES = 0x021b,
-   // Free disk space (uint64 bytes) for the Temp and Incoming directories -
-   // cache-backed daemon-side, never a filesystem round trip per poll. Only
-   // sent at EC_DETAIL_FULL/EC_DETAIL_INC_UPDATE, not EC_DETAIL_CMD - see
-   // Status.ts's class doc.
    EC_TAG_STATS_TEMP_FREE_SPACE = 0x021c,
    EC_TAG_STATS_INCOMING_FREE_SPACE = 0x021d,
    EC_TAG_PARTFILE = 0x0300,
@@ -164,9 +152,6 @@ export enum ECTagNames {
    EC_TAG_SERVER_IP = 0x050c,
    EC_TAG_SERVER_PORT = 0x050d,
    EC_TAG_SERVER_COUNTRY = 0x050e,
-   // Per-user publishing limits this server advertises (0/absent = "not
-   // told us yet") and wire capability flag bitmasks - diagnostics, hidden
-   // by default in the reference GUI too.
    EC_TAG_SERVER_FILES_SOFT = 0x050f,
    EC_TAG_SERVER_FILES_HARD = 0x0510,
    EC_TAG_SERVER_TCP_FLAGS = 0x0511,
@@ -218,13 +203,11 @@ export enum ECTagNames {
    EC_TAG_CLIENT_IS_FRIEND = 0x062c,
    EC_TAG_CLIENT_SCORE_RATIO = 0x062d,
    EC_TAG_CLIENT_COUNTRY = 0x062e,
-   // Clients-history entry fields (EC_OP_CLIENT_HISTORY) - the credit
-   // store's persisted last-seen timestamp (always present) and the
-   // extended-metadata trailer's first-seen timestamp/session count
-   // (present only when the daemon has that trailer for this peer).
    EC_TAG_CLIENT_LAST_SEEN = 0x062f,
    EC_TAG_CLIENT_FIRST_SEEN = 0x0630,
    EC_TAG_CLIENT_SESSIONS = 0x0631,
+   EC_TAG_CLIENT_CONNECTED = 0x0632,
+   EC_TAG_CLIENT_MOD_CAPABILITIES = 0x0633,
    EC_TAG_SEARCHFILE = 0x0700,
    EC_TAG_SEARCH_TYPE = 0x0701,
    EC_TAG_SEARCH_NAME = 0x0702,
@@ -390,46 +373,16 @@ export enum ECTagNames {
    EC_TAG_STAT_NODE_VALUE = 0x1b07,
    EC_TAG_STAT_VALUE_TYPE = 0x1b08,
    EC_TAG_STATTREE_NODEID = 0x1b09,
-   // Active uploads / active downloads per point — parallel
-   // to STATSGRAPH_DATA's connection total, lets amulegui
-   // draw monolithic amule's 3-line connection scope.
    EC_TAG_STATSGRAPH_DATA_CONN = 0x1b0a,
-   // Session totals as of the latest point in the reply.
-   // Lets amulegui compute the daemon's
-   // kBytesReceived/sTimestamp session average instead of
-   // integrating locally from GUI startup.
    EC_TAG_STATSGRAPH_SESSION_DL = 0x1b0b,
    EC_TAG_STATSGRAPH_SESSION_UL = 0x1b0c,
    EC_TAG_STATSGRAPH_SESSION_KAD = 0x1b0d,
    EC_TAG_STATSGRAPH_SESSION_TIMESPAN = 0x1b0e,
-   // Stable, untranslated machine key for a stat-tree node. Optional
-   // subtag of EC_TAG_STATTREE_NODE; legacy consumers skip it (see the
-   // STATTREE_NODEID precedent). Lets API clients look a field up by a
-   // fixed identifier instead of matching the English label.
    EC_TAG_STAT_NODE_KEY = 0x1b0f,
-   // Raw numeric UL:DL ratio (download-per-upload, i.e. received/sent) as
-   // a double, so API clients don't parse the composite ratio string.
-   // Optional subtags of the ratio's EC_TAG_STATTREE_NODE; legacy
-   // consumers skip them. _RATIO is the session ratio, _RATIO_TOTAL the
-   // all-time ratio. Present only when computable (both sides > 0).
    EC_TAG_STAT_NODE_RATIO = 0x1b10,
    EC_TAG_STAT_NODE_RATIO_TOTAL = 0x1b11,
-   // Raw, untranslated machine value for a node whose label is data
-   // (client version / OS string). Optional sibling of the display label;
-   // legacy consumers skip it. Lets API clients read the value without
-   // parsing it out of the composite label.
    EC_TAG_STAT_NODE_RAW = 0x1b12,
-   // Stable, locale-independent token for a well-known sentinel *value*
-   // (e.g. "never", "not_available"). Optional sub-tag of an
-   // EC_TAG_STAT_NODE_VALUE; the English display string stays alongside it
-   // (EC_VALUE_STRING) so GUI/legacy consumers are unaffected.
    EC_TAG_STAT_VALUE_ENUM = 0x1b13,
-   // How many points the daemon can actually answer for the scale used in
-   // the reply this accompanies (CStatistics::GetPointsPerRange()), so the
-   // caller can cap its next fetch()'s width instead of guessing - see
-   // StatsGraphs.fetch()'s doc. Over-asking doesn't error, it just repeats
-   // a record, and there's no timestamp per point on the wire to detect
-   // that from the data alone.
    EC_TAG_STATSGRAPH_DEPTH = 0x1b14,
    EC_TAG_PREFS_SECURITY = 0x1c00,
    EC_TAG_SECURITY_CAN_SEE_SHARES = 0x1c01,

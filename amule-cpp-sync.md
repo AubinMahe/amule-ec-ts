@@ -42,6 +42,22 @@ three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT
 comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
 `EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
 
+## 2026-09-07
+
+Local C++ checkout pulled and rebuilt (HEAD `f98d790a2`). Diffed `src/libs/ec/abstracts/ECCodes.abstract` against the 2026-08-31
+baseline (`821e34e8`, 73 commits): no `EC_OP_*`/`EC_TAG_*` value changed or removed, 2 new tags added - `EC_TAG_CLIENT_CONNECTED`
+(0x0632, #1295) and `EC_TAG_CLIENT_MOD_CAPABILITIES` (0x0633, #1288), both `EC_TAG_CLIENT_*` additions, neither decoded here yet -
+sorted into `TODO.md`'s "Tags, declared but not decoded" section.
+
+Commit-by-commit review of the same range for behavior changes on already-ported protocol: most of the 73 commits touch
+`amuleapi`/`web-ui` (aMule's separate JSON/HTTP API, out of scope for this library) or GUI-only code, out of scope here. Of the
+rest: #1228/#1232 (category-error reporting) were already tracked in an earlier, untracked-here session (amule-ec 2.29.2); #1314
+(count a ban once per banned address) is an internal statistics-counting fix with no `EC_TAG`/`EC_OP` touched, transparent to any EC
+client; #1222 (Kad: stop unassigned searches answering to the legacy EC search id) fixes daemon-side search-lifecycle misreporting
+for EC clients that never negotiate `EC_TAG_CAN_MULTI_SEARCH` (every one of their searches shared the same internal sentinel id) -
+transparent once the daemon updates, no client-side change needed. `9442dcde8` (Kademlia protocol 0x0a) is peer-to-peer Kad wire
+protocol, not the local EC client protocol - out of scope.
+
 ## 2026-08-31
 
 Local C++ checkout pulled (HEAD `821e34e8`) and rebuilt the daemon. Diffed `src/libs/ec/abstracts/ECCodes.abstract` against the

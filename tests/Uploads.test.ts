@@ -16,6 +16,8 @@ function uploadClientTag(fields: {
    softwareVersion?: string;
    uploadFileEcid?: number;
    friendSlot?: boolean;
+   connected?: boolean;
+   modCapabilities?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
@@ -44,6 +46,12 @@ function uploadClientTag(fields: {
    }
    if (fields.friendSlot !== undefined) {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT, fields.friendSlot ? 1 : 0));
+   }
+   if (fields.connected !== undefined) {
+      children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_CONNECTED, fields.connected ? 1 : 0));
+   }
+   if (fields.modCapabilities !== undefined) {
+      children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES, fields.modCapabilities));
    }
    return new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, fields.ecid, children);
 }
@@ -93,6 +101,36 @@ describe("UploadClient", () => {
    it("friendSlot defaults to false when the tag is absent (unconditional on the wire)", () => {
       const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
       expect(client.friendSlot).to.equal(false);
+   });
+
+   it("reads connected true/false when present", () => {
+      const online = new ec.UploadClient(uploadClientTag({ ecid: 1, connected: true }));
+      const offline = new ec.UploadClient(uploadClientTag({ ecid: 1, connected: false }));
+      expect(online.connected).to.equal(true);
+      expect(offline.connected).to.equal(false);
+   });
+
+   it("connected defaults to false when the tag is absent (daemon predates it)", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
+      expect(client.connected).to.equal(false);
+   });
+
+   it("reads modCapabilities' five flags from the bitfield", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1, modCapabilities: 0b10101 }));
+      expect(client.modCapabilities.extendedSourceExchange).to.equal(true);
+      expect(client.modCapabilities.natTraversal).to.equal(false);
+      expect(client.modCapabilities.ipv6).to.equal(true);
+      expect(client.modCapabilities.buddyInfoPull).to.equal(false);
+      expect(client.modCapabilities.natTraversalQuic).to.equal(true);
+   });
+
+   it("modCapabilities is all-false when the tag is absent (daemon predates it, or peer claims nothing)", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
+      expect(client.modCapabilities.extendedSourceExchange).to.equal(false);
+      expect(client.modCapabilities.natTraversal).to.equal(false);
+      expect(client.modCapabilities.ipv6).to.equal(false);
+      expect(client.modCapabilities.buddyInfoPull).to.equal(false);
+      expect(client.modCapabilities.natTraversalQuic).to.equal(false);
    });
 
    describe("softwareText", () => {

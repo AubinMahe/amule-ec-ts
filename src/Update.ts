@@ -8,6 +8,7 @@ import { ECTag, ECUInt8Tag, ECHash16Tag } from "./ECTags.js";
 import { SharedFile } from "./SharedFiles.js";
 import { DownloadFile } from "./Downloads.js";
 import { ServerPriority } from "./Servers.js";
+import { ClientModCapabilities, parseClientModCapabilities } from "./Uploads.js";
 
 const debug = debuglog("amule-ec:update");
 
@@ -17,8 +18,7 @@ const debug = debuglog("amule-ec:update");
  * These fields (`EC_TAG_CLIENT_USER_IP`/`_SERVER_IP`, `EC_TAG_SERVER_IP`,
  * `EC_TAG_FRIEND_IP`) carry the same "anti-host order" 32-bit integer as
  * `CServer`/`CUpDownClient`'s own `GetIP()` - confirmed against
- * `Uint32toStringIP` (https://github.com/amule-org/amule/blob/master/src/NetworkFunctions.h#L36-L39):
- * the least-significant byte is the first octet, unlike `ECIPv4Tag`'s
+ * `Uint32toStringIP` the least-significant byte is the first octet, unlike `ECIPv4Tag`'s
  * compound `EC_IPv4_t` encoding (used by `Servers.fetch()`'s own top-level
  * tag, which stores octets already in display order and needs no
  * conversion). Not the same convention Kad IPs use elsewhere in the C++
@@ -37,8 +37,7 @@ export function ipFromTag(tag: ECTag, name: number): string | undefined {
 
 /**
  * A client's `EC_TAG_CLIENT_FROM` value - where this source was learned
- * from. Confirmed against `ESourceFrom`
- * (https://github.com/amule-org/amule/blob/master/src/Constants.h#L123-L134).
+ * from.
  */
 export enum ECClientSourceFrom {
    NONE = 0,
@@ -54,8 +53,7 @@ export enum ECClientSourceFrom {
 
 /**
  * A client's `EC_TAG_CLIENT_IDENT_STATE` value - secure-identification
- * status. Confirmed against `EIdentState`
- * (https://github.com/amule-org/amule/blob/master/src/ClientCredits.h#L51-L58).
+ * status.
  */
 export enum ECIdentState {
    NOT_AVAILABLE = 0,
@@ -70,9 +68,7 @@ export enum ECIdentState {
  *
  * A richer, mergeable sibling of `UploadClient` (which models
  * `EC_OP_GET_ULOAD_QUEUE`'s reply): both wrap the same `CEC_UpDownClient_Tag`
- * C++ class, but `GET_UPDATE` uses its `valuemap`-diffing constructor
- * (confirmed against
- * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L343-L397), which may
+ * C++ class, but `GET_UPDATE` uses its `valuemap`-diffing constructor, which may
  * omit any child whose value hasn't changed since this connection's last
  * poll - every field is genuinely optional here, with no placeholder
  * fallback text, so `mergedWith()` can tell "unchanged" from "actually
@@ -132,6 +128,17 @@ export class ClientUpdate {
     * ratio-like field on this class.
     */
    public readonly scoreRatio: number | undefined;
+   /**
+    * Whether the daemon holds a live, actually-connected socket to this peer right now
+    * (`EC_TAG_CLIENT_CONNECTED`) - distinct from this client merely existing in the list, which
+    * only means contact was attempted, possibly against a peer that can never be reached.
+    */
+   public readonly connected: boolean | undefined;
+   /**
+    * The peer's eMuleAI vendor capabilities (`EC_TAG_CLIENT_MOD_CAPABILITIES`) - see
+    * ClientModCapabilities's doc (`Uploads.ts`).
+    */
+   public readonly modCapabilities: ClientModCapabilities | undefined;
 
    private constructor(fields: {
       ecid: bigint;
@@ -162,6 +169,8 @@ export class ClientUpdate {
       remoteQueueRank: bigint | undefined;
       isFriend: boolean | undefined;
       scoreRatio: number | undefined;
+      connected: boolean | undefined;
+      modCapabilities: ClientModCapabilities | undefined;
    }) {
       this.ecid = fields.ecid;
       this.name = fields.name;
@@ -191,10 +200,13 @@ export class ClientUpdate {
       this.remoteQueueRank = fields.remoteQueueRank;
       this.isFriend = fields.isFriend;
       this.scoreRatio = fields.scoreRatio;
+      this.connected = fields.connected;
+      this.modCapabilities = fields.modCapabilities;
    }
 
    public static fromTag(tag: ECTag): ClientUpdate {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
+      const modCapabilitiesBits = tag.childInt(ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES);
       return new ClientUpdate({
          ecid: tag.intValue ?? 0n,
          name: tag.childString(ECTagNames.EC_TAG_CLIENT_NAME),
@@ -224,6 +236,8 @@ export class ClientUpdate {
          remoteQueueRank: tag.childInt(ECTagNames.EC_TAG_CLIENT_REMOTE_QUEUE_RANK),
          isFriend: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_IS_FRIEND)),
          scoreRatio: tag.childDouble(ECTagNames.EC_TAG_CLIENT_SCORE_RATIO),
+         connected: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_CONNECTED)),
+         modCapabilities: modCapabilitiesBits === undefined ? undefined : parseClientModCapabilities(modCapabilitiesBits),
       });
    }
 
@@ -261,6 +275,8 @@ export class ClientUpdate {
          remoteQueueRank: update.remoteQueueRank ?? this.remoteQueueRank,
          isFriend: update.isFriend ?? this.isFriend,
          scoreRatio: update.scoreRatio ?? this.scoreRatio,
+         connected: update.connected ?? this.connected,
+         modCapabilities: update.modCapabilities ?? this.modCapabilities,
       });
    }
 }
@@ -278,8 +294,7 @@ function boolOrUndefined(value: bigint | undefined): boolean | undefined {
  *
  * A richer, mergeable sibling of `ServerInfo` (which models
  * `EC_OP_GET_SERVER_LIST`'s reply): both wrap `CEC_Server_Tag`, but
- * `GET_UPDATE` uses the `valuemap`-diffing constructor
- * (https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L115-L136), which has
+ * `GET_UPDATE` uses the `valuemap`-diffing constructor, which has
  * a different own-tag-value (the server's ECID, not an `EC_IPv4_t`) and
  * carries `ip`/`port` as ordinary optional children instead - so this is a
  * distinct class rather than an extension of `ServerInfo`, keyed by ECID
@@ -399,6 +414,13 @@ export class FriendInfo {
     * other field above.
     */
    public readonly friendSlot: boolean | undefined;
+   /**
+    * Whether this friend's linked client (if any) has a live, actually-connected socket right now
+    * (`EC_TAG_CLIENT_CONNECTED`, echoed from `linkedClient.GetClient()->IsConnected()`) - `false`
+    * for a friend with no linked client at all (`linkedClientEcid` is `0n`), not `undefined` for
+    * that reason, mirroring `linkedClientEcid`'s own doc.
+    */
+   public readonly connected: boolean | undefined;
 
    private constructor(fields: {
       ecid: bigint;
@@ -408,6 +430,7 @@ export class FriendInfo {
       port: bigint | undefined;
       linkedClientEcid: bigint | undefined;
       friendSlot: boolean | undefined;
+      connected: boolean | undefined;
    }) {
       this.ecid = fields.ecid;
       this.name = fields.name;
@@ -416,6 +439,7 @@ export class FriendInfo {
       this.port = fields.port;
       this.linkedClientEcid = fields.linkedClientEcid;
       this.friendSlot = fields.friendSlot;
+      this.connected = fields.connected;
    }
 
    public static fromTag(tag: ECTag): FriendInfo {
@@ -428,6 +452,7 @@ export class FriendInfo {
          port: tag.childInt(ECTagNames.EC_TAG_FRIEND_PORT),
          linkedClientEcid: tag.childInt(ECTagNames.EC_TAG_FRIEND_CLIENT),
          friendSlot: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_FRIEND_FRIENDSLOT)),
+         connected: boolOrUndefined(tag.childInt(ECTagNames.EC_TAG_CLIENT_CONNECTED)),
       });
    }
 
@@ -444,6 +469,7 @@ export class FriendInfo {
          port: update.port ?? this.port,
          linkedClientEcid: update.linkedClientEcid ?? this.linkedClientEcid,
          friendSlot: update.friendSlot ?? this.friendSlot,
+         connected: update.connected ?? this.connected,
       });
    }
 }
@@ -461,14 +487,12 @@ export class FriendInfo {
  *    `EC_DETAIL_FULL`) makes the daemon's `EC_OP_GET_UPDATE` case leave its
  *    response unset, which then falls into `ExternalConn.cpp`'s generic
  *    "invalid opcode" handler - the same `wxFAIL` + `EC_OP_FAILED` path an
- *    actually-unknown opcode gets
- *    (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3466-L3474,4047-4054).
+ *    actually-unknown opcode gets.
  *    `fetch()` always sends it - this is called out because it is easy to
  *    get wrong by analogy with every other `GET_*` opcode, where omitting
  *    the detail level just means "give me the default".
  *  - Like `GET_PREFERENCES`, the reply's own opcode is `EC_OP_SHARED_FILES`,
- *    not `EC_OP_GET_UPDATE`
- *    (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L1792-L1798) - the same
+ *    not `EC_OP_GET_UPDATE` - the same
  *    opcode `Get_EC_Response_GetSharedFiles` uses for `GET_SHARED_FILES`
  *    itself. Since EC has no request/reply correlation ID, only the fact
  *    that this is a synchronous reply to the request just sent identifies

@@ -109,6 +109,28 @@ describe("Update.fetch", () => {
       });
    });
 
+   it("decodes a client's connected flag and eMuleAI mod capabilities", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      reply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CLIENT, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42, [
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_CONNECTED, 1),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES, 0b00100),
+            ]),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      await update.fetch();
+
+      expect(update.clients[0]?.connected).to.equal(true);
+      expect(update.clients[0]?.modCapabilities?.ipv6).to.equal(true);
+      expect(update.clients[0]?.modCapabilities?.natTraversal).to.equal(false);
+   });
+
    it("parses the EC_TAG_SERVER container's children into servers, keyed by ECID", async () => {
       const fake = createFakeConnection();
       fake.connection.remoteCapabilities.partialUpdate = true;
@@ -161,6 +183,26 @@ describe("Update.fetch", () => {
       });
    });
 
+   it("decodes a friend's connected flag, echoed from its linked client", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      reply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_FRIEND, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND, 5, [
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_FRIEND_CLIENT, 9),
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_CONNECTED, 1),
+            ]),
+         ]),
+      );
+      fake.queueReply(reply);
+
+      await update.fetch();
+
+      expect(update.friends[0]?.connected).to.equal(true);
+   });
+
    it("merges a later partial poll onto the previous snapshot instead of discarding unmentioned fields", async () => {
       const fake = createFakeConnection();
       fake.connection.remoteCapabilities.partialUpdate = true;
@@ -192,6 +234,38 @@ describe("Update.fetch", () => {
       expect(update.clients).to.have.lengthOf(1);
       expect(update.clients[0]?.name).to.equal("peer1");
       expect(update.clients[0]?.uploadSpeed).to.equal(200n);
+   });
+
+   it("keeps a client's previous modCapabilities/connected when a later poll omits them (unchanged)", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.partialUpdate = true;
+      const update = new ec.Update(fake.connection);
+
+      const firstReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      firstReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CLIENT, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42, [
+               new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_CONNECTED, 1),
+               new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES, 0b00001),
+            ]),
+         ]),
+      );
+      fake.queueReply(firstReply);
+      await update.fetch();
+
+      // Second poll only reports an unrelated field - connected/modCapabilities are unchanged
+      // since last cycle and so are omitted by the daemon.
+      const secondReply = new ec.ECPacket(ec.ECOpcode.EC_OP_SHARED_FILES);
+      secondReply.add(
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CLIENT, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT, 42, [new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_UP_SPEED, 200)]),
+         ]),
+      );
+      fake.queueReply(secondReply);
+      await update.fetch();
+
+      expect(update.clients[0]?.connected).to.equal(true);
+      expect(update.clients[0]?.modCapabilities?.extendedSourceExchange).to.equal(true);
    });
 
    it("merges a later partial poll onto the previous server snapshot instead of discarding unmentioned fields", async () => {

@@ -11,8 +11,6 @@ const debug = debuglog("amule-ec:uploads");
 
 /**
  * A client's `EC_TAG_CLIENT_SOFTWARE` value - the ed2k protocol's client-software identifier.
- * Confirmed against `EClientSoftware`
- * (https://github.com/amule-org/amule/blob/master/src/include/protocol/ed2k/ClientSoftware.h).
  */
 export enum ECClientSoftware {
    SO_EMULE = 0,
@@ -36,11 +34,61 @@ export enum ECClientSoftware {
 }
 
 /**
+ * A peer's decoded eMuleAI vendor capability bits (`EC_TAG_CLIENT_MOD_CAPABILITIES`, the wire form
+ * of `CT_MOD_MISCOPTIONS`) - confirmed against `PeerCapabilities.h`'s `CPeerCapabilities`: already
+ * masked to the five defined bits server-side, so no reserved/unknown bit ever reaches here. An
+ * absent tag and an all-zero one mean the same thing upstream (eMuleAI omits the handshake tag
+ * entirely when its word is zero, and so does a daemon predating this tag) - decoded the same way
+ * here, as every flag false, rather than `undefined`.
+ */
+export class ClientModCapabilities {
+   public constructor(
+      /**
+       * Extended source exchange with variable source info.
+       */
+      public readonly extendedSourceExchange: boolean,
+      /**
+       * Legacy uTP NAT traversal (simple UDP traversal through NATs).
+       */
+      public readonly natTraversal: boolean,
+      public readonly ipv6: boolean,
+      /**
+       * Vendor buddy-info pull.
+       */
+      public readonly buddyInfoPull: boolean,
+      /**
+       * QUIC NAT-T data transport.
+       */
+      public readonly natTraversalQuic: boolean,
+   ) {}
+}
+
+const MOD_MISCOPT_EXTENDED_XS = 0x01n;
+const MOD_MISCOPT_NAT_TRAVERSAL = 0x02n;
+const MOD_MISCOPT_IPV6 = 0x04n;
+const MOD_MISCOPT_SERVING_BUDDY_PULL = 0x08n;
+const MOD_MISCOPT_NAT_TRAVERSAL_QUIC = 0x10n;
+
+/**
+ * Decodes a raw `EC_TAG_CLIENT_MOD_CAPABILITIES` word into its five named flags. Takes the bits
+ * rather than the tag itself so a caller that must tell "absent" apart from "present and zero"
+ * (an `EC_OP_GET_UPDATE` diff - see `Update.ts`'s `ClientUpdate`) can do that check first; one that
+ * doesn't need the distinction (`Uploads.fetch()`'s full snapshot) can default to `0n` inline.
+ */
+export function parseClientModCapabilities(bits: bigint): ClientModCapabilities {
+   return new ClientModCapabilities(
+      (bits & MOD_MISCOPT_EXTENDED_XS) !== 0n,
+      (bits & MOD_MISCOPT_NAT_TRAVERSAL) !== 0n,
+      (bits & MOD_MISCOPT_IPV6) !== 0n,
+      (bits & MOD_MISCOPT_SERVING_BUDDY_PULL) !== 0n,
+      (bits & MOD_MISCOPT_NAT_TRAVERSAL_QUIC) !== 0n,
+   );
+}
+
+/**
  * One EC_TAG_CLIENT entry from an EC_OP_ULOAD_QUEUE reply.
  *
- * Confirmed against
- * https://github.com/amule-org/amule/blob/master/src/ECSpecialCoreTags.cpp#L327-L397
- * (CEC_UpDownClient_Tag): EC_TAG_CLIENT's own data is the client's internal
+ * EC_TAG_CLIENT's own data is the client's internal
  * ECID (`CECTag(EC_TAG_CLIENT, client->ECID())`), not its user hash - the
  * hash and the other properties used below are children, added
  * unconditionally before the `detail_level == EC_DETAIL_UPDATE`
@@ -90,6 +138,19 @@ export class UploadClient {
     * `EC_DETAIL_CMD` level `Uploads.fetch()` already requests.
     */
    public readonly friendSlot: boolean;
+   /**
+    * Whether the daemon holds a live, actually-connected socket to this peer right now
+    * (`EC_TAG_CLIENT_CONNECTED`, `client->IsConnected()`) - distinct from this client merely
+    * existing in the upload queue, which only means contact was attempted, possibly against a peer
+    * that can never be reached. Absent on a daemon predating this tag, decoded as `false` then -
+    * indistinguishable from "not connected" either way, since neither carries a live socket.
+    */
+   public readonly connected: boolean;
+   /**
+    * The peer's eMuleAI vendor capabilities (`EC_TAG_CLIENT_MOD_CAPABILITIES`) - see
+    * ClientModCapabilities's doc.
+    */
+   public readonly modCapabilities: ClientModCapabilities;
 
    public constructor(tag: ECTag) {
       const hashTag = tag.findChild(ECTagNames.EC_TAG_CLIENT_HASH);
@@ -105,13 +166,14 @@ export class UploadClient {
       this.ecid = tag.intValue ?? 0n;
       this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE) ?? 0n;
       this.friendSlot = (tag.childInt(ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT) ?? 0n) !== 0n;
+      this.connected = (tag.childInt(ECTagNames.EC_TAG_CLIENT_CONNECTED) ?? 0n) !== 0n;
+      this.modCapabilities = parseClientModCapabilities(tag.childInt(ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES) ?? 0n);
    }
 
    /**
-    * Human-readable software name, mirroring `GetSoftName()`
-    * (https://github.com/amule-org/amule/blob/master/src/DataToText.cpp#L104-L142). Unlike
-    * `softwareVersion` (the version-only EC_TAG_CLIENT_SOFT_VER_STR string, e.g. "v0.50a"), the
-    * daemon never sends this name as text over EC - only the raw `software` code - so it is
+    * Human-readable software name, mirroring `GetSoftName()`.
+    * Unlike `softwareVersion` (the version-only EC_TAG_CLIENT_SOFT_VER_STR string, e.g. "v0.50a"),
+    * the daemon never sends this name as text over EC - only the raw `software` code - so it is
     * decoded client-side from `ECClientSoftware`.
     */
    public get softwareText(): string {
@@ -184,8 +246,7 @@ export class Uploads implements ECFetchable {
     * Moves an uploading client to another of the daemon's downloads -
     * EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE.
     *
-    * Confirmed against ExternalConn.cpp's EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE
-    * case (https://github.com/amule-org/amule/blob/master/src/ExternalConn.cpp#L3324-L3333): the
+    * Confirmed against ExternalConn.cpp's EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE case: the
     * request carries two top-level tags, EC_TAG_CLIENT (the client's ECID,
     * plain uint32 - same tag name UploadClient.ecid reads, but as its own
     * data here rather than a child) and EC_TAG_PARTFILE (the target
