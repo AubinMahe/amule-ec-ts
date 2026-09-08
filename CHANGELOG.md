@@ -9,6 +9,45 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+### Added
+
+- `UploadClient.connected`/`.modCapabilities` (`Uploads.ts`) and `ClientUpdate.connected`/`.modCapabilities` (`Update.ts`) -
+  `EC_TAG_CLIENT_CONNECTED` (whether the daemon holds a live, actually-connected socket to this peer right now, as opposed to merely
+  attempting contact) and `EC_TAG_CLIENT_MOD_CAPABILITIES` (the peer's eMuleAI vendor capability bitfield, decoded into the new
+  `ClientModCapabilities` class: `extendedSourceExchange`/`natTraversal`/`ipv6`/`buddyInfoPull`/`natTraversalQuic`). Both new
+  upstream (#1295, #1288), neither previously declared in `ECTagNames.ts`. `false`/all-flags-false when the tag is absent (a daemon
+  predating either). Live-tested against a real daemon: of 6 clients in the upload queue, only the one actually transferring data
+  read `connected: true`, the other 5 (queued, no active transfer) read `false` - confirming the fix this tag exists for (a client
+  merely listed is not the same as one actually connected).
+- `FriendInfo.connected` (`Update.ts`) - the same `EC_TAG_CLIENT_CONNECTED`, echoed on the friend container from its linked client.
+
+## [2.29.2] - 2026-09-07
+
+### Fixed
+
+- `Categories.readFailure()` (shared by `update()`/`delete()`) now checks `EC_TAG_STRING` first and uses it verbatim when present,
+  instead of assuming `EC_OP_FAILED` never carries one - tracks two upstream fixes to
+  `EC_OP_UPDATE_CATEGORY`/`EC_OP_DELETE_CATEGORY` (amule-org/amule#1228, #1232). #1228: an out-of-range index used to abort the
+  whole daemon with `SIGABRT`; a fixed daemon now replies `EC_OP_FAILED` with a reason instead. #1232: `EC_OP_DELETE_CATEGORY` used
+  to answer `EC_OP_NOOP` unconditionally even when nothing was deleted (index 0, a malformed request, or an out-of-range index),
+  silently letting a client's category list diverge from the daemon's; `delete()` gained the corresponding `EC_OP_FAILED` branch.
+  Against an older daemon both paths are inert - unchanged behavior. Live-tested against a freshly rebuilt daemon with both fixes:
+  `update()`/`delete()` with an out-of-range index now throw "No such category." instead of crashing the daemon; `delete(0)` throws
+  "The default category cannot be deleted.".
+
+## [2.29.1] - 2026-09-07
+
+### Fixed
+
+- `Servers.setStatic()`/`.setPriority()` now send `EC_TAG_SERVER_STATIC`/`_PRIO` as sibling tags on the request, alongside
+  `EC_TAG_SERVER`, instead of nesting them as `EC_TAG_SERVER`'s own child. The daemon's `EC_OP_SERVER_SET_STATIC_PRIO` handler reads
+  the static/priority tag with `GetTagByName()` directly on the request packet, which only scans direct children and never recurses
+   - the nested tag was invisible to it, so the daemon's guard was always false and the setting silently never applied (the opcode
+     always replies `EC_OP_NOOP` regardless of whether anything happened, so no error surfaced client-side either). Found by
+     comparing wire traffic against `amule-remote-gui.cpp` while investigating server list checkbox/priority edits that visually
+     toggled then reverted on the next refresh. Live-tested against a real daemon: the previous shape silently no-oped in every
+     direction, the sibling-tag shape applies correctly every time.
+
 ## [2.29.0] - 2026-08-31
 
 ### Added
