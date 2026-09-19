@@ -228,3 +228,15 @@ Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asse
 
 - **Priority**: High
 - **Effort**: Medium
+
+### TypeScript above 6.0: lift the Dependabot ignore once typescript-eslint follows
+
+`typescript` is pinned to `~6.0.3` and `.github/dependabot.yml` ignores its minor and major updates, because `typescript-eslint`
+(8.70.0 at the time of writing) accepts `typescript` below 6.1.0 only: with TypeScript 7 `npm ci` fails with ERESOLVE, and forcing
+it would run the type-aware lint rules on a TypeScript their parser does not support. Nothing will announce that this has changed.
+When a new `typescript-eslint` comes (Dependabot proposes them in the grouped development-dependencies pull request), check what it
+accepts with `npm view typescript-eslint peerDependencies.typescript`; once the range covers a newer TypeScript, remove the
+`typescript` rule from `.github/dependabot.yml` and raise the range in `package.json`.
+
+- **Priority**: Low
+- **Effort**: Low
