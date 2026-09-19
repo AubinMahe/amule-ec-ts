@@ -228,14 +228,3 @@ Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asse
 
 - **Priority**: High
 - **Effort**: Medium
-
-### npm publication provenance
-
-`release.yml` creates the GitHub release only. The npm publication is manual and taken when a version is judged mature: as of
-2026-09-19 the latest version on npm is 2.30.0 (published 2026-09-08), while 2.30.1 to 2.33.0 exist as tags and GitHub Releases
-only. No npm provenance (`npm publish --provenance`, which needs the publish to run from CI with `id-token: write`) is configured,
-and one from the maintainer's machine cannot carry it; a workflow triggered by hand for a chosen tag would fit a publication made
-only when a version is mature.
-
-- **Priority**: High
-- **Effort**: Medium

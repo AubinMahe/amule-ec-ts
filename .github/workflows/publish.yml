@@ -1,0 +1,45 @@
+name: Publish to npm
+
+# Run by hand, on the tag of the version to publish, once it is judged mature:
+#   gh workflow run publish.yml --ref vX.Y.Z
+# (or "Run workflow" in the Actions tab, choosing the tag). The provenance statement records the
+# commit the workflow runs on, so it has to be the tag's own, and a branch is refused. The tag
+# has to contain this file, so the first version that can be published this way is the one
+# released after it was added.
+#
+# The version is only staged: it goes live once a maintainer approves it with two-factor
+# authentication, on npmjs.com ("Staged Packages") or with `npm stage approve <stage-id>`.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse anything but a version tag
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ] || ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Run this workflow on a version tag (vX.Y.Z), not on '$GITHUB_REF_NAME'."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+      - name: Check the npm version (staged publishing needs 11.15.0 or later)
+        run: |
+          npm --version
+          printf '11.15.0\n%s\n' "$(npm --version)" | sort -V -C
+      - run: npm ci
+      - name: Check tag, package.json and package-lock.json versions match
+        run: npm run check-versions -- "$GITHUB_REF_NAME"
+      - run: npm run lint
+      - run: npm run test
+      - name: Stage with provenance
+        run: npm stage publish --provenance --access public .

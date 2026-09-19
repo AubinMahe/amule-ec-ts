@@ -51,8 +51,14 @@ version in two places, which `npm install` does not update unless asked. A versi
 the bump is merged, push the tag `vX.Y.Z`: the release workflow runs the same check with the tag as argument
 (`npm run check-versions -- vX.Y.Z`) and stops if the tag, `package.json` and `package-lock.json` do not all carry the same version.
 
-A tag and its GitHub Release do not publish to npm. Publication to npm is a separate, manual step, taken when a version is judged
-mature, so the latest version on npm can be older than the latest tag.
+A tag and its GitHub Release do not publish to npm. Publication to npm is a separate step, taken when a version is judged mature, so
+the latest version on npm can be older than the latest tag. It is done by the "Publish to npm" workflow, run by hand on that
+version's tag (`gh workflow run publish.yml --ref vX.Y.Z`, or "Run workflow" in the Actions tab, choosing the tag): it checks the
+versions, runs the linter and the tests, then stages the version with a provenance statement through npm's trusted publishing, so no
+npm token is stored. The version goes live once a maintainer approves it with two-factor authentication, on npmjs.com ("Staged
+Packages") or with `npm stage approve <stage-id>`. The workflow refuses a branch, because the provenance records the commit it runs
+on. It needs the package's "Trusted Publisher" setting on npmjs.com to name this repository and the workflow file `publish.yml`,
+with direct publishing left disabled, and only a tag that contains that file can be published this way.
 
 ## Continuous integration and dependencies
 
