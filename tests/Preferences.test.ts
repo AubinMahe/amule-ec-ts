@@ -1072,3 +1072,51 @@ describe("Preferences.listCategories", () => {
       expect(categories).to.deep.equal([]);
    });
 });
+
+describe("Preferences URL fields", () => {
+   const badUrls = ["file:///etc/passwd", "ftp://example.com/x", "javascript:alert(1)", "not a url"];
+
+   it("setSecurity rejects a non-http(s) ipFilterUpdateUrl without sending a request", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+
+      for (const url of badUrls) {
+         await expectRejection(preferences.setSecurity({ ...securityPrefsFixture(), ipFilterUpdateUrl: url }), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("setServers rejects a non-http(s) updateUrl without sending a request", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+
+      for (const url of badUrls) {
+         await expectRejection(preferences.setServers({ ...serversPrefsFixture(), updateUrl: url }), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("setKademlia rejects a non-http(s) nodesUpdateUrl without sending a request", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+
+      for (const url of badUrls) {
+         await expectRejection(preferences.setKademlia({ nodesUpdateUrl: url }), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("setIP2Country rejects a non-http(s) customUrl without sending a request", async () => {
+      const fake = createFakeConnection();
+      const preferences = new ec.Preferences(fake.connection);
+
+      for (const url of badUrls) {
+         await expectRejection(preferences.setIP2Country({ ...ip2CountryPrefsFixture(), customUrl: url }), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+});

@@ -54,4 +54,31 @@ describe("IPFilter.updateFromUrl", () => {
 
       await expectRejection(ipFilter.updateFromUrl(), /EC_OP_NOOP/);
    });
+
+   it("rejects anything but an http: or https: URL, without sending a request", async () => {
+      const fake = createFakeConnection();
+      const ipFilter = new ec.IPFilter(fake.connection);
+
+      for (const url of [
+         "file:///etc/passwd",
+         "ftp://example.com/ipfilter.dat",
+         "javascript:alert(1)",
+         "not a url",
+         "//example.com/x",
+      ]) {
+         await expectRejection(ipFilter.updateFromUrl(url), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("accepts an https: URL", async () => {
+      const fake = createFakeConnection();
+      const ipFilter = new ec.IPFilter(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await ipFilter.updateFromUrl("https://example.com/ipfilter.dat");
+
+      expect(fake.sent).to.have.lengthOf(1);
+   });
 });

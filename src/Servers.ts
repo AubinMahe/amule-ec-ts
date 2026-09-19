@@ -6,6 +6,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECIPv4Tag, ECStringTag } from "./ECTags.js";
+import { assertEmptyOrHttpUrl } from "./ECValidation.js";
 
 const debug = debuglog("amule-ec:servers");
 
@@ -297,6 +298,7 @@ export class Servers implements ECFetchable {
     * fetch itself later succeeds.
     */
    public async updateFromUrl(url: string): Promise<void> {
+      assertEmptyOrHttpUrl(url);
       const request = new ECPacket(ECOpcode.EC_OP_SERVER_UPDATE_FROM_URL);
       request.add(new ECStringTag(ECTagNames.EC_TAG_SERVERS_UPDATE_URL, url));
       await this.connection.send(request);

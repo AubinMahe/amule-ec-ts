@@ -4,6 +4,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECStringTag } from "./ECTags.js";
+import { assertEmptyOrHttpUrl } from "./ECValidation.js";
 
 const debug = debuglog("amule-ec:ipfilter");
 
@@ -46,6 +47,7 @@ export class IPFilter {
     * asynchronously with no result relayed back over this request.
     */
    public async updateFromUrl(url = ""): Promise<void> {
+      assertEmptyOrHttpUrl(url);
       const request = new ECPacket(ECOpcode.EC_OP_IPFILTER_UPDATE);
       request.add(new ECStringTag(ECTagNames.EC_TAG_STRING, url));
       await this.connection.send(request);

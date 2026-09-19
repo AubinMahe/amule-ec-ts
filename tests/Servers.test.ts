@@ -293,6 +293,33 @@ describe("Servers.updateFromUrl", () => {
 
       await expectRejection(servers.updateFromUrl("http://example.com/server.met"), /EC_OP_NOOP/);
    });
+
+   it("rejects anything but an http: or https: URL, without sending a request", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+
+      for (const url of [
+         "file:///etc/passwd",
+         "ftp://example.com/server.met",
+         "javascript:alert(1)",
+         "not a url",
+         "//example.com/x",
+      ]) {
+         await expectRejection(servers.updateFromUrl(url), /Invalid URL/);
+      }
+
+      expect(fake.sent).to.have.lengthOf(0);
+   });
+
+   it("accepts an https: URL", async () => {
+      const fake = createFakeConnection();
+      const servers = new ec.Servers(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await servers.updateFromUrl("https://example.com/server.met");
+
+      expect(fake.sent).to.have.lengthOf(1);
+   });
 });
 
 describe("Servers.disconnect", () => {

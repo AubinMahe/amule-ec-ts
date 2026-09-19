@@ -544,6 +544,11 @@ function fixedWidthFor(type: ECTagType): number {
 }
 
 function encodeCString(value: string): Buffer {
+   if (value.includes("\0")) {
+      throw new RangeError(
+         "A tag string cannot contain a NUL character: the daemon reads it as a C string and would cut it there.",
+      );
+   }
    return Buffer.concat([Buffer.from(value, "utf8"), Buffer.from([0])]);
 }
 

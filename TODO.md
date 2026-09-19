@@ -49,7 +49,7 @@ handshake/encryption logic is implemented - `ECConnection.ts`'s auth flow is unc
 Reference implementation to work from, if this becomes a real task: `docs/EC_Protocol.md` and `src/libs/ec/cpp/ECCrypt.{h,cpp}` in
 the upstream C++ checkout.
 
-- **Priority**: Low
+- **Priority**: Medium
 - **Effort**: High
 
 ### `Status.ts` - undecoded `EC_OP_STATS`/`EC_OP_GET_CONNSTATE` fields
@@ -166,7 +166,12 @@ there:
 Result of a robustness review of the library against hostile or faulty peers, and against misuse that could harm `amuled` or another
 TS client (2026-09-19). What is broken today is in `ISSUES.md`; below is what does not exist yet. Three defects found by the same
 review (a throwing `notification` listener stopping the read loop, a decode error leaving the connection half-alive, `reconnect()`
-not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's `[Unreleased]` section.
+not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's 2.30.1 entry, and so was outbound input
+validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see `[Unreleased]`.
+
+Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
+network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
+ed2k/Kad network control much of the data coming back.
 
 ### Receive-side limits
 
@@ -176,6 +181,9 @@ MiB after (`CECSocket::ReadHeader` in the C++ `ECSocket.cpp`). `EC_FLAG_ZLIB` in
 `zlib` was negotiated. See `ISSUES.md`: "No upper bound on the announced packet size", "Decompression is unbounded and synchronous",
 "Tag tree decoding has no depth or total-count limit".
 
+- **Priority**: High
+- **Effort**: Medium
+
 ### Atomic `request()` on `ECConnection`
 
 One method doing `send()` then `receive()` under a per-connection lock (one request in flight), with a timeout that, on expiry,
@@ -183,23 +191,25 @@ closes the connection instead of leaving a late reply to be paired with the next
 `receive()` separately. See `ISSUES.md`: "No timeout on connection or on requests", "Concurrent requests can pair with the wrong
 reply".
 
+- **Priority**: High
+- **Effort**: Medium
+
 ### Read-only mode or opcode allowlist
 
 An `ECConnection`/`ECEngine` option restricting the opcodes it may send, so a consumer that only monitors cannot call
 `Daemon.shutdown()`, delete downloads or files, or write `Preferences` (paths, ports, credentials). None exists: the library exposes
 the daemon's full remote control.
 
-### Outbound input validation
-
-Requests are built from caller-supplied values with limited checks (integer ranges, hash and IPv4 lengths, `packIPv4ToUint32()`).
-Missing: rejecting NUL characters in strings (a C string on the daemon side would be truncated there), a maximum string length and a
-maximum encoded packet size, and restricting `IPFilter.updateFromUrl()` and `Servers.updateFromUrl()` to `http:`/`https:` URLs,
-since the daemon is the one fetching them.
+- **Priority**: Medium
+- **Effort**: Medium
 
 ### Request pacing for heavy queries
 
 Full-detail listings (for instance `SharedFiles.fetch()` on a large library) are processed by `amuled`'s main loop. No rate limit,
 minimum interval or concurrency limit exists on the library side.
+
+- **Priority**: Low
+- **Effort**: Medium
 
 ### Refusing a non-loopback `host` without an explicit opt-in
 
@@ -207,11 +217,17 @@ minimum interval or concurrency limit exists on the library side.
 encrypted nor authenticated per packet". An opt-in flag (or a warning) for anything but loopback does not exist; the real fix is the
 session encryption item above.
 
+- **Priority**: High
+- **Effort**: Low
+
 ### Authentication failure handling
 
 Close the socket when `authenticateWithHash()` fails (in `ECEngine.start()` and in `reconnectLoop()`), and stop reconnecting on
 `EC_OP_AUTH_FAIL` instead of retrying forever. See `ISSUES.md`: "Failed authentication leaves the socket open, and reconnection
 never gives up".
+
+- **Priority**: High
+- **Effort**: Low
 
 ### `AlternateNamesCache` hardening
 
@@ -219,10 +235,16 @@ Bounds on entries, names per entry and name length; write to a temporary file th
 empty (keeping a copy) instead of failing `ECEngine.start()`; validate the loaded shape; create the file with mode `0o600`. See
 `ISSUES.md`: "`AlternateNamesCache` file handling".
 
+- **Priority**: High
+- **Effort**: Low
+
 ### Decoder fuzz test
 
 Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asserting that the only error ever thrown is
 `ECDecodeError` (or `RangeError` from the tag constructors) and within a bounded time. No such test exists.
+
+- **Priority**: High
+- **Effort**: Medium
 
 ### Project hygiene
 
@@ -231,5 +253,14 @@ Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asse
   provenance (`--provenance`) is configured.
 - GitHub Actions are referenced by mutable tag (`actions/checkout@v4`), not by commit SHA.
 - No `npm audit` step, Dependabot configuration or CodeQL workflow.
-- `engines.node` is `>=18`, a release line that no longer receives security fixes; CI still tests 18.x. Raising the floor to 20
-  would also lift the constraint described in `ISSUES.md`: "`npm run lint:md` requires Node 20+".
+
+- **Priority**: High
+- **Effort**: Low
+
+### Node.js support floor
+
+`engines.node` is `>=18`, a release line that no longer receives security fixes; CI still tests 18.x. Raising the floor to 20 would
+also lift the constraint described in `ISSUES.md`: "`npm run lint:md` requires Node 20+", but drops support for Node 18 consumers.
+
+- **Priority**: Low
+- **Effort**: Low

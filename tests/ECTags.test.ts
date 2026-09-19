@@ -99,6 +99,22 @@ describe("ECTag encode/decode round-trip", () => {
    );
 });
 
+describe("ECStringTag encoding", () => {
+   const capabilities = new ec.ECCapabilities();
+
+   it("refuses a string containing a NUL character, which the daemon would read as its end", () => {
+      const tag = new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "before\0after");
+
+      expect(() => tag.encode(capabilities)).to.throw(RangeError, /NUL/);
+   });
+
+   it("still encodes an ordinary string, terminated by a single NUL", () => {
+      const tag = new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "abc");
+
+      expect(tag.encode(capabilities).at(-1)).to.equal(0);
+   });
+});
+
 describe("packIPv4ToUint32", () => {
    it("packs a dotted-quad address low-byte-first (octet a in the low byte)", () => {
       expect(ec.packIPv4ToUint32("192.0.2.1")).to.equal(0x010200c0);
