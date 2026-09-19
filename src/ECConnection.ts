@@ -98,16 +98,26 @@ export class ECConnection extends events.EventEmitter {
    /**
     * Attaches the data/error/close listeners to `this.socket` - called from
     * the constructor and again from reconnect() once a fresh socket is in place.
+    * Events of a socket reconnect() has since replaced are ignored: a destroyed
+    * socket still delivers its own "close" afterwards, which must not mark the
+    * new connection closed.
     */
    private wireSocket(): void {
-      this.socket.on("data", (chunk: Buffer) => {
-         this.onData(chunk);
+      const socket = this.socket;
+      socket.on("data", (chunk: Buffer) => {
+         if (socket === this.socket) {
+            this.onData(chunk);
+         }
       });
-      this.socket.on("error", (error: Error) => {
-         this.onClose(error);
+      socket.on("error", (error: Error) => {
+         if (socket === this.socket) {
+            this.onClose(error);
+         }
       });
-      this.socket.on("close", () => {
-         this.onClose(this.closeError ?? new Error("EC connection closed."));
+      socket.on("close", () => {
+         if (socket === this.socket) {
+            this.onClose(this.closeError ?? new Error("EC connection closed."));
+         }
       });
    }
 
@@ -121,7 +131,7 @@ export class ECConnection extends events.EventEmitter {
     * two explicit request/reply calls.
     */
    private beginPump(): void {
-      void this.pump();
+      void this.pump(this.socket);
    }
 
    private static connectSocket(host: string, port: number): Promise<net.Socket> {
@@ -155,16 +165,23 @@ export class ECConnection extends events.EventEmitter {
     * no changes of their own. Callers must re-authenticate afterward (the
     * daemon requires a fresh EC_OP_AUTH_REQ handshake per TCP connection) -
     * see ECEngine's reconnect loop.
+    *
+    * The previous socket is destroyed and whatever was still pending on it is
+    * rejected: it may well still be open (a failed authenticate() leaves its
+    * socket so), and would otherwise stay open on the daemon's side for as long
+    * as the daemon tolerates it.
     */
    public async reconnect(host: string, port: number): Promise<void> {
       const socket = await ECConnection.connectSocket(host, port);
+      const previous = this.socket;
       this.socket = socket;
+      const replaced = new Error("EC connection replaced by reconnect().");
+      this.rejectPending(replaced);
+      previous.destroy();
       this.closed = false;
       this.closeError = undefined;
       this.receiveChunks.length = 0;
       this.receiveBufferedLength = 0;
-      this.pendingReads.length = 0;
-      this.pendingReceives.length = 0;
       this.wireSocket();
       this.beginPump();
    }
@@ -356,17 +373,37 @@ export class ECConnection extends events.EventEmitter {
     * Runs independently of receive() calls so that a notification pushed
     * while nobody is awaiting a reply still gets emitted.
     */
-   private async pump(): Promise<void> {
+   private async pump(socket: net.Socket): Promise<void> {
       try {
          for (;;) {
             const packet = await this.readPacket();
+            if (socket !== this.socket) {
+               return;
+            }
             this.dispatchPacket(packet);
          }
       } catch (error) {
-         const reason = error instanceof Error ? error : new Error(String(error));
-         while (this.pendingReceives.length > 0) {
-            this.pendingReceives.shift()?.reject(reason);
+         if (socket !== this.socket) {
+            return;
          }
+         const reason = error instanceof Error ? error : new Error(String(error));
+         // Whatever ended the loop (socket closed, or a packet that could not be framed or
+         // decoded), the byte stream cannot be trusted from here on and nobody is reading it
+         // any more: close the connection for good rather than leave it open, buffering
+         // whatever the peer keeps sending, with every later receive() waiting forever.
+         // A no-op on the state side when the socket closing is what ended the loop.
+         this.onClose(reason);
+         socket.destroy();
+         this.rejectPending(reason);
+      }
+   }
+
+   private rejectPending(reason: Error): void {
+      while (this.pendingReads.length > 0) {
+         this.pendingReads.shift()?.reject(reason);
+      }
+      while (this.pendingReceives.length > 0) {
+         this.pendingReceives.shift()?.reject(reason);
       }
    }
 
@@ -397,7 +434,23 @@ export class ECConnection extends events.EventEmitter {
          return;
       }
       debug("dispatch: opcode 0x%s -> notification (no pending receive())", packet.opcode.toString(16));
-      this.emit("notification", packet);
+      this.emitGuarded("notification", packet);
+   }
+
+   /**
+    * Like emit(), but a listener that throws is reported and skipped instead of propagating:
+    * emit() runs listeners synchronously, so an exception from one would escape into pump()
+    * (or a socket event handler) and stop the read loop, taking the whole connection down for
+    * a bug in the caller's code, and skipping the listeners registered after it.
+    */
+   private emitGuarded(event: "notification" | "disconnected", ...args: unknown[]): void {
+      for (const listener of this.rawListeners(event)) {
+         try {
+            listener.apply(this, args);
+         } catch (error) {
+            console.error(`amule-ec: a "${event}" listener threw:`, error);
+         }
+      }
    }
 
    private async readPacket(): Promise<ECPacket> {
@@ -463,7 +516,8 @@ export class ECConnection extends events.EventEmitter {
     * emits "disconnected" once (guarded by the same `closed` check) so
     * ECEngine's reconnect loop can react. pump()'s own catch block rejects
     * pendingReceives; this handles pendingReads (readBytes() callers still
-    * waiting on the socket directly) and the reconnect signal.
+    * waiting on the socket directly) and the reconnect signal. pump() also calls it
+    * when a packet can't be decoded, closing the connection the same way.
     *
     * Skips the "disconnected" emit entirely when close() caused this - see
     * its doc for why reconnecting after a deliberate close is a bug, not a
@@ -479,7 +533,7 @@ export class ECConnection extends events.EventEmitter {
          this.pendingReads.shift()?.reject(error);
       }
       if (!this.intentionalClose) {
-         this.emit("disconnected");
+         this.emitGuarded("disconnected");
       }
    }
 }

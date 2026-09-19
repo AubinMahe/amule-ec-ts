@@ -9,6 +9,21 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.30.1] - 2026-09-19
+
+### Fixed
+
+- A `notification` (or `disconnected`) listener that throws no longer stops the connection's read loop. `emit()` runs listeners
+  synchronously, so the exception used to escape into `ECConnection.pump()`, which ended without closing the socket: every later
+  `receive()` waited forever. Listeners are now called one by one; a throwing one is reported on `console.error` and the others
+  still run.
+- A packet that can't be framed or decoded now closes the connection (emitting `disconnected`, so `ECEngine`'s reconnect loop takes
+  over) instead of leaving it open with nothing reading it: the byte stream is desynchronized from that point on, later `receive()`
+  calls used to wait forever, and whatever the peer kept sending piled up in memory.
+- `ECConnection.reconnect()` destroys the previous socket and rejects the `receive()` calls still pending on it. It used to leave
+  that socket open - after a failed `authenticateWithHash()` in `ECEngine`'s reconnect loop, one more connection stayed open on the
+  daemon per attempt - and the old socket's late `close` event marked the new, healthy connection as closed.
+
 ## [2.30.0] - 2026-09-08
 
 ### Added

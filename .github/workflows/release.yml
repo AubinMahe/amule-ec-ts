@@ -19,14 +19,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test
-      - name: Check tag matches package.json version
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
-            exit 1
-          fi
+      - name: Check tag, package.json and package-lock.json versions match
+        run: npm run check-versions -- "$GITHUB_REF_NAME"
       - run: npm run pack-release
       - uses: softprops/action-gh-release@v2
         with:

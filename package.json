@@ -10,7 +10,7 @@
    "name"           : "amule-ec",
    "type"           : "module",
    "types"          : "./dist/index.d.ts",
-   "version"        : "2.30.0",
+   "version"        : "2.30.1",
    "allowScripts"   : {
       "esbuild@0.28.1": true
    },
@@ -49,9 +49,11 @@
    "scripts"        : {
       "build"           : "tsc --build tsconfig.src.json",
       "check"           : "rm -rf dist *.tsbuildinfo coverage && npm run lint && npm run build && npm run test",
+      "check-versions"  : "node scripts/check-versions.mjs",
       "choices-coverage": "node scripts/choices-coverage.mjs",
       "lint"            : "tsc --build tsconfig.json && eslint src tests --ext .ts",
       "lint:fix"        : "npm run lint:md-fix ; npm run lint:style-fix ; npm run lint:ts-fix ; npm run lint:pckg-fix",
+      "lint:md"         : "markdownlint-cli2",
       "lint:md-fix"     : "markdownlint-cli2 --fix ; prettier \"*.md\" --write",
       "lint:pckg-fix"   : "node scripts/format-package.mjs --in-place package.json",
       "lint:style"      : "eslint       src tests --ext .ts",
