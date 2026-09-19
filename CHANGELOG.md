@@ -9,6 +9,21 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.31.0] - 2026-09-19
+
+### Changed
+
+- A tag string containing a NUL character is refused with a `RangeError` when the request is encoded: the daemon reads it as a C
+  string and would cut it there, so the request it acts on would differ from the one the caller built.
+- `ECConnection.send()` refuses, with a `RangeError` and before writing anything, a request whose encoded body exceeds 16 MiB, the
+  bound the daemon itself applies to a peer before authentication. No request built by this library comes near it.
+- The URLs the daemon fetches on the caller's behalf must be empty or absolute `http:`/`https:` URLs, otherwise a `RangeError` is
+  thrown before anything is sent: `IPFilter.updateFromUrl()`, `Servers.updateFromUrl()`, `Kad.updateNodesFromUrl()`, and the
+  `Preferences` setters carrying one (`setSecurity()`'s `ipFilterUpdateUrl`, `setServers()`'s `updateUrl`, `setKademlia()`'s
+  `nodesUpdateUrl`, `setIP2Country()`'s `customUrl`). A caller forwarding user input to one of them could otherwise pick any scheme
+  the daemon's downloader understands. Only the scheme is checked: a host on the daemon's own network is still reachable. A
+  `Preferences` object read from a daemon configured with another scheme now needs that field changed before it can be written back.
+
 ## [2.30.1] - 2026-09-19
 
 ### Fixed

@@ -4,6 +4,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECStringTag, ECUInt16Tag, ECUInt32Tag, packIPv4ToUint32 } from "./ECTags.js";
+import { assertEmptyOrHttpUrl } from "./ECValidation.js";
 
 const debug = debuglog("amule-ec:kad");
 
@@ -88,6 +89,7 @@ export class Kad {
     * success/failure reported over this request.
     */
    public async updateNodesFromUrl(url: string): Promise<void> {
+      assertEmptyOrHttpUrl(url);
       const request = new ECPacket(ECOpcode.EC_OP_KAD_UPDATE_FROM_URL);
       request.add(new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, url));
       await this.connection.send(request);

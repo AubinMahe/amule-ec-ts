@@ -6,6 +6,7 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECPreferencesSelection } from "./ECPreferencesSelection.js";
 import { ECTag, ECUInt8Tag, ECUInt16Tag, ECUInt32Tag, ECUInt64Tag, ECStringTag, ECCustomTag, ECHash16Tag } from "./ECTags.js";
+import { assertEmptyOrHttpUrl } from "./ECValidation.js";
 
 const debug = debuglog("amule-ec:preferences");
 
@@ -744,6 +745,7 @@ export class Preferences {
     * Replaces the whole SECURITY section - EC_TAG_PREFS_SECURITY.
     */
    public async setSecurity(prefs: SecurityPrefs): Promise<void> {
+      assertEmptyOrHttpUrl(prefs.ipFilterUpdateUrl);
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SECURITY, new Uint8Array(), [
          new ECUInt8Tag(ECTagNames.EC_TAG_SECURITY_CAN_SEE_SHARES, prefs.canSeeShares),
@@ -824,6 +826,7 @@ export class Preferences {
     * Replaces the whole SERVERS section - EC_TAG_PREFS_SERVERS.
     */
    public async setServers(prefs: ServersPrefs): Promise<void> {
+      assertEmptyOrHttpUrl(prefs.updateUrl);
       const flag = (name: number, value: boolean): ECTag[] => (value ? [new ECCustomTag(name, new Uint8Array())] : []);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_SERVERS, new Uint8Array(), [
          ...flag(ECTagNames.EC_TAG_SERVERS_REMOVE_DEAD, prefs.removeDeadServers),
@@ -861,6 +864,7 @@ export class Preferences {
     * Replaces the whole KADEMLIA section - EC_TAG_PREFS_KADEMLIA.
     */
    public async setKademlia(prefs: KademliaPrefs): Promise<void> {
+      assertEmptyOrHttpUrl(prefs.nodesUpdateUrl);
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_KADEMLIA, new Uint8Array(), [
          new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, prefs.nodesUpdateUrl),
       ]);
@@ -1016,6 +1020,7 @@ export class Preferences {
     * Replaces the whole IP2COUNTRY section - EC_TAG_PREFS_IP2COUNTRY.
     */
    public async setIP2Country(prefs: IP2CountryPrefs): Promise<void> {
+      assertEmptyOrHttpUrl(prefs.customUrl);
       const children: ECTag[] = [
          new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_ENABLED, prefs.enabled ? 1 : 0),
          new ECUInt8Tag(ECTagNames.EC_TAG_IP2COUNTRY_SOURCE, prefs.source),

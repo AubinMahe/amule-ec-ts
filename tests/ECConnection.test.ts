@@ -321,6 +321,31 @@ describe("ECConnection.send/receive", () => {
    });
 });
 
+describe("ECConnection.send request size limit", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("refuses a request whose encoded body exceeds 16 MiB, and the connection stays usable", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const tooBig = new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "x".repeat(16 * 1024 * 1024)),
+      );
+
+      await expectRejection(connection.send(tooBig), /exceeds the 16777216-byte limit/);
+      await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      // The server reads the small packet next: nothing of the refused one was written.
+      expect((await peer.readPacket()).tags).to.have.lengthOf(0);
+   });
+});
+
 describe("ECConnection disconnect/reconnect", () => {
    let server: FakeEcServer;
 

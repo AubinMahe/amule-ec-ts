@@ -66,6 +66,13 @@ export class ECConnection extends events.EventEmitter {
     */
    private static readonly ZLIB_OVERSIZED_THRESHOLD = 100_000;
 
+   /**
+    * A request whose encoded body is larger than this is refused before anything is written. The
+    * daemon drops a peer announcing more than 16 MiB before authentication (`CECSocket::ReadHeader`
+    * in the C++ `ECSocket.cpp`), and no request built by this library comes anywhere near it.
+    */
+   private static readonly MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
    /**
@@ -311,6 +318,9 @@ export class ECConnection extends events.EventEmitter {
 
    public async send(packet: ECPacket): Promise<void> {
       let body = packet.encode(this.localCapabilities);
+      if (body.length > ECConnection.MAX_REQUEST_BYTES) {
+         throw new RangeError(`EC request of ${body.length} bytes exceeds the ${ECConnection.MAX_REQUEST_BYTES}-byte limit.`);
+      }
       const oversized = body.length > ECConnection.ZLIB_OVERSIZED_THRESHOLD;
       const compress = this.localCapabilities.zlib && (oversized || !this.localCapabilities.preferNoZlib);
       if (compress) {
