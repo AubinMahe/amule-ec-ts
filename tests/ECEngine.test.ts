@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as ec from "../src/index.js";
 import { startFakeEcServer, computeSaltedHash, type FakeEcServer, type FakeEcPeer } from "./fakeEcServer.js";
-import { hexHash } from "./testUtils.js";
+import { expectRejection, hexHash } from "./testUtils.js";
 
 describe("ECEngine.connection", () => {
    it("throws before ECEngine.start() has ever completed", () => {
@@ -139,5 +139,94 @@ describe("ECEngine.start", () => {
       expect(ec.ECEngine.connection.localCapabilities.multiSearch).to.equal(true);
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(true);
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(true);
+   });
+});
+
+async function refuseAuthentication(peer: FakeEcPeer, salt: bigint): Promise<void> {
+   await peer.readPacket();
+   peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, salt)));
+   await peer.readPacket();
+   peer.writePacket(
+      new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_FAIL).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid password.")),
+   );
+}
+
+describe("ECEngine.start when the daemon rejects the credentials", () => {
+   const PASSWORD_HASH = hexHash("d");
+   const SALT = 0x0102_0304_0506_0708n;
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("rejects with an ECAuthenticationError and does not leave the socket open", async () => {
+      const peerPromise = server.nextPeer();
+      const outcome = ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH }).then(
+         () => undefined,
+         (error: unknown) => error,
+      );
+      const peer = await peerPromise;
+      const serverSawClose = new Promise<void>((resolve) => {
+         peer.socket.once("close", resolve);
+      });
+
+      await refuseAuthentication(peer, SALT);
+
+      const error = await outcome;
+      expect(error).to.be.instanceOf(ec.ECAuthenticationError);
+      await serverSawClose;
+   });
+});
+
+describe("armReconnect when the daemon rejects the credentials", () => {
+   const PASSWORD_HASH = hexHash("e");
+   const SALT = 0x1112_1314_1516_1718n;
+   let server: FakeEcServer;
+   let originalConsoleError: typeof console.error;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+      originalConsoleError = console.error;
+      console.error = (): void => undefined;
+   });
+
+   afterEach(async () => {
+      console.error = originalConsoleError;
+      await server.close();
+   });
+
+   it("gives up instead of retrying forever, and requests fail with the daemon's reason", async () => {
+      const [connection, firstPeer] = await Promise.all([ec.ECConnection.connect("127.0.0.1", server.port), server.nextPeer()]);
+      const authenticated = connection.authenticateWithHash(PASSWORD_HASH);
+      await firstPeer.readPacket();
+      firstPeer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
+      await firstPeer.readPacket();
+      firstPeer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK));
+      await authenticated;
+      ec.armReconnect(connection, "127.0.0.1", server.port, PASSWORD_HASH, false, false, false, 20);
+
+      const secondPeerPromise = server.nextPeer();
+      firstPeer.socket.destroy();
+      const secondPeer = await secondPeerPromise;
+      await refuseAuthentication(secondPeer, SALT);
+
+      // The next attempt, had there been one, would come 40 ms later.
+      const outcome = await Promise.race([
+         server.nextPeer().then(() => "retried"),
+         new Promise<string>((resolve) => {
+            setTimeout(() => {
+               resolve("gave up");
+            }, 300);
+         }),
+      ]);
+      expect(outcome).to.equal("gave up");
+      await expectRejection(connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP)), /Invalid password\./);
    });
 });

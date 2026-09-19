@@ -31,6 +31,19 @@ function md5Hex(input: string): string {
    return md5Digest(input).toString("hex").toLowerCase();
 }
 
+/**
+ * The daemon answered EC_OP_AUTH_FAIL: it refused the credentials (or the protocol version), and
+ * asking again with the same ones cannot succeed. `message` is the reason it gave, if any. Any
+ * other failure of the handshake (a timeout, a dropped connection) is a plain Error, and may well
+ * be transient.
+ */
+export class ECAuthenticationError extends Error {
+   public constructor(message: string) {
+      super(message);
+      this.name = "ECAuthenticationError";
+   }
+}
+
 interface PendingRead {
    length: number;
    resolve: (buffer: Buffer) => void;
@@ -291,6 +304,11 @@ export class ECConnection extends events.EventEmitter {
    public async authenticateWithHash(passwordHash: string): Promise<void> {
       try {
          await this.handshake(passwordHash);
+      } catch (error) {
+         // A connection whose handshake failed is of no use, and the daemon expects the client to
+         // drop it: close it here rather than leave an unauthenticated socket open on the daemon.
+         this.abort(error instanceof Error ? error : new Error(String(error)));
+         throw error;
       } finally {
          // Whatever the outcome, requests held since reconnect() may go now: after a failure
          // they fail on the closed connection instead of waiting for an authentication that
@@ -339,7 +357,7 @@ export class ECConnection extends events.EventEmitter {
       if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
-         throw new Error(reason);
+         throw new ECAuthenticationError(reason);
       }
       if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
          throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);

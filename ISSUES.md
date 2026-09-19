@@ -87,19 +87,6 @@ system's TCP timeout. (Requests, the authentication handshake included, are cove
 
 None in the library; callers can race the call against their own timer.
 
-## Failed authentication leaves the socket open, and reconnection never gives up
-
-### Risk
-
-When `authenticateWithHash()` throws, `ECEngine.start()` and `reconnectLoop()` (`ECEngine.ts`) leave the freshly connected socket
-open: in `start()` this keeps the process alive, in the loop the socket stays open until the next attempt replaces it.
-`reconnectLoop()` also retries every 30 seconds forever after an `EC_OP_AUTH_FAIL`, although a rejected password is not a transient
-condition. Read from the code, not reproduced.
-
-### Mitigation
-
-None in the library.
-
 ## `AlternateNamesCache` file handling
 
 ### Risk
