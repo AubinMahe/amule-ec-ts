@@ -58,10 +58,11 @@ mature, so the latest version on npm can be older than the latest tag.
 
 CI runs the tests on Node 22 and 24, the range `engines.node` declares, and on Node 22 also `npm run lint:md`, `npm run lint` and
 the version check. GitHub Actions are pinned by commit SHA, with the version in a trailing comment, and Dependabot proposes updates
-weekly for the actions and for the development dependencies. CI runs `npm audit --omit=dev`, which blocks (the package has no
-dependencies, and this keeps it that way), and a full `npm audit`, which only reports: the known advisories of the development
-toolchain are listed in `ISSUES.md`. CodeQL analyzes the TypeScript on every push and pull request, and weekly. To report a
-vulnerability, see `SECURITY.md`.
+weekly for the actions and for the development dependencies: minor and patch updates are grouped in one pull request per ecosystem,
+every major update comes on its own for a review, and `@types/node` stays on the major of the lowest supported Node. CI runs
+`npm audit --omit=dev`, which blocks (the package has no dependencies, and this keeps it that way), and a full `npm audit`, which
+only reports: the known advisories of the development toolchain are listed in `ISSUES.md`. CodeQL analyzes the TypeScript on every
+push and pull request, and weekly. To report a vulnerability, see `SECURITY.md`.
 
 ## Code style
 
