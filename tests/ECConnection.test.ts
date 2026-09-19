@@ -397,3 +397,117 @@ describe("ECConnection disconnect/reconnect", () => {
       },
    );
 });
+
+describe("ECConnection error containment", () => {
+   let server: FakeEcServer;
+   let originalConsoleError: typeof console.error;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+      originalConsoleError = console.error;
+      console.error = (): void => undefined;
+   });
+
+   afterEach(async () => {
+      console.error = originalConsoleError;
+      await server.close();
+   });
+
+   it("keeps delivering replies after a 'notification' listener throws", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const notified = new Promise<void>((resolve) => {
+         connection.onNotification(() => {
+            resolve();
+            throw new Error("listener bug");
+         });
+      });
+
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      await notified;
+      const reply = connection.receive();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "still alive")));
+
+      expect(((await reply).find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal("still alive");
+   });
+
+   it("still calls the other 'notification' listeners when one throws", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const calls: string[] = [];
+      connection.onNotification(() => {
+         calls.push("first");
+         throw new Error("listener bug");
+      });
+      const secondListenerCalled = new Promise<void>((resolve) => {
+         connection.onNotification(() => {
+            calls.push("second");
+            resolve();
+         });
+      });
+
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      await secondListenerCalled;
+
+      expect(calls).to.deep.equal(["first", "second"]);
+   });
+
+   it("tears the connection down when a packet cannot be decoded, instead of leaving it half-alive", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const serverSawClose = new Promise<void>((resolve) => {
+         peer.socket.once("close", resolve);
+      });
+      const pending = expectRejection(connection.receive(), /TAGTYPE/);
+
+      const garbage = Buffer.from([0xff, 0xff, 0xff, 0xff, 0xff]);
+      peer.socket.write(Buffer.concat([new ec.TransmissionHeader(ec.ECFlags.create(), garbage.length).encode(), garbage]));
+
+      await pending;
+      await disconnected;
+      await serverSawClose;
+      await expectRejection(connection.receive(), /TAGTYPE/);
+   });
+});
+
+describe("ECConnection.reconnect() on a still-open socket", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("destroys the previous socket and is not affected by its late 'close'", async () => {
+      const { connection, peer: firstPeer } = await connectPeer(server);
+      const firstSocketClosed = new Promise<void>((resolve) => {
+         firstPeer.socket.once("close", resolve);
+      });
+      let disconnectedFired = false;
+      connection.once("disconnected", () => {
+         disconnectedFired = true;
+      });
+
+      const [, secondPeer] = await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
+      await firstSocketClosed;
+      // Let the client-side 'close' event of the destroyed socket be delivered.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const reply = connection.receive();
+      secondPeer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      expect((await reply).opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);
+      expect(disconnectedFired).to.equal(false);
+   });
+
+   it("rejects a receive() still pending on the replaced socket", async () => {
+      const { connection } = await connectPeer(server);
+      const stale = expectRejection(connection.receive(), /replaced by reconnect\(\)/);
+
+      await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
+
+      await stale;
+   });
+});

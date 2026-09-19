@@ -36,3 +36,127 @@ None available without dropping either Node 18 support or MD060 (table-style) en
 MD060 was only added in 0.39.0, which already requires Node 20+. Run `npm run lint:md` on Node 20+ locally instead; CI no longer
 runs it on any matrix version, so a Markdown-only mistake (bad table style, prose over 132 columns, ...) won't be caught there until
 this is revisited.
+
+## No upper bound on the announced packet size
+
+### Risk
+
+`ECConnection.readPacket()` (`ECConnection.ts`) reads `bodyLength` bytes as announced by the 8-byte transmission header, a uint32
+(up to 4 GiB), and buffers them in `receiveChunks` with no limit before decoding. Reproduced against a local fake server: a header
+announcing a 1 GB body, followed by a stream of bytes, took the process from 92 MB to 512 MB RSS after 400 MB, with no error and no
+disconnect. A compromised or impersonated endpoint (EC is not encrypted, see below) can exhaust the memory of the process using this
+library. The daemon itself bounds this: `CECSocket::ReadHeader` in the C++ `ECSocket.cpp` drops a peer announcing more than 16 MiB
+before authentication and more than 256 MiB after.
+
+### Mitigation
+
+None in the library. Connect only to a trusted, loopback or tunnelled `amuled`.
+
+## Decompression is unbounded and synchronous
+
+### Risk
+
+`zlib.inflateSync()` in `ECConnection.readPacket()` has no `maxOutputLength`, so a small compressed body can inflate to the
+runtime's maximum buffer size, and the synchronous call blocks the event loop meanwhile. The `compressed` flag of an incoming header
+is also honoured whether or not `zlib` was negotiated for this connection. Read from the code, not reproduced.
+
+### Mitigation
+
+None in the library.
+
+## Tag tree decoding has no depth or total-count limit
+
+### Risk
+
+`ECTagDecoder.readTag()` (`ECTags.ts`) recurses once per nesting level with no depth limit, so a body made of deeply nested tags can
+overflow the call stack; the resulting `RangeError` is caught by the pump loop, like any decode error. The number of tags is only
+bounded by the body size. Read from the code, not reproduced.
+
+### Mitigation
+
+None in the library; bounding the packet size (see above) bounds the depth reachable.
+
+## No timeout on connection or on requests
+
+### Risk
+
+Neither `receive()` nor `ECConnection.connect()` has a timeout of its own. A daemon that accepts a request and never replies leaves
+that `receive()` pending forever, and since pending receives are served in FIFO order (`pendingReceives`), every later request on
+the same connection stays queued behind it. A connect to an unresponsive host waits for the operating system's TCP timeout.
+
+### Mitigation
+
+None in the library; callers can race `receive()` against their own timer, but a reply arriving after the timer still gets paired
+with the next request.
+
+## Concurrent requests can pair with the wrong reply
+
+### Risk
+
+Every service does `send()` then `receive()` as two separate calls (`connection.send`/`connection.receive` appear in every
+`src/*.ts` file that issues a request), and EC has no request id. Two requests started concurrently on one connection have no
+mechanism guaranteeing that their `receive()` calls register in the same order as their `send()` calls, in which case each gets the
+other's reply. This is independent of `notify: true` (see above). Read from the code, not reproduced.
+
+### Mitigation
+
+Serialize requests on a connection in the caller, or use one `ECConnection` per concurrent activity.
+
+## Failed authentication leaves the socket open, and reconnection never gives up
+
+### Risk
+
+When `authenticateWithHash()` throws, `ECEngine.start()` and `reconnectLoop()` (`ECEngine.ts`) leave the freshly connected socket
+open: in `start()` this keeps the process alive, in the loop the socket stays open until the next attempt replaces it.
+`reconnectLoop()` also retries every 30 seconds forever after an `EC_OP_AUTH_FAIL`, although a rejected password is not a transient
+condition. Read from the code, not reproduced.
+
+### Mitigation
+
+None in the library.
+
+## `AlternateNamesCache` file handling
+
+### Risk
+
+- The alternate names come from remote peers; neither the number of entries, the number of names per entry nor a name's length is
+  bounded, and the whole file is rewritten on every change.
+- `persist()` writes in place (no temporary file plus rename), so an interrupted write leaves a truncated file, and `load()` only
+  tolerates a missing file: any other read or `JSON.parse` failure makes `ECEngine.start()` throw on every later start until the
+  file is removed.
+- The loaded JSON is not validated: an entry whose `names` is not an array makes `add()` throw, and a non-string `lastUpdated` is
+  never purged.
+- The file is created with the process's default mode (typically world-readable) although it lists filenames.
+
+### Mitigation
+
+Point `altNamesCachePath` at a private directory and remove a corrupted file by hand.
+
+## Peer-supplied data is returned unmodified
+
+### Risk
+
+Filenames, comments, client names, server names and descriptions, chat messages and log lines reach the caller exactly as a remote
+peer (or the network through `amuled`) supplied them. A caller that renders them in HTML, uses them as a path component, prints them
+to a terminal or uses them as an object key inherits the usual injection classes (XSS, path traversal, escape-sequence injection,
+prototype pollution). Sizes and counters are decoded as `bigint`; wherever a caller or a service converts one with `Number()`,
+values above 2^53 silently lose precision.
+
+### Mitigation
+
+Treat every decoded string as untrusted input, and keep 64-bit quantities as `bigint` end to end.
+
+## The EC session is neither encrypted nor authenticated per packet
+
+### Risk
+
+EC runs in clear text over TCP; the password is MD5-based, salted challenge/response, and once the handshake is over nothing
+authenticates individual packets. An on-path attacker between this library and `amuled` can read every reply and inject or alter
+packets in an established session. `ECEngine.start()` accepts any `host`. Upstream `amuled` can offer an authenticated, encrypted
+session (see TODO.md, "EC session encryption"); a comment in the daemon's authentication code (`ExternalConn.cpp`) also mentions an
+operator policy refusing any session that did not negotiate encryption, in which case this library could not connect at all (the
+exact preference was not checked).
+
+### Mitigation
+
+Keep `host` on loopback, or reach a remote daemon through an SSH tunnel or VPN.

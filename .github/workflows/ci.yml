@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - if: matrix.node-version == '22.x'
+        run: npm run check-versions
+      - if: matrix.node-version == '22.x'
         run: npm run lint
       - run: npm run build
       - run: npm run test:coverage

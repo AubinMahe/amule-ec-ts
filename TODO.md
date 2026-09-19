@@ -160,3 +160,76 @@ there:
 
 - **Priority**: Low
 - **Effort**: Low
+
+## Hardening
+
+Result of a robustness review of the library against hostile or faulty peers, and against misuse that could harm `amuled` or another
+TS client (2026-09-19). What is broken today is in `ISSUES.md`; below is what does not exist yet. Three defects found by the same
+review (a throwing `notification` listener stopping the read loop, a decode error leaving the connection half-alive, `reconnect()`
+not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's `[Unreleased]` section.
+
+### Receive-side limits
+
+Configurable maximum announced packet size, maximum inflated size (`maxOutputLength`, ideally asynchronous inflate), maximum tag
+depth and tag count, and a connect timeout. The daemon's own bounds are a reference for defaults: 16 MiB before authentication, 256
+MiB after (`CECSocket::ReadHeader` in the C++ `ECSocket.cpp`). `EC_FLAG_ZLIB` in an incoming header would be honoured only when
+`zlib` was negotiated. See `ISSUES.md`: "No upper bound on the announced packet size", "Decompression is unbounded and synchronous",
+"Tag tree decoding has no depth or total-count limit".
+
+### Atomic `request()` on `ECConnection`
+
+One method doing `send()` then `receive()` under a per-connection lock (one request in flight), with a timeout that, on expiry,
+closes the connection instead of leaving a late reply to be paired with the next request. Every service currently calls `send()` and
+`receive()` separately. See `ISSUES.md`: "No timeout on connection or on requests", "Concurrent requests can pair with the wrong
+reply".
+
+### Read-only mode or opcode allowlist
+
+An `ECConnection`/`ECEngine` option restricting the opcodes it may send, so a consumer that only monitors cannot call
+`Daemon.shutdown()`, delete downloads or files, or write `Preferences` (paths, ports, credentials). None exists: the library exposes
+the daemon's full remote control.
+
+### Outbound input validation
+
+Requests are built from caller-supplied values with limited checks (integer ranges, hash and IPv4 lengths, `packIPv4ToUint32()`).
+Missing: rejecting NUL characters in strings (a C string on the daemon side would be truncated there), a maximum string length and a
+maximum encoded packet size, and restricting `IPFilter.updateFromUrl()` and `Servers.updateFromUrl()` to `http:`/`https:` URLs,
+since the daemon is the one fetching them.
+
+### Request pacing for heavy queries
+
+Full-detail listings (for instance `SharedFiles.fetch()` on a large library) are processed by `amuled`'s main loop. No rate limit,
+minimum interval or concurrency limit exists on the library side.
+
+### Refusing a non-loopback `host` without an explicit opt-in
+
+`ECEngine.start()` and `ECConnection.connect()` accept any host while EC is unencrypted, see `ISSUES.md`: "The EC session is neither
+encrypted nor authenticated per packet". An opt-in flag (or a warning) for anything but loopback does not exist; the real fix is the
+session encryption item above.
+
+### Authentication failure handling
+
+Close the socket when `authenticateWithHash()` fails (in `ECEngine.start()` and in `reconnectLoop()`), and stop reconnecting on
+`EC_OP_AUTH_FAIL` instead of retrying forever. See `ISSUES.md`: "Failed authentication leaves the socket open, and reconnection
+never gives up".
+
+### `AlternateNamesCache` hardening
+
+Bounds on entries, names per entry and name length; write to a temporary file then rename; treat a corrupt or malformed file as
+empty (keeping a copy) instead of failing `ECEngine.start()`; validate the loaded shape; create the file with mode `0o600`. See
+`ISSUES.md`: "`AlternateNamesCache` file handling".
+
+### Decoder fuzz test
+
+Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asserting that the only error ever thrown is
+`ECDecodeError` (or `RangeError` from the tag constructors) and within a bounded time. No such test exists.
+
+### Project hygiene
+
+- No `SECURITY.md` (private vulnerability reporting instructions).
+- `release.yml` creates the GitHub release; how the npm package is published is not described in the repository, and no npm
+  provenance (`--provenance`) is configured.
+- GitHub Actions are referenced by mutable tag (`actions/checkout@v4`), not by commit SHA.
+- No `npm audit` step, Dependabot configuration or CodeQL workflow.
+- `engines.node` is `>=18`, a release line that no longer receives security fixes; CI still tests 18.x. Raising the floor to 20
+  would also lift the constraint described in `ISSUES.md`: "`npm run lint:md` requires Node 20+".

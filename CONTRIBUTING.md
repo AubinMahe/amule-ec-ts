@@ -35,6 +35,19 @@ description which C++ source file(s) you checked.
 - New behavior has unit tests (see `tests/*.test.ts` and `tests/fakeEcServer.ts` for the mocking pattern already in use).
 - Public API changes are reflected in `README.md`'s usage example if relevant.
 
+## Releasing
+
+`package-lock.json` is tracked (CI runs `npm ci`, which pins the dev toolchain with integrity hashes), and carries the package's own
+version in two places, which `npm install` does not update unless asked. A version bump is one commit containing all of:
+
+1. `package.json`: the new `version`.
+2. `package-lock.json`: regenerated with `npm install --package-lock-only`.
+3. `CHANGELOG.md`: the `[Unreleased]` entries moved under a dated `[x.y.z]` heading.
+
+`npm run check-versions` verifies that `package.json` and `package-lock.json` agree; CI runs it on every push and pull request. Once
+the bump is merged, push the tag `vX.Y.Z`: the release workflow runs the same check with the tag as argument
+(`npm run check-versions -- vX.Y.Z`) and stops if the tag, `package.json` and `package-lock.json` do not all carry the same version.
+
 ## Code style
 
 Formatting is enforced by `.editorconfig` and `.prettierrc` (3-space indent, double quotes, semicolons) - run `npm run lint:ts-fix`

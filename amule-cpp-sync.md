@@ -42,6 +42,27 @@ three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT
 comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
 `EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
 
+## 2026-09-13
+
+Local C++ checkout **not** pulled/rebuilt this time - checked whether it was worth it first. Local HEAD (`f98d790a2`, the 2026-09-07
+baseline) is 69 commits behind `origin/master` (`1521bff73`). Diffed `src/libs/ec/abstracts/ECCodes.abstract` between the two: no
+`EC_OP_*`/`EC_TAG_*` value added, changed or removed. Of the 69 commits, only 3 touch `src/libs/ec/` or `docs/EC_Protocol.md`:
+
+- `2ef1a164c` ("trim verbose comment blocks", #1365) and `0734db2ec` ("tree-wide comment brevity pass", #1372) - every changed line
+  in every EC file they touch (`ECSocket.{cpp,h}`, `ECTag.{cpp,h}`, `ECCrypt.{cpp,h}`, `RemoteConnect.{cpp,h}`,
+  `ECSpecialTags.{cpp,h}`, `ECMemSocket`/`ECMuleSocket`/`ECPacket`/`ECUInt128`/`ECFileConfig`/`ECID`/`ECLog`) checked line-by-line:
+  comments or blank lines only, no code change.
+- `5fdface48` (#1376, eMuleAI-parity follow-ups) - `docs/EC_Protocol.md` had `EC_TAG_CLIENT_MOD_CAPABILITIES` documented as
+  `0x0632`; corrected to the real value `0x0633` (`0x0632` is `EC_TAG_CLIENT_CONNECTED`). Documentation-only fix, no enum value
+  actually changed - `ECTagNames.ts` already has both values right (CHANGELOG.md's 2.30.0 entry cites `0x0632`/`0x0633` correctly),
+  nothing to change here.
+
+The rest of the 69 commits are GUI (search-controls layout, new columns), the new uTP transport work, Kad, CI/build and
+translations - outside this library's protocol surface.
+
+**Decision: deferred, not pulled/rebuilt.** No EC-relevant change accumulated since the 2026-09-07 sync. Re-check in about a week
+rather than on every push to `origin/master`.
+
 ## 2026-09-07
 
 Local C++ checkout pulled and rebuilt (HEAD `f98d790a2`). Diffed `src/libs/ec/abstracts/ECCodes.abstract` against the 2026-08-31
