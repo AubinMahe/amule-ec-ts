@@ -251,6 +251,58 @@ describe("ECConnection.authenticateWithHash", () => {
       await expectRejection(authPromise, /Invalid password\./);
    });
 
+   it("rejects with an ECAuthenticationError on EC_OP_AUTH_FAIL, and closes the connection", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const serverSawClose = new Promise<void>((resolve) => {
+         peer.socket.once("close", resolve);
+      });
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_FAIL).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Invalid password.")),
+      );
+      let caught: unknown;
+      try {
+         await authPromise;
+      } catch (error) {
+         caught = error;
+      }
+
+      expect(caught).to.be.instanceOf(ec.ECAuthenticationError);
+      expect((caught as Error).message).to.equal("Invalid password.");
+      await disconnected;
+      await serverSawClose;
+   });
+
+   it("closes the connection when the handshake fails for any other reason, with a plain Error", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const serverSawClose = new Promise<void>((resolve) => {
+         peer.socket.once("close", resolve);
+      });
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      let caught: unknown;
+      try {
+         await authPromise;
+      } catch (error) {
+         caught = error;
+      }
+
+      expect(caught).to.be.instanceOf(Error);
+      expect(caught).not.to.be.instanceOf(ec.ECAuthenticationError);
+      await serverSawClose;
+   });
+
    it("throws when the salt reply has an unexpected opcode", async () => {
       const { connection, peer } = await connectPeer(server);
 

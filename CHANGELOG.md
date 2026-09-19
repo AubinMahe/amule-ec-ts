@@ -9,6 +9,28 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.33.0] - 2026-09-19
+
+### Added
+
+- `ECAuthenticationError`: what `authenticateWithHash()` (and so `ECEngine.start()`) now throws when the daemon answers
+  `EC_OP_AUTH_FAIL`, with the reason it gave as its message. It tells a refusal that retrying cannot fix from a failure that may be
+  transient (a timeout, a dropped connection), which stay plain `Error`s.
+- `armReconnect()` takes an optional last argument, the delay before the first reconnection attempt (default 2 s, unchanged), which
+  mostly serves tests.
+
+### Fixed
+
+- A failed handshake now closes the connection: `authenticateWithHash()` used to leave the freshly connected socket open,
+  unauthenticated, on the daemon, which expects the client to drop it. In `ECEngine.start()` it also kept the process alive, and in
+  the reconnect loop one such socket stayed open per failed attempt until the next replaced it. The connection is closed with the
+  handshake's error, so `disconnected` is emitted and later requests fail with that error.
+- `ECEngine`'s reconnect loop gives up when the daemon refuses the credentials (`ECAuthenticationError`) instead of retrying every
+  30 s forever: a changed password is not a transient condition. It logs "the daemon rejected the credentials, no longer
+  reconnecting.", and the connection stays closed, every later request failing with the daemon's reason. Any other failure is
+  retried as before. Live-tested against a daemon whose password was changed under an open connection: one reconnection attempt,
+  none after it over the next 20 s.
+
 ## [2.32.0] - 2026-09-19
 
 ### Added

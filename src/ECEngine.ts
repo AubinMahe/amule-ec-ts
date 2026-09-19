@@ -2,7 +2,7 @@ import { setTimeout } from "node:timers/promises";
 import { debuglog } from "node:util";
 
 import { AlternateNamesCache } from "./AlternateNamesCache.js";
-import { ECConnection } from "./ECConnection.js";
+import { ECAuthenticationError, ECConnection } from "./ECConnection.js";
 
 const debug = debuglog("amule-ec:engine");
 
@@ -92,10 +92,12 @@ export interface ECEngineStartOptions {
  * that otherwise repeat on every periodic poll forever), then retries
  * ECConnection.reconnect() + authenticateWithHash() with an exponential
  * backoff (capped at RECONNECT_MAX_DELAY_MS) until one succeeds, and rearms
- * itself for the next disconnect. Every service already holds this same
- * `connection` instance (captured once via ECEngine.connection at
- * construction), so nothing else needs to change once it's reconnected -
- * the next scheduled poll just starts working again.
+ * itself for the next disconnect. It gives up for good if the daemon refuses
+ * the credentials (ECAuthenticationError), since retrying cannot help.
+ * Every service already holds this same `connection` instance (captured
+ * once via ECEngine.connection at construction), so nothing else needs to
+ * change once it's reconnected - the next scheduled poll just starts
+ * working again.
  */
 export function armReconnect(
    connection: ECConnection,
@@ -105,10 +107,11 @@ export function armReconnect(
    notify: boolean,
    multiSearch: boolean,
    chatSessions: boolean,
+   initialDelayMs = RECONNECT_INITIAL_DELAY_MS,
 ): void {
    connection.once("disconnected", () => {
       console.error("amule-ec: connection to amuled lost, reconnecting...");
-      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch, chatSessions);
+      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs);
    });
 }
 
@@ -120,8 +123,9 @@ async function reconnectLoop(
    notify: boolean,
    multiSearch: boolean,
    chatSessions: boolean,
+   initialDelayMs: number,
 ): Promise<void> {
-   let delayMs = RECONNECT_INITIAL_DELAY_MS;
+   let delayMs = initialDelayMs;
    for (let attempt = 1; ; attempt++) {
       await setTimeout(delayMs);
       debug("reconnectLoop: attempt %d, after %dms backoff", attempt, delayMs);
@@ -132,9 +136,16 @@ async function reconnectLoop(
          connection.localCapabilities.chatSessions = chatSessions;
          await connection.authenticateWithHash(passwordHash);
          console.log("amule-ec: reconnected to amuled.");
-         armReconnect(connection, host, port, passwordHash, notify, multiSearch, chatSessions);
+         armReconnect(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs);
          return;
       } catch (error) {
+         if (error instanceof ECAuthenticationError) {
+            // Not transient: the credentials that worked before are no longer accepted (a changed
+            // password, say). The connection stays closed with this error, which is what every
+            // later request() fails with.
+            console.error("amule-ec: the daemon rejected the credentials, no longer reconnecting.", error);
+            return;
+         }
          console.error("amule-ec: reconnect attempt failed, retrying...", error);
          delayMs = Math.min(delayMs * 2, RECONNECT_MAX_DELAY_MS);
       }
