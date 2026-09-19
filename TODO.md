@@ -229,21 +229,23 @@ Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asse
 - **Priority**: High
 - **Effort**: Medium
 
-### Project hygiene
+### npm publication provenance
 
-- No `SECURITY.md` (private vulnerability reporting instructions).
-- `release.yml` creates the GitHub release; how the npm package is published is not described in the repository, and no npm
-  provenance (`--provenance`) is configured.
-- GitHub Actions are referenced by mutable tag (`actions/checkout@v4`), not by commit SHA.
-- No `npm audit` step, Dependabot configuration or CodeQL workflow.
+`release.yml` creates the GitHub release only. The npm publication is manual and taken when a version is judged mature: as of
+2026-09-19 the latest version on npm is 2.30.0 (published 2026-09-08), while 2.30.1 to 2.33.0 exist as tags and GitHub Releases
+only. No npm provenance (`npm publish --provenance`, which needs the publish to run from CI with `id-token: write`) is configured,
+and one from the maintainer's machine cannot carry it; a workflow triggered by hand for a chosen tag would fit a publication made
+only when a version is mature.
 
 - **Priority**: High
-- **Effort**: Low
+- **Effort**: Medium
 
 ### Node.js support floor
 
 `engines.node` is `>=18`, a release line that no longer receives security fixes; CI still tests 18.x. Raising the floor to 20 would
 also lift the constraint described in `ISSUES.md`: "`npm run lint:md` requires Node 20+", but drops support for Node 18 consumers.
+`mocha@12`, which fixes the advisories listed in `ISSUES.md`'s "Known advisories in the development dependencies", requires Node
+`^20.19.0 || >=22.12.0`.
 
 - **Priority**: Low
 - **Effort**: Low

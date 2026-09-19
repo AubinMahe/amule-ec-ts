@@ -48,6 +48,17 @@ version in two places, which `npm install` does not update unless asked. A versi
 the bump is merged, push the tag `vX.Y.Z`: the release workflow runs the same check with the tag as argument
 (`npm run check-versions -- vX.Y.Z`) and stops if the tag, `package.json` and `package-lock.json` do not all carry the same version.
 
+A tag and its GitHub Release do not publish to npm. Publication to npm is a separate, manual step, taken when a version is judged
+mature, so the latest version on npm can be older than the latest tag.
+
+## Continuous integration and dependencies
+
+GitHub Actions are pinned by commit SHA, with the version in a trailing comment, and Dependabot proposes updates weekly for the
+actions and for the development dependencies. CI runs `npm audit --omit=dev`, which blocks (the package has no dependencies, and
+this keeps it that way), and a full `npm audit`, which only reports: the known advisories of the development toolchain are listed in
+`ISSUES.md`. CodeQL analyzes the TypeScript on every push and pull request, and weekly. To report a vulnerability, see
+`SECURITY.md`.
+
 ## Code style
 
 Formatting is enforced by `.editorconfig` and `.prettierrc` (3-space indent, double quotes, semicolons) - run `npm run lint:ts-fix`

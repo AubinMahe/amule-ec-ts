@@ -132,3 +132,18 @@ exact preference was not checked).
 ### Mitigation
 
 Keep `host` on loopback, or reach a remote daemon through an SSH tunnel or VPN.
+
+## Known advisories in the development dependencies
+
+### Risk
+
+`npm audit` reports 5 advisories (1 low, 1 moderate, 3 high), none of them in the published package: `npm audit --omit=dev` finds
+nothing, since it has no dependencies. `mocha@11` depends on `serialize-javascript` 6.x and `diff` 7.x; the fixed versions come with
+`mocha@12`, which requires Node `^20.19.0 || >=22.12.0` while CI still tests Node 18. `markdownlint-cli2` (already at its latest
+release) depends on `smol-toml`, with a denial-of-service advisory on malformed TOML documents; the only fix `npm audit` lists is a
+downgrade of `markdownlint-cli2`. They sit in the toolchain that runs in CI and in the release job, not in what consumers install.
+
+### Mitigation
+
+CI's `npm audit --omit=dev` step blocks, and the full `npm audit` step only reports. Moving to `mocha@12` goes with raising the Node
+floor (see TODO.md).
