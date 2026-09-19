@@ -20,23 +20,6 @@ Confirmed to work: open a second, dedicated `ECConnection` purely for `notify: t
 shared by any number of `onNotification()` listeners - the safety property is "never mixed with polling," not "one per consumer."
 Documented on `dispatchPacket()` and `ECEngineStartOptions.notify` themselves.
 
-## `npm run lint:md` requires Node 20+
-
-### Risk
-
-`markdownlint-cli2`'s dependency chain requires Node 20+: `markdownlint` (>=0.38.0) depends on `string-width@8.x`, which uses the
-`/v` regex flag (ES2024/V8 11+) and throws `SyntaxError: Invalid regular expression flags` under Node 18. `markdownlint-cli2@0.23.2`
-itself even declares `engines: >=22`. `package.json`'s own `engines.node` is `>=18`, and CI tests 18.x/20.x/22.x - `npm run lint:md`
-broke the 18.x job the first time it ran there, so it's no longer folded into `npm run lint` (which stays Node-18-safe: `tsc` +
-`eslint` only). Anyone touching Markdown must run `npm run lint:md` separately, and it needs Node 20+ to do so.
-
-### Mitigation
-
-None available without dropping either Node 18 support or MD060 (table-style) enforcement: no `markdownlint` version supports both -
-MD060 was only added in 0.39.0, which already requires Node 20+. Run `npm run lint:md` on Node 20+ locally instead; CI no longer
-runs it on any matrix version, so a Markdown-only mistake (bad table style, prose over 132 columns, ...) won't be caught there until
-this is revisited.
-
 ## No upper bound on the announced packet size
 
 ### Risk
@@ -133,17 +116,15 @@ exact preference was not checked).
 
 Keep `host` on loopback, or reach a remote daemon through an SSH tunnel or VPN.
 
-## Known advisories in the development dependencies
+## Known advisory in the development dependencies
 
 ### Risk
 
-`npm audit` reports 5 advisories (1 low, 1 moderate, 3 high), none of them in the published package: `npm audit --omit=dev` finds
-nothing, since it has no dependencies. `mocha@11` depends on `serialize-javascript` 6.x and `diff` 7.x; the fixed versions come with
-`mocha@12`, which requires Node `^20.19.0 || >=22.12.0` while CI still tests Node 18. `markdownlint-cli2` (already at its latest
-release) depends on `smol-toml`, with a denial-of-service advisory on malformed TOML documents; the only fix `npm audit` lists is a
-downgrade of `markdownlint-cli2`. They sit in the toolchain that runs in CI and in the release job, not in what consumers install.
+`npm audit` reports 2 advisories, both high, none of them in the published package: `npm audit --omit=dev` finds nothing, since it
+has no dependencies. `markdownlint-cli2` (already at its latest release) depends on `smol-toml`, with a denial-of-service advisory
+on malformed TOML documents; the only fix `npm audit` lists is a downgrade of `markdownlint-cli2`. It sits in the toolchain that
+runs in CI, not in what consumers install.
 
 ### Mitigation
 
-CI's `npm audit --omit=dev` step blocks, and the full `npm audit` step only reports. Moving to `mocha@12` goes with raising the Node
-floor (see TODO.md).
+CI's `npm audit --omit=dev` step blocks, and the full `npm audit` step only reports.

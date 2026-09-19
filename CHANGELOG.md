@@ -9,6 +9,15 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-19
+
+### Changed
+
+- **Breaking**: Node 22 or later is now required (`engines.node` is `>=22`, it was `>=18`). Node 18 and 20 are out of maintenance,
+  and the development toolchain no longer runs on Node 18: `mocha` 12 needs Node `^20.19.0 || >=22.12.0`, and `markdownlint-cli2`
+  Node 22. CI now tests Node 22 and 24. The library's own code is unchanged, so it may still work on older Node versions, but that
+  is neither tested nor supported. Anyone who has to stay on Node 18 has to stay on a 2.x release.
+
 ## [2.33.0] - 2026-09-19
 
 ### Added

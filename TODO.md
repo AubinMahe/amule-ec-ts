@@ -239,13 +239,3 @@ only when a version is mature.
 
 - **Priority**: High
 - **Effort**: Medium
-
-### Node.js support floor
-
-`engines.node` is `>=18`, a release line that no longer receives security fixes; CI still tests 18.x. Raising the floor to 20 would
-also lift the constraint described in `ISSUES.md`: "`npm run lint:md` requires Node 20+", but drops support for Node 18 consumers.
-`mocha@12`, which fixes the advisories listed in `ISSUES.md`'s "Known advisories in the development dependencies", requires Node
-`^20.19.0 || >=22.12.0`.
-
-- **Priority**: Low
-- **Effort**: Low
