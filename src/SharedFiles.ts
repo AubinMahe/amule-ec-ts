@@ -445,8 +445,7 @@ export class SharedFiles implements ECFetchable {
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_SHARED_FILES);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SHARED_FILES) {
          throw new Error(`Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -469,8 +468,7 @@ export class SharedFiles implements ECFetchable {
     */
    public async reload(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHAREDFILES_RELOAD);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -498,8 +496,7 @@ export class SharedFiles implements ECFetchable {
             new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_PRIO, priority),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -529,8 +526,7 @@ export class SharedFiles implements ECFetchable {
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       request.add(new ECStringTag(ECTagNames.EC_TAG_KNOWNFILE_COMMENT, comment));
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_KNOWNFILE_RATING, rating));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -556,8 +552,7 @@ export class SharedFiles implements ECFetchable {
    public async searchKadNotes(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_SHARED_FILE_SEARCH_KAD_NOTES);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -580,8 +575,7 @@ export class SharedFiles implements ECFetchable {
    public async verifyLocalData(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_VERIFY_LOCAL_DATA);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -609,8 +603,7 @@ export class SharedFiles implements ECFetchable {
    public async refreshMediaMetadata(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to refresh media metadata for ${hash}.`;
@@ -634,8 +627,7 @@ export class SharedFiles implements ECFetchable {
     */
    public async refreshAllMediaMetadata(): Promise<number> {
       const request = new ECPacket(ECOpcode.EC_OP_REFRESH_MEDIA_METADATA);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to refresh media metadata.";
@@ -679,8 +671,7 @@ export class SharedFiles implements ECFetchable {
          );
       }
       const request = new ECPacket(ECOpcode.EC_OP_GET_SHARED_DIRS);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_GET_SHARED_DIRS) {
          throw new Error(`Expected EC_OP_GET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -735,8 +726,7 @@ export class SharedFiles implements ECFetchable {
             ),
          );
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SET_SHARED_DIRS) {
          throw new Error(`Expected EC_OP_SET_SHARED_DIRS, received opcode 0x${reply.opcode.toString(16)}.`);
       }

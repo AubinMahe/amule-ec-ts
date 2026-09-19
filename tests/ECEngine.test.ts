@@ -107,6 +107,22 @@ describe("ECEngine.start", () => {
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(false);
    });
 
+   it("keeps the default request timeout unless requestTimeoutMs is given, and applies it when it is", async () => {
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+      expect(ec.ECEngine.connection.requestTimeoutMs).to.equal(ec.ECConnection.DEFAULT_REQUEST_TIMEOUT_MS);
+
+      ec.ECEngine.connection.removeAllListeners("disconnected");
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH, requestTimeoutMs: 1234 }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+
+      expect(ec.ECEngine.connection.requestTimeoutMs).to.equal(1234);
+   });
+
    it("sets localCapabilities and sends EC_TAG_CAN_NOTIFY/EC_TAG_CAN_MULTI_SEARCH when requested", async () => {
       const [, authRequest] = await Promise.all([
          ec.ECEngine.start({

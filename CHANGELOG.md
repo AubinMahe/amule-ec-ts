@@ -9,6 +9,28 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [2.32.0] - 2026-09-19
+
+### Added
+
+- `ECConnection.request(packet)`: sends a request and resolves with the daemon's reply, as one exchange. Exchanges run one at a time
+  per connection, in call order: EC has no request id, so replies can only be paired with requests by order, and two concurrent
+  `send()`/`receive()` pairs could swap their replies. Every service now goes through it (`Daemon.shutdown()`, which expects no
+  reply, still uses `send()`); `send()` and `receive()` stay public.
+- `ECConnection.requestTimeoutMs` (default `ECConnection.DEFAULT_REQUEST_TIMEOUT_MS`, 30 s, `Infinity` disables it) and
+  `ECEngineStartOptions.requestTimeoutMs`: an exchange that gets no reply in time fails with "No reply from the daemon within N
+  ms.", and the connection is closed, since a late reply could only be paired with the wrong request. It emits `disconnected`, so
+  `ECEngine`'s reconnect loop takes over. The authentication handshake is covered too.
+
+### Fixed
+
+- A request made through `request()` after `reconnect()`, while the new socket is still authenticating, is held until
+  `authenticateWithHash()` has run. Sent earlier, it was answered by the daemon with `EC_OP_AUTH_FAIL` and the connection dropped,
+  which made the reconnect loop's own authentication fail. Found live by polling a daemon frozen with `SIGSTOP` then resumed, the
+  case a consumer refreshing on a timer runs into.
+- A daemon that stops answering (a frozen process, a stalled network) no longer leaves every request waiting forever: before,
+  `receive()` had no timeout and later requests queued behind the stuck one.
+
 ## [2.31.0] - 2026-09-19
 
 ### Changed

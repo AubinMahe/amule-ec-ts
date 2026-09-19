@@ -58,8 +58,7 @@ export class Friends {
       request.add(
          new ECCustomTag(ECTagNames.EC_TAG_FRIEND_ADD, new Uint8Array(), [new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(ecid))]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to add friend by ECID ${ecid}.`;
@@ -97,8 +96,7 @@ export class Friends {
             new ECStringTag(ECTagNames.EC_TAG_FRIEND_NAME, name),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -126,8 +124,7 @@ export class Friends {
             new ECUInt32Tag(ECTagNames.EC_TAG_FRIEND, Number(ecid)),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -162,8 +159,7 @@ export class Friends {
             new ECUInt32Tag(ECTagNames.EC_TAG_FRIEND, Number(ecid)),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set friend slot for ECID ${ecid}.`;
@@ -217,8 +213,7 @@ export class Friends {
             new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason =

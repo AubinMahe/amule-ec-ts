@@ -118,15 +118,13 @@ export class Status implements ECFetchable {
       // Get_EC_Response_StatRequest, ExternalConn.cpp), so _CMD alone would
       // never carry them.
       statsRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_FULL));
-      await this.connection.send(statsRequest);
-      const statsReply = await this.connection.receive();
+      const statsReply = await this.connection.request(statsRequest);
       if (statsReply.opcode !== ECOpcode.EC_OP_STATS) {
          throw new Error(`Expected EC_OP_STATS, received opcode 0x${statsReply.opcode.toString(16)}.`);
       }
       const connStateRequest = new ECPacket(ECOpcode.EC_OP_GET_CONNSTATE);
       connStateRequest.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
-      await this.connection.send(connStateRequest);
-      const connStateReply = await this.connection.receive();
+      const connStateReply = await this.connection.request(connStateRequest);
       if (connStateReply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
          throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${connStateReply.opcode.toString(16)}.`);
       }

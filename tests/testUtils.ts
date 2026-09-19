@@ -3,11 +3,12 @@ import * as ec from "../src/index.js";
 
 /**
  * A minimal stand-in for ECConnection, structurally compatible with what
- * every ec/*.ts service actually calls on it (send/receive) - none of them
- * touch anything else, so a real net.Socket is never needed to unit-test
- * request-building/reply-parsing. queueReply() feeds canned packets for
- * receive() to hand back, in order; sent records every packet passed to
- * send(), so tests can assert on the request shape too.
+ * every ec/*.ts service actually calls on it (request, plus send for a
+ * request with no reply) - none of them touch anything else, so a real
+ * net.Socket is never needed to unit-test request-building/reply-parsing.
+ * queueReply() feeds canned packets for request()/receive() to hand back,
+ * in order; sent records every packet passed to request()/send(), so tests
+ * can assert on the request shape too.
  */
 export interface FakeConnection {
    readonly connection: ec.ECConnection;
@@ -30,6 +31,10 @@ export function createFakeConnection(): FakeConnection {
             throw new Error("FakeConnection: no queued reply for receive().");
          }
          return Promise.resolve(next);
+      },
+      request: (packet: ec.ECPacket): Promise<ec.ECPacket> => {
+         sent.push(packet);
+         return fake.receive();
       },
       // Real ECCapabilities instance (all flags default false, same as a
       // fresh ECConnection before authenticate() runs) - lets tests opt a

@@ -82,8 +82,7 @@ export class Daemon {
     */
    public async checkVersion(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_VERSION_CHECK);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to trigger a version check.";

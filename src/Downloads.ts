@@ -541,8 +541,7 @@ export class Downloads implements ECFetchable {
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_DLOAD_QUEUE);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_DLOAD_QUEUE) {
          throw new Error(`Expected EC_OP_DLOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -574,8 +573,7 @@ export class Downloads implements ECFetchable {
    public async cancel(hash: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_PARTFILE_DELETE);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to cancel ${hash}.`;
@@ -612,8 +610,7 @@ export class Downloads implements ECFetchable {
       const request = new ECPacket(ECOpcode.EC_OP_RENAME_FILE);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(hash, "hex"))));
       request.add(new ECStringTag(ECTagNames.EC_TAG_PARTFILE_NAME, newName));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to rename ${hash}.`;
@@ -642,8 +639,7 @@ export class Downloads implements ECFetchable {
    private async sendPartFileCommand(opcode: ECOpcode, hash: string, failureMessage: string): Promise<void> {
       const request = new ECPacket(opcode);
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : failureMessage;
@@ -742,8 +738,7 @@ export class Downloads implements ECFetchable {
             new ECUInt32Tag(ECTagNames.EC_TAG_PARTFILE_CAT, categoryIndex),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set category for ${hash}.`;
@@ -775,8 +770,7 @@ export class Downloads implements ECFetchable {
             new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_A4AFAUTO, value ? 1 : 0),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set A4AF-auto for ${hash}.`;
@@ -811,8 +805,7 @@ export class Downloads implements ECFetchable {
             new ECUInt8Tag(ECTagNames.EC_TAG_PARTFILE_PRIO, priority),
          ]),
       );
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to set priority for ${hash}.`;
@@ -840,8 +833,7 @@ export class Downloads implements ECFetchable {
    public async addLink(link: string): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_ADD_LINK);
       request.add(new ECStringTag(ECTagNames.EC_TAG_STRING, link));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to add link ${link}.`;
@@ -871,8 +863,7 @@ export class Downloads implements ECFetchable {
       for (const ecid of ecids) {
          request.add(new ECUInt32Tag(ECTagNames.EC_TAG_ECID, Number(ecid)));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }

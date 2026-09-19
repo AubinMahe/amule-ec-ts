@@ -215,8 +215,7 @@ export class StatsTree {
    public async fetch(maxChildrenPerNode = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_STATSTREE);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_STATTREE_CAPPING, maxChildrenPerNode));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_STATSTREE) {
          throw new Error(`Expected EC_OP_STATSTREE, received opcode 0x${reply.opcode.toString(16)}.`);
       }

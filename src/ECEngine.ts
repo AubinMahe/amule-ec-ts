@@ -68,6 +68,13 @@ export interface ECEngineStartOptions {
     */
    chatSessions?: boolean;
    /**
+    * Sets connection.requestTimeoutMs before authenticating, so the handshake itself is covered:
+    * how long every request waits for its reply before the connection is closed (and
+    * reconnected by this engine). Defaults to ECConnection.DEFAULT_REQUEST_TIMEOUT_MS (30 s);
+    * `Infinity` disables it.
+    */
+   requestTimeoutMs?: number;
+   /**
     * Path to a JSON file persisting alternate filenames observed for downloads - see
     * AlternateNamesCache's doc for what it stores and why, Downloads.ts's
     * cacheAltNamesIfEligible() for the population policy (progress threshold, fetch()/notification
@@ -153,6 +160,9 @@ export const ECEngine = {
       connection.localCapabilities.notify = notify;
       connection.localCapabilities.multiSearch = multiSearch;
       connection.localCapabilities.chatSessions = chatSessions;
+      if (options.requestTimeoutMs !== undefined) {
+         connection.requestTimeoutMs = options.requestTimeoutMs;
+      }
       await connection.authenticateWithHash(options.passwordHash);
       instance = connection;
       altNamesCacheInstance = options.altNamesCachePath ? new AlternateNamesCache(options.altNamesCachePath) : undefined;
