@@ -167,8 +167,7 @@ export class Chat implements ECFetchable {
       if (this.cursor !== 0n) {
          request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CHAT_MSG_ID, Number(this.cursor)));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_CHAT_SESSIONS) {
          throw new Error(`Expected EC_OP_CHAT_SESSIONS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -210,8 +209,7 @@ export class Chat implements ECFetchable {
       if (cursor !== undefined) {
          request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CHAT_MSG_ID, Number(cursor)));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason =
@@ -248,8 +246,7 @@ export class Chat implements ECFetchable {
       const request = new ECPacket(ECOpcode.EC_OP_CHAT_SEND);
       request.add(new ECStringTag(ECTagNames.EC_TAG_CHAT, text));
       request.add(targetTag);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : failureMessage;
@@ -317,8 +314,7 @@ export class Chat implements ECFetchable {
       this.requireCapability();
       const request = new ECPacket(ECOpcode.EC_OP_CHAT_CLOSE_SESSION);
       request.add(new ECUInt64Tag(ECTagNames.EC_TAG_CHAT_CLIENT_ID, clientId));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to close chat session ${clientId}.`;

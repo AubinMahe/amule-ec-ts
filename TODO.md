@@ -167,7 +167,9 @@ Result of a robustness review of the library against hostile or faulty peers, an
 TS client (2026-09-19). What is broken today is in `ISSUES.md`; below is what does not exist yet. Three defects found by the same
 review (a throwing `notification` listener stopping the read loop, a decode error leaving the connection half-alive, `reconnect()`
 not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's 2.30.1 entry, and so was outbound input
-validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see `[Unreleased]`.
+validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see CHANGELOG.md's 2.31.0 entry,
+and so was the pairing of requests with replies (atomic `request()` with a timeout, `ISSUES.md`'s "No timeout on connection or on
+requests" and "Concurrent requests can pair with the wrong reply"), see `[Unreleased]`.
 
 Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
 network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
@@ -180,16 +182,6 @@ depth and tag count, and a connect timeout. The daemon's own bounds are a refere
 MiB after (`CECSocket::ReadHeader` in the C++ `ECSocket.cpp`). `EC_FLAG_ZLIB` in an incoming header would be honoured only when
 `zlib` was negotiated. See `ISSUES.md`: "No upper bound on the announced packet size", "Decompression is unbounded and synchronous",
 "Tag tree decoding has no depth or total-count limit".
-
-- **Priority**: High
-- **Effort**: Medium
-
-### Atomic `request()` on `ECConnection`
-
-One method doing `send()` then `receive()` under a per-connection lock (one request in flight), with a timeout that, on expiry,
-closes the connection instead of leaving a late reply to be paired with the next request. Every service currently calls `send()` and
-`receive()` separately. See `ISSUES.md`: "No timeout on connection or on requests", "Concurrent requests can pair with the wrong
-reply".
 
 - **Priority**: High
 - **Effort**: Medium

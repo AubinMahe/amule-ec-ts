@@ -550,8 +550,7 @@ export class Update {
       }
       const request = new ECPacket(ECOpcode.EC_OP_GET_UPDATE);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_INC_UPDATE));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SHARED_FILES) {
          throw new Error(`Expected EC_OP_SHARED_FILES, received opcode 0x${reply.opcode.toString(16)}.`);
       }

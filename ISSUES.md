@@ -76,31 +76,16 @@ bounded by the body size. Read from the code, not reproduced.
 
 None in the library; bounding the packet size (see above) bounds the depth reachable.
 
-## No timeout on connection or on requests
+## No timeout on connecting
 
 ### Risk
 
-Neither `receive()` nor `ECConnection.connect()` has a timeout of its own. A daemon that accepts a request and never replies leaves
-that `receive()` pending forever, and since pending receives are served in FIFO order (`pendingReceives`), every later request on
-the same connection stays queued behind it. A connect to an unresponsive host waits for the operating system's TCP timeout.
+`ECConnection.connect()` and `reconnect()` have no timeout of their own: a connect to an unresponsive host waits for the operating
+system's TCP timeout. (Requests, the authentication handshake included, are covered by `ECConnection.requestTimeoutMs`.)
 
 ### Mitigation
 
-None in the library; callers can race `receive()` against their own timer, but a reply arriving after the timer still gets paired
-with the next request.
-
-## Concurrent requests can pair with the wrong reply
-
-### Risk
-
-Every service does `send()` then `receive()` as two separate calls (`connection.send`/`connection.receive` appear in every
-`src/*.ts` file that issues a request), and EC has no request id. Two requests started concurrently on one connection have no
-mechanism guaranteeing that their `receive()` calls register in the same order as their `send()` calls, in which case each gets the
-other's reply. This is independent of `notify: true` (see above). Read from the code, not reproduced.
-
-### Mitigation
-
-Serialize requests on a connection in the caller, or use one `ECConnection` per concurrent activity.
+None in the library; callers can race the call against their own timer.
 
 ## Failed authentication leaves the socket open, and reconnection never gives up
 

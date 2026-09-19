@@ -321,6 +321,131 @@ describe("ECConnection.send/receive", () => {
    });
 });
 
+describe("ECConnection.request", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   const message = (text: string): ec.ECPacket =>
+      new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, text));
+   const textOf = (packet: ec.ECPacket): string => (packet.find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value;
+   const sleep = (milliseconds: number): Promise<void> =>
+      new Promise((resolve) => {
+         setTimeout(resolve, milliseconds);
+      });
+
+   it("defaults to a 30 s timeout", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_REQUEST_TIMEOUT_MS).to.equal(30_000);
+      expect(connection.requestTimeoutMs).to.equal(30_000);
+   });
+
+   it("sends the packet and resolves with the daemon's reply", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const reply = connection.request(message("question"));
+      expect(textOf(await peer.readPacket())).to.equal("question");
+      peer.writePacket(message("answer"));
+
+      expect(textOf(await reply)).to.equal("answer");
+   });
+
+   it("runs concurrent requests one at a time, each getting its own reply", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const first = connection.request(message("first"));
+      const second = connection.request(message("second"));
+      expect(textOf(await peer.readPacket())).to.equal("first");
+      let bytesBeforeFirstReply = 0;
+      peer.socket.on("data", (chunk: Buffer) => {
+         bytesBeforeFirstReply += chunk.length;
+      });
+      await sleep(100);
+      expect(bytesBeforeFirstReply).to.equal(0);
+
+      peer.writePacket(message("reply to first"));
+      expect(textOf(await first)).to.equal("reply to first");
+      expect(textOf(await peer.readPacket())).to.equal("second");
+      peer.writePacket(message("reply to second"));
+
+      expect(textOf(await second)).to.equal("reply to second");
+   });
+
+   it("times out when the daemon does not reply, and closes the connection", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.requestTimeoutMs = 100;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const serverSawClose = new Promise<void>((resolve) => {
+         peer.socket.once("close", resolve);
+      });
+
+      await expectRejection(connection.request(message("anyone there?")), /No reply from the daemon within 100 ms/);
+
+      await disconnected;
+      await serverSawClose;
+      // A late reply could only be paired with the wrong request: the connection stays closed.
+      await expectRejection(connection.request(message("next")), /No reply from the daemon within 100 ms/);
+   });
+
+   it("fails a request queued behind one that timed out instead of leaving it waiting", async () => {
+      const { connection } = await connectPeer(server);
+      connection.requestTimeoutMs = 100;
+
+      const first = expectRejection(connection.request(message("first")), /No reply from the daemon/);
+      const second = expectRejection(connection.request(message("second")), /No reply from the daemon/);
+
+      await first;
+      await second;
+   });
+
+   it("covers the authentication handshake too", async () => {
+      const { connection } = await connectPeer(server);
+      connection.requestTimeoutMs = 100;
+
+      await expectRejection(connection.authenticateWithHash(PASSWORD_HASH), /No reply from the daemon within 100 ms/);
+   });
+
+   it("holds a request made after reconnect() until the fresh connection has authenticated", async () => {
+      const { connection, peer: firstPeer } = await connectPeer(server);
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      firstPeer.socket.destroy();
+      await disconnected;
+      const [, secondPeer] = await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
+
+      // Made by a caller polling while the reconnect loop is about to authenticate.
+      const early = connection.request(message("early"));
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(secondPeer)]);
+
+      expect(authRequest.opcode).to.equal(ec.ECOpcode.EC_OP_AUTH_REQ);
+      expect(textOf(await secondPeer.readPacket())).to.equal("early");
+      secondPeer.writePacket(message("late but fine"));
+      expect(textOf(await early)).to.equal("late but fine");
+   });
+
+   it("waits for as long as it takes when requestTimeoutMs is Infinity", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.requestTimeoutMs = Infinity;
+
+      const reply = connection.request(message("slow"));
+      await peer.readPacket();
+      await sleep(150);
+      peer.writePacket(message("finally"));
+
+      expect(textOf(await reply)).to.equal("finally");
+   });
+});
+
 describe("ECConnection.send request size limit", () => {
    let server: FakeEcServer;
 

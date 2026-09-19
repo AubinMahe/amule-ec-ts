@@ -120,8 +120,7 @@ export class Categories {
    public async create(title: string, path: string, comment = "", color = 0, prio = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_CREATE_CATEGORY);
       request.add(Categories.buildCategoryTag(0, title, path, comment, color, prio));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          throw Categories.readFailure(reply, "create", title);
       }
@@ -156,8 +155,7 @@ export class Categories {
    public async update(index: number, title: string, path: string, comment = "", color = 0, prio = 0): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_UPDATE_CATEGORY);
       request.add(Categories.buildCategoryTag(index, title, path, comment, color, prio));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          throw Categories.readFailure(reply, "update", title);
       }
@@ -189,8 +187,7 @@ export class Categories {
    public async delete(index: number): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_DELETE_CATEGORY);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CATEGORY, index));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          throw Categories.readFailure(reply, "delete", `#${index}`);
       }

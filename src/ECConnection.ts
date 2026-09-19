@@ -73,6 +73,21 @@ export class ECConnection extends events.EventEmitter {
     */
    private static readonly MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 
+   /**
+    * Default for `requestTimeoutMs`.
+    */
+   public static readonly DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+   /**
+    * How long request() waits for the whole exchange (write, then reply) before giving up. On
+    * expiry the connection is closed, since EC has no request id: a reply arriving late could
+    * only be paired with the wrong request. It emits "disconnected" like any other loss of the
+    * connection, so ECEngine's reconnect loop takes over. `Infinity` disables the timeout. Read
+    * on every request, so it can be changed at any time; it is not applied to receive(), which
+    * stays a bare wait for the next packet.
+    */
+   public requestTimeoutMs = ECConnection.DEFAULT_REQUEST_TIMEOUT_MS;
+
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
    /**
@@ -91,6 +106,14 @@ export class ECConnection extends events.EventEmitter {
     * decodes. FIFO: the oldest pending receive() claims the next packet.
     */
    private readonly pendingReceives: PendingReceive[] = [];
+   /**
+    * Tail of the chain request() serializes its exchanges on: settled once the last one has.
+    */
+   private requestQueue: Promise<void> = Promise.resolve();
+   /**
+    * Set by reconnect(), called (once) by authenticateWithHash() - see reconnect().
+    */
+   private releaseHeldRequests: (() => void) | undefined;
    private closed = false;
    private closeError: Error | undefined;
    private intentionalClose = false;
@@ -191,6 +214,14 @@ export class ECConnection extends events.EventEmitter {
       this.receiveBufferedLength = 0;
       this.wireSocket();
       this.beginPump();
+      // The daemon answers anything but EC_OP_AUTH_REQ on a fresh connection with EC_OP_AUTH_FAIL
+      // and drops it, so a request() made by a caller polling while the new socket is still
+      // authenticating (see ECEngine's reconnect loop) must wait for authenticateWithHash().
+      this.releaseHeldRequests?.();
+      const held = new Promise<void>((resolve) => {
+         this.releaseHeldRequests = resolve;
+      });
+      this.requestQueue = this.requestQueue.then(() => held);
    }
 
    /**
@@ -258,6 +289,22 @@ export class ECConnection extends events.EventEmitter {
    }
 
    public async authenticateWithHash(passwordHash: string): Promise<void> {
+      try {
+         await this.handshake(passwordHash);
+      } finally {
+         // Whatever the outcome, requests held since reconnect() may go now: after a failure
+         // they fail on the closed connection instead of waiting for an authentication that
+         // isn't coming.
+         this.releaseHeldRequests?.();
+         this.releaseHeldRequests = undefined;
+      }
+   }
+
+   /**
+    * The handshake's own exchanges skip request()'s queue: it is precisely what the requests held
+    * by reconnect() wait behind.
+    */
+   private async handshake(passwordHash: string): Promise<void> {
       const authRequest = new ECPacket(ECOpcode.EC_OP_AUTH_REQ);
       authRequest.add(new ECUInt16Tag(ECTagNames.EC_TAG_PROTOCOL_VERSION, ECVersion.PROTOCOL));
       authRequest.add(new ECStringTag(ECTagNames.EC_TAG_CLIENT_NAME, ECVersion.CLIENT_NAME));
@@ -273,8 +320,7 @@ export class ECConnection extends events.EventEmitter {
       // Unconditional too - see ECCapabilities.clientHistory's doc.
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CLIENT_HISTORY, new Uint8Array()));
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
-      await this.send(authRequest);
-      const saltPacket = await this.receive();
+      const saltPacket = await this.exchange(authRequest);
       if (saltPacket.opcode !== ECOpcode.EC_OP_AUTH_SALT) {
          throw new Error(`Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`);
       }
@@ -289,8 +335,7 @@ export class ECConnection extends events.EventEmitter {
       const saltedHash = new Uint8Array(finalHash);
       const authPasswd = new ECPacket(ECOpcode.EC_OP_AUTH_PASSWD);
       authPasswd.add(new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, saltedHash));
-      await this.send(authPasswd);
-      const reply = await this.receive();
+      const reply = await this.exchange(authPasswd);
       if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
@@ -337,6 +382,51 @@ export class ECConnection extends events.EventEmitter {
             }
          });
       });
+   }
+
+   /**
+    * Sends `packet` and resolves with the daemon's reply - the way every request/reply exchange
+    * of this library goes. Unlike a separate send() then receive(), it is safe to call
+    * concurrently: EC has no request id, so replies can only be paired with requests by order,
+    * and exchanges are therefore run one at a time, in call order, on a per-connection queue. A
+    * failed or timed-out exchange does not stop the ones queued behind it (they fail on their
+    * own, on a closed connection, or succeed after a reconnect()). See `requestTimeoutMs`.
+    *
+    * Not for a notification-only connection (see `dispatchPacket`), and not for requests the
+    * daemon never answers (Daemon.shutdown() keeps using send()).
+    */
+   public request(packet: ECPacket): Promise<ECPacket> {
+      const exchange = this.requestQueue.then(() => this.exchange(packet));
+      this.requestQueue = exchange.then(
+         () => undefined,
+         () => undefined,
+      );
+      return exchange;
+   }
+
+   private async exchange(packet: ECPacket): Promise<ECPacket> {
+      if (this.closed) {
+         throw this.closeError ?? new Error("EC connection closed.");
+      }
+      const timeoutMs = this.requestTimeoutMs;
+      let timer: NodeJS.Timeout | undefined;
+      const expired = new Promise<never>((_resolve, reject) => {
+         if (Number.isFinite(timeoutMs)) {
+            timer = setTimeout(() => {
+               const error = new Error(`No reply from the daemon within ${timeoutMs} ms.`);
+               this.abort(error);
+               reject(error);
+            }, timeoutMs);
+         }
+      });
+      // The timeout can fire while send() is still pending, before anything races against it.
+      expired.catch(() => undefined);
+      try {
+         await this.send(packet);
+         return await Promise.race([this.receive(), expired]);
+      } finally {
+         clearTimeout(timer);
+      }
    }
 
    /**
@@ -402,10 +492,19 @@ export class ECConnection extends events.EventEmitter {
          // any more: close the connection for good rather than leave it open, buffering
          // whatever the peer keeps sending, with every later receive() waiting forever.
          // A no-op on the state side when the socket closing is what ended the loop.
-         this.onClose(reason);
-         socket.destroy();
-         this.rejectPending(reason);
+         this.abort(reason);
       }
+   }
+
+   /**
+    * Closes the connection for good because of `reason`: marks it closed (emitting
+    * "disconnected", unless close() caused it), destroys the socket and rejects whatever was
+    * still waiting. Used when the byte stream can no longer be trusted or has stopped answering.
+    */
+   private abort(reason: Error): void {
+      this.onClose(reason);
+      this.socket.destroy();
+      this.rejectPending(reason);
    }
 
    private rejectPending(reason: Error): void {

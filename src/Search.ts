@@ -209,8 +209,7 @@ export class SearchSession {
       if (close) {
          request.add(new ECCustomTag(ECTagNames.EC_TAG_SEARCH_CLOSE, new Uint8Array()));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
          throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -231,8 +230,7 @@ export class SearchSession {
    public async progress(): Promise<ECSearchProgress> {
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_PROGRESS);
       this.addIdTag(request);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_PROGRESS) {
          throw new Error(`Expected EC_OP_SEARCH_PROGRESS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -282,8 +280,7 @@ export class SearchSession {
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_RESULTS);
       this.addIdTag(request);
       request.add(new ECCustomTag(ECTagNames.EC_TAG_SEARCH_PARENT, new Uint8Array()));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_RESULTS) {
          throw new Error(`Expected EC_OP_SEARCH_RESULTS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -347,8 +344,7 @@ export class Search {
       ]);
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_START);
       request.add(searchTag);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to start search.";
@@ -392,8 +388,7 @@ export class Search {
          }
          request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(hash, "hex")), children));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_STRINGS) {
          throw new Error(`Expected EC_OP_STRINGS, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -419,8 +414,7 @@ export class Search {
       if (searchId !== undefined) {
          request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_ID, Number(searchId)));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_MISC_DATA) {
          throw new Error(`Expected EC_OP_MISC_DATA, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -456,8 +450,7 @@ export class Search {
          );
       }
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_LIST);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SEARCH_LIST) {
          throw new Error(`Expected EC_OP_SEARCH_LIST, received opcode 0x${reply.opcode.toString(16)}.`);
       }

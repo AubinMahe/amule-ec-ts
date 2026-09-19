@@ -43,8 +43,7 @@ export class Kad {
     */
    public async start(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_KAD_START);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to start Kad.";
@@ -67,8 +66,7 @@ export class Kad {
     */
    public async stop(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_KAD_STOP);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -92,8 +90,7 @@ export class Kad {
       assertEmptyOrHttpUrl(url);
       const request = new ECPacket(ECOpcode.EC_OP_KAD_UPDATE_FROM_URL);
       request.add(new ECStringTag(ECTagNames.EC_TAG_KADEMLIA_UPDATE_URL, url));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -118,8 +115,7 @@ export class Kad {
       const request = new ECPacket(ECOpcode.EC_OP_KAD_BOOTSTRAP_FROM_IP);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_BOOTSTRAP_IP, packIPv4ToUint32(ip)));
       request.add(new ECUInt16Tag(ECTagNames.EC_TAG_BOOTSTRAP_PORT, port));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to bootstrap from ${ip}:${port}.`;
@@ -150,8 +146,7 @@ export class Kad {
     */
    public async connect(): Promise<readonly string[]> {
       const request = new ECPacket(ECOpcode.EC_OP_CONNECT);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "Failed to connect.";
@@ -179,8 +174,7 @@ export class Kad {
     */
    public async disconnect(): Promise<readonly string[]> {
       const request = new ECPacket(ECOpcode.EC_OP_DISCONNECT);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_NOOP) {
          debug("disconnect: nothing was connected");
          return [];

@@ -119,8 +119,7 @@ export class StatsGraphs {
       if (options.width !== undefined) {
          request.add(new ECUInt16Tag(ECTagNames.EC_TAG_STATSGRAPH_WIDTH, options.width));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          this.points = [];
          debug("fetch: no points for graph");

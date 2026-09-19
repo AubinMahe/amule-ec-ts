@@ -26,8 +26,7 @@ export class IPFilter {
     */
    public async reload(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_IPFILTER_RELOAD);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -50,8 +49,7 @@ export class IPFilter {
       assertEmptyOrHttpUrl(url);
       const request = new ECPacket(ECOpcode.EC_OP_IPFILTER_UPDATE);
       request.add(new ECStringTag(ECTagNames.EC_TAG_STRING, url));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }

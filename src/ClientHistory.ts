@@ -116,8 +116,7 @@ export class ClientHistory implements ECFetchable {
          );
       }
       const request = new ECPacket(ECOpcode.EC_OP_GET_CLIENT_HISTORY);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_CLIENT_HISTORY) {
          throw new Error(`Expected EC_OP_CLIENT_HISTORY, received opcode 0x${reply.opcode.toString(16)}.`);
       }

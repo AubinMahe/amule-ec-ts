@@ -228,8 +228,7 @@ export class Uploads implements ECFetchable {
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_ULOAD_QUEUE);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_CMD));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_ULOAD_QUEUE) {
          throw new Error(`Expected EC_OP_ULOAD_QUEUE, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -258,8 +257,7 @@ export class Uploads implements ECFetchable {
       const request = new ECPacket(ECOpcode.EC_OP_CLIENT_SWAP_TO_ANOTHER_FILE);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)));
       request.add(new ECHash16Tag(ECTagNames.EC_TAG_PARTFILE, new Uint8Array(Buffer.from(fileHash, "hex"))));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }

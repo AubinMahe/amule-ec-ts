@@ -456,8 +456,7 @@ export class Preferences {
    private async fetchSection(selection: ECPreferencesSelection, sectionTagName: number): Promise<ECTag | undefined> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_PREFERENCES);
       request.add(new ECUInt32Tag(ECTagNames.EC_TAG_SELECT_PREFS, selection));
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_SET_PREFERENCES) {
          throw new Error(`Expected EC_OP_SET_PREFERENCES, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -472,8 +471,7 @@ export class Preferences {
       const request = new ECPacket(ECOpcode.EC_OP_SET_PREFERENCES);
       request.add(new ECUInt8Tag(ECTagNames.EC_TAG_DETAIL_LEVEL, ECDetailLevel.EC_DETAIL_UPDATE));
       request.add(section);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }

@@ -26,8 +26,7 @@ export class Log implements ECFetchable {
     */
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_LOG);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_LOG) {
          throw new Error(`Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -49,8 +48,7 @@ export class Log implements ECFetchable {
     */
    public async reset(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_RESET_LOG);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -82,8 +80,7 @@ export class Log implements ECFetchable {
       if (toStatus) {
          request.add(new ECCustomTag(ECTagNames.EC_TAG_LOG_TO_STATUS, new Uint8Array()));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -105,8 +102,7 @@ export class Log implements ECFetchable {
     */
    public async fetchLast(): Promise<string | undefined> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_LAST_LOG_ENTRY);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_LOG) {
          throw new Error(`Expected EC_OP_LOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -135,8 +131,7 @@ export class DebugLog implements ECFetchable {
     */
    public async fetch(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_GET_DEBUGLOG);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_DEBUGLOG) {
          throw new Error(`Expected EC_OP_DEBUGLOG, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -159,8 +154,7 @@ export class DebugLog implements ECFetchable {
     */
    public async reset(): Promise<void> {
       const request = new ECPacket(ECOpcode.EC_OP_RESET_DEBUGLOG);
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
@@ -192,8 +186,7 @@ export class DebugLog implements ECFetchable {
       if (toStatus) {
          request.add(new ECCustomTag(ECTagNames.EC_TAG_LOG_TO_STATUS, new Uint8Array()));
       }
-      await this.connection.send(request);
-      const reply = await this.connection.receive();
+      const reply = await this.connection.request(request);
       if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
          throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
       }
