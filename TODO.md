@@ -171,20 +171,11 @@ validation (NUL in strings, request size, `http:`/`https:` only for the URLs the
 and so was the pairing of requests with replies (atomic `request()` with a timeout), see CHANGELOG.md's 2.32.0 entry, the handling
 of a failed authentication (socket closed, no endless reconnection on a refused password), see CHANGELOG.md's 2.33.0 entry, the
 receive-side limits plus a decoder fuzz test, see CHANGELOG.md's 3.1.0 entry, refusing a non-loopback `host` without an explicit
-opt-in, and `AlternateNamesCache` hardening, see CHANGELOG.md's `[Unreleased]` section.
+opt-in, `AlternateNamesCache` hardening, and read-only mode, see CHANGELOG.md's `[Unreleased]` section.
 
 Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
 network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
 ed2k/Kad network control much of the data coming back.
-
-### Read-only mode or opcode allowlist
-
-An `ECConnection`/`ECEngine` option restricting the opcodes it may send, so a consumer that only monitors cannot call
-`Daemon.shutdown()`, delete downloads or files, or write `Preferences` (paths, ports, credentials). None exists: the library exposes
-the daemon's full remote control.
-
-- **Priority**: Medium
-- **Effort**: Medium
 
 ### Request pacing for heavy queries
 

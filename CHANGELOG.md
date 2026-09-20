@@ -28,6 +28,14 @@ verified against that source before being reflected here.
   distinct names on one entry than `maxNamesPerEntry` allows keeps the ones already known, and a call that would add a new entry
   past `maxEntries` evicts the least-recently-updated existing ones first, the same age-based policy `init()`'s own purge already
   uses.
+- `ECConnection.readOnly` (default `false`) and `ECEngineStartOptions.readOnly`: a consumer that only monitors `amuled` can set this
+  instead of relying on its own code never happening to call `Daemon.shutdown()`, delete a download or a shared file, or write
+  `Preferences`. `send()` refuses, with a `RangeError` and before writing anything, any opcode outside the new
+  `ECConnection.READ_ONLY_OPCODES` - the handshake and every opcode this library only ever uses to fetch or poll state, never to
+  change something on the daemon, a peer or the network. Applies equally to `request()`, which calls `send()` underneath. Live-
+  tested against a real daemon: `Status.fetch()`/`SharedFiles.fetch()` succeed under `readOnly: true`, `Daemon.shutdown()` and
+  `Log.reset()` are both refused before either packet reaches the daemon, and the connection stays fully usable afterward. See
+  `CHOICES.md` for the one known gap this opcode-level check leaves (`Friends.browseSharedFiles()`).
 
 ### Fixed
 

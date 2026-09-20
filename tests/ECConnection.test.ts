@@ -714,6 +714,91 @@ describe("ECConnection receive-side tag tree limits", () => {
    });
 });
 
+describe("ECConnection.readOnly", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("defaults to false", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(connection.readOnly).to.equal(false);
+   });
+
+   it("refuses a mutating opcode via send(), before writing anything, and the connection stays usable", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.readOnly = true;
+
+      await expectRejection(
+         connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_SHUTDOWN)),
+         /Refusing to send opcode 0x8 on a read-only connection\./,
+      );
+      await connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_GET_DLOAD_QUEUE));
+
+      // The server reads the allowed packet next: nothing of the refused one was written.
+      expect((await peer.readPacket()).opcode).to.equal(ec.ECOpcode.EC_OP_GET_DLOAD_QUEUE);
+   });
+
+   it("refuses a mutating opcode via request() too - the same send() underneath", async () => {
+      const { connection } = await connectPeer(server);
+      connection.readOnly = true;
+
+      await expectRejection(
+         connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_PARTFILE_DELETE)),
+         /Refusing to send opcode 0x1d on a read-only connection\./,
+      );
+   });
+
+   it("still allows every opcode in READ_ONLY_OPCODES, the handshake and a poll included", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.readOnly = true;
+
+      const [, authRequest] = await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
+      expect(authRequest.opcode).to.equal(ec.ECOpcode.EC_OP_AUTH_REQ);
+
+      const reply = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_GET_SERVER_LIST));
+      expect((await peer.readPacket()).opcode).to.equal(ec.ECOpcode.EC_OP_GET_SERVER_LIST);
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_SERVER_LIST));
+      expect((await reply).opcode).to.equal(ec.ECOpcode.EC_OP_SERVER_LIST);
+   });
+
+   it("classifies every opcode this library ever sends as exactly one of read-only or mutating", () => {
+      // A sample from each ec/*.ts service, not the exhaustive list - see READ_ONLY_OPCODES' own
+      // doc for the full reasoning, including the one real gap (Friends.ts/EC_OP_FRIEND).
+      const readOnlySample = [
+         ec.ECOpcode.EC_OP_STAT_REQ,
+         ec.ECOpcode.EC_OP_GET_SHARED_FILES,
+         ec.ECOpcode.EC_OP_SEARCH_PROGRESS,
+         ec.ECOpcode.EC_OP_SEARCH_RESULTS,
+         ec.ECOpcode.EC_OP_GET_PREFERENCES,
+         ec.ECOpcode.EC_OP_GET_LOG,
+      ];
+      const mutatingSample = [
+         ec.ECOpcode.EC_OP_SHUTDOWN,
+         ec.ECOpcode.EC_OP_SET_PREFERENCES,
+         ec.ECOpcode.EC_OP_PARTFILE_DELETE,
+         ec.ECOpcode.EC_OP_SEARCH_START,
+         ec.ECOpcode.EC_OP_SERVER_ADD,
+         ec.ECOpcode.EC_OP_FRIEND,
+         ec.ECOpcode.EC_OP_KAD_START,
+         ec.ECOpcode.EC_OP_VERSION_CHECK,
+      ];
+
+      for (const opcode of readOnlySample) {
+         expect(ec.ECConnection.READ_ONLY_OPCODES.has(opcode), `expected 0x${opcode.toString(16)} to be read-only`).to.equal(true);
+      }
+      for (const opcode of mutatingSample) {
+         expect(ec.ECConnection.READ_ONLY_OPCODES.has(opcode), `expected 0x${opcode.toString(16)} to be mutating`).to.equal(false);
+      }
+   });
+});
+
 describe("ECConnection non-loopback host", () => {
    it("defaults allowNonLoopback to false", async () => {
       const server = await startFakeEcServer();
