@@ -170,8 +170,8 @@ not destroying the previous socket) were fixed instead of listed, see CHANGELOG.
 validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see CHANGELOG.md's 2.31.0 entry,
 and so was the pairing of requests with replies (atomic `request()` with a timeout), see CHANGELOG.md's 2.32.0 entry, the handling
 of a failed authentication (socket closed, no endless reconnection on a refused password), see CHANGELOG.md's 2.33.0 entry, the
-receive-side limits plus a decoder fuzz test, see CHANGELOG.md's 3.1.0 entry, and refusing a non-loopback `host` without an explicit
-opt-in, see CHANGELOG.md's `[Unreleased]` section.
+receive-side limits plus a decoder fuzz test, see CHANGELOG.md's 3.1.0 entry, refusing a non-loopback `host` without an explicit
+opt-in, and `AlternateNamesCache` hardening, see CHANGELOG.md's `[Unreleased]` section.
 
 Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
 network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
@@ -193,15 +193,6 @@ minimum interval or concurrency limit exists on the library side.
 
 - **Priority**: Low
 - **Effort**: Medium
-
-### `AlternateNamesCache` hardening
-
-Bounds on entries, names per entry and name length; write to a temporary file then rename; treat a corrupt or malformed file as
-empty (keeping a copy) instead of failing `ECEngine.start()`; validate the loaded shape; create the file with mode `0o600`. See
-`ISSUES.md`: "`AlternateNamesCache` file handling".
-
-- **Priority**: High
-- **Effort**: Low
 
 ### TypeScript above 6.0: lift the Dependabot ignore once typescript-eslint follows
 

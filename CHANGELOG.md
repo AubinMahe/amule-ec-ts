@@ -20,6 +20,23 @@ verified against that source before being reflected here.
   call.
 - `assertLoopbackOrAllowed()`, the function behind the check above, is exported from `ECValidation.js` alongside
   `assertEmptyOrHttpUrl()`.
+- `AlternateNamesCache`'s constructor takes three optional bounds - `maxEntries`/`maxNamesPerEntry`/`maxNameLength`, defaulting to
+  the new `AlternateNamesCache.DEFAULT_MAX_ENTRIES` (10,000), `.DEFAULT_MAX_NAMES_PER_ENTRY` (100, matching `MAX_FILENAMES` in the
+  upstream C++ checkout's Kad `Entry.cpp`, the same cap on a Kad entry's own accumulated filename variants) and
+  `.DEFAULT_MAX_NAME_LENGTH` (255, the common filesystem filename length limit) - on the names it caches, which come from remote
+  ed2k/Kad peers by way of `Downloads.ts`: a name longer than `maxNameLength` is dropped, an `add()` call that would put more
+  distinct names on one entry than `maxNamesPerEntry` allows keeps the ones already known, and a call that would add a new entry
+  past `maxEntries` evicts the least-recently-updated existing ones first, the same age-based policy `init()`'s own purge already
+  uses.
+
+### Fixed
+
+- `AlternateNamesCache.persist()` now writes to a temporary file (mode `0o600`, since the file lists filenames) and renames it over
+  the real one, atomic on the same filesystem - a process killed mid-write used to leave a truncated file.
+- `AlternateNamesCache.load()` (so `init()`, so `ECEngine.start()`) no longer throws on a file that fails to parse as JSON or whose
+  top level isn't a plain object: it is backed up to `<path>.corrupt` (best effort; a failure to back it up still doesn't throw) and
+  treated as empty. Within an otherwise well-formed file, an individual entry that doesn't have the right shape (`names` not a
+  string array, `lastUpdated` not a valid date) is dropped on its own, without discarding the rest of the file or a backup.
 
 ## [3.1.0] - 2026-09-20
 
