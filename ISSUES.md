@@ -57,14 +57,16 @@ Treat every decoded string as untrusted input, and keep 64-bit quantities as `bi
 
 EC runs in clear text over TCP; the password is MD5-based, salted challenge/response, and once the handshake is over nothing
 authenticates individual packets. An on-path attacker between this library and `amuled` can read every reply and inject or alter
-packets in an established session. `ECEngine.start()` accepts any `host`. Upstream `amuled` can offer an authenticated, encrypted
-session (see TODO.md, "EC session encryption"); a comment in the daemon's authentication code (`ExternalConn.cpp`) also mentions an
-operator policy refusing any session that did not negotiate encryption, in which case this library could not connect at all (the
-exact preference was not checked).
+packets in an established session. Upstream `amuled` can offer an authenticated, encrypted session (see TODO.md, "EC session
+encryption"); a comment in the daemon's authentication code (`ExternalConn.cpp`) also mentions an operator policy refusing any
+session that did not negotiate encryption, in which case this library could not connect at all (the exact preference was not
+checked).
 
 ### Mitigation
 
-Keep `host` on loopback, or reach a remote daemon through an SSH tunnel or VPN.
+`ECConnection.connect()`/`.reconnect()` (and `ECEngineStartOptions`) now refuse a non-loopback `host` unless `allowNonLoopback` is
+set, so reaching a remote daemon over a real network takes a deliberate opt-in rather than an accident. Once opted in, reach it
+through an SSH tunnel or VPN rather than a bare network address - the traffic itself is still unencrypted either way.
 
 ## Known advisory in the development dependencies
 

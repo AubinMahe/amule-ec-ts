@@ -169,8 +169,9 @@ review (a throwing `notification` listener stopping the read loop, a decode erro
 not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's 2.30.1 entry, and so was outbound input
 validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see CHANGELOG.md's 2.31.0 entry,
 and so was the pairing of requests with replies (atomic `request()` with a timeout), see CHANGELOG.md's 2.32.0 entry, the handling
-of a failed authentication (socket closed, no endless reconnection on a refused password), see CHANGELOG.md's 2.33.0 entry, and the
-receive-side limits plus a decoder fuzz test, see CHANGELOG.md's `[Unreleased]` section.
+of a failed authentication (socket closed, no endless reconnection on a refused password), see CHANGELOG.md's 2.33.0 entry, the
+receive-side limits plus a decoder fuzz test, see CHANGELOG.md's 3.1.0 entry, and refusing a non-loopback `host` without an explicit
+opt-in, see CHANGELOG.md's `[Unreleased]` section.
 
 Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
 network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
@@ -192,15 +193,6 @@ minimum interval or concurrency limit exists on the library side.
 
 - **Priority**: Low
 - **Effort**: Medium
-
-### Refusing a non-loopback `host` without an explicit opt-in
-
-`ECEngine.start()` and `ECConnection.connect()` accept any host while EC is unencrypted, see `ISSUES.md`: "The EC session is neither
-encrypted nor authenticated per packet". An opt-in flag (or a warning) for anything but loopback does not exist; the real fix is the
-session encryption item above.
-
-- **Priority**: High
-- **Effort**: Low
 
 ### `AlternateNamesCache` hardening
 

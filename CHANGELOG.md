@@ -9,6 +9,18 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+### Added
+
+- `ECConnection.allowNonLoopback` (default `false`) and a fourth argument of the same name on `connect()`/`.reconnect()`, plus
+  `ECEngineStartOptions.allowNonLoopback`: a non-loopback `host` is now refused with a `RangeError`, before any socket is even
+  opened, unless this is set. EC is neither encrypted nor authenticated per packet (see `ISSUES.md`), so reaching a remote daemon
+  over a real network now takes a deliberate opt-in instead of an accident. Loopback covers `"localhost"`, an IPv4 address in
+  `127.0.0.0/8`, and the two common spellings of the IPv6 loopback address; anything else needs the opt-in. `reconnect()` defaults
+  to whatever value `connect()` (or a direct assignment) already gave the connection, so it does not have to be repeated on every
+  call.
+- `assertLoopbackOrAllowed()`, the function behind the check above, is exported from `ECValidation.js` alongside
+  `assertEmptyOrHttpUrl()`.
+
 ## [3.1.0] - 2026-09-20
 
 ### Added
