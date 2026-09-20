@@ -334,7 +334,7 @@ const RESULT_EMPTY = Buffer.alloc(0);
  * it) to diagnose a malformed or misunderstood wire format without having
  * to manually recount bytes in a raw hex dump.
  */
-class ECDecodeError extends Error {
+export class ECDecodeError extends Error {
    private static hexAround(buffer: Buffer, offset: number, radius = 12): string {
       const start = Math.max(0, offset - radius);
       const end = Math.min(buffer.length, offset + radius);
@@ -568,11 +568,32 @@ function decodeCString(data: Buffer): string {
  * field ended), so something has to own it; this is that something.
  */
 export class ECTagDecoder {
+   /**
+    * Default for `maxDepth` - real EC tag trees never nest past 4 or 5 levels (a section, a
+    * record, a field, occasionally a sub-field), so this is generous headroom, not a tight fit;
+    * its purpose is only to fail cleanly with `ECDecodeError` before a maliciously nested body
+    * could grow the recursion deep enough to overflow the call stack.
+    */
+   public static readonly DEFAULT_MAX_DEPTH = 32;
+
+   /**
+    * Default for `maxTagCount` - the largest reply this library has actually seen is
+    * `SharedFiles.fetch()` against an 81,495-file library, one tag per file plus a handful of
+    * children each; this is comfortably above that with room to grow, while still far below the
+    * tens of millions of minimal tags a maximum-size packet could otherwise pack in (each decoded
+    * tag becomes a JS object several times larger than its few bytes on the wire, so bounding the
+    * packet's byte size alone does not bound the decoded tree's own memory footprint).
+    */
+   public static readonly DEFAULT_MAX_TAG_COUNT = 2_000_000;
+
    private offset = 0;
+   private tagCount = 0;
 
    public constructor(
       private readonly buffer: Buffer,
       private readonly caps: ECCapabilities,
+      private readonly maxDepth: number = ECTagDecoder.DEFAULT_MAX_DEPTH,
+      private readonly maxTagCount: number = ECTagDecoder.DEFAULT_MAX_TAG_COUNT,
    ) {}
 
    /**
@@ -644,6 +665,13 @@ export class ECTagDecoder {
     * ECDecodeError if something goes wrong.
     */
    public readTag(path: number[] = []): ECTag {
+      this.tagCount++;
+      if (this.tagCount > this.maxTagCount) {
+         throw new ECDecodeError(`Tag count exceeds the ${this.maxTagCount}-tag limit.`, path, this.offset, this.buffer);
+      }
+      if (path.length >= this.maxDepth) {
+         throw new ECDecodeError(`Tag nesting exceeds the ${this.maxDepth}-level depth limit.`, path, this.offset, this.buffer);
+      }
       if (this.offset >= this.buffer.length) {
          throw new ECDecodeError("Ran out of bytes while expecting a tag header (TAGNAME).", path, this.offset, this.buffer);
       }
