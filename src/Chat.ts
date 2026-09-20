@@ -4,7 +4,7 @@ import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
-import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag } from "./ECTags.js";
+import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag, packIPv4ToUint32 } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:chat");
 
@@ -79,6 +79,18 @@ export class ChatSession {
             .map((child) => ChatMessage.fromTag(child)),
       );
    }
+}
+
+/**
+ * The daemon's `GUI_ID(ip, port)` - `(ip << 16) + port`, with `ip` the same "anti-host order"
+ * 32-bit integer `EC_TAG_CLIENT_USER_IP` carries (see `ipFromUint32()`), which is why it goes
+ * through `packIPv4ToUint32()` rather than a big-endian read of the octets.
+ */
+function chatClientId(ip: string, port: number): bigint {
+   if (!Number.isInteger(port) || port < 1 || port > 0xffff) {
+      throw new RangeError(`Invalid port: ${port}.`);
+   }
+   return (BigInt(packIPv4ToUint32(ip)) << 16n) + BigInt(port);
 }
 
 function compareMessageId(a: ChatMessage, b: ChatMessage): number {
@@ -234,18 +246,18 @@ export class Chat implements ECFetchable {
    }
 
    /**
-    * Sends `EC_OP_CHAT_SEND` addressed by `targetTag`, returning the resolved `clientId` (the
-    * GUI_ID `sendToSession()`/`closeSession()` address a session by) - shared by
-    * `sendToSession()`/`sendToClient()`/`sendToFriend()`, which differ only in which tag addresses
-    * the target. A `false`-ish send result at the daemon (message queued while a connection to the
-    * peer is still being established) is not surfaced as failure here either, matching upstream's
-    * own reasoning: it is not an error, the message still arrives once connected.
+    * Sends `EC_OP_CHAT_SEND` to `clientId` (the GUI_ID `sendToSession()`/`closeSession()` address a
+    * session by), returning the id the daemon resolved - shared by `sendToSession()`/
+    * `sendToAddress()`, which differ only in how they obtain that id. A `false`-ish send result at
+    * the daemon (message queued while a connection to the peer is still being established) is not
+    * surfaced as failure here either, matching upstream's own reasoning: it is not an error, the
+    * message still arrives once connected.
     */
-   private async sendTo(targetTag: ECTag, text: string, failureMessage: string): Promise<bigint> {
+   private async sendTo(clientId: bigint, text: string, failureMessage: string): Promise<bigint> {
       this.requireCapability();
       const request = new ECPacket(ECOpcode.EC_OP_CHAT_SEND);
       request.add(new ECStringTag(ECTagNames.EC_TAG_CHAT, text));
-      request.add(targetTag);
+      request.add(new ECUInt64Tag(ECTagNames.EC_TAG_CHAT_CLIENT_ID, clientId));
       const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
@@ -264,42 +276,26 @@ export class Chat implements ECFetchable {
     * opened.
     */
    public async sendToSession(clientId: bigint, text: string): Promise<bigint> {
-      const resolved = await this.sendTo(
-         new ECUInt64Tag(ECTagNames.EC_TAG_CHAT_CLIENT_ID, clientId),
-         text,
-         `Failed to send to chat session ${clientId}.`,
-      );
+      const resolved = await this.sendTo(clientId, text, `Failed to send to chat session ${clientId}.`);
       debug("sendToSession: clientId=%s", clientId);
       return resolved;
    }
 
    /**
-    * Starts or continues a conversation with a currently-connected client, by ECID - correlate
-    * against `ChatSession.clientEcid` or `Uploads`/`Update`'s own client entries.
+    * Starts or continues a conversation with a peer, by its address - the daemon's only way to open
+    * a session (`EC_OP_CHAT_SEND` addresses a target by `EC_TAG_CHAT_CLIENT_ID` alone since
+    * upstream's #1498, which removed the ECID-addressed forms). The address is what the caller
+    * already holds on its own `Uploads`/`Update` client and friend entries (`userIp`/`userPort`,
+    * `ip`/`port`), and it reaches a friend who is currently offline just as well: the daemon opens
+    * a session for an address it has never seen.
+    *
+    * Returns the resolved `clientId`, which is `ChatSession.clientId` from then on.
+    *
+    * @throws RangeError if `ip` is not a dotted-quad IPv4 address or `port` is not in 1-65535.
     */
-   public async sendToClient(clientEcid: bigint, text: string): Promise<bigint> {
-      const resolved = await this.sendTo(
-         new ECUInt32Tag(ECTagNames.EC_TAG_CLIENT, Number(clientEcid)),
-         text,
-         `Failed to send to client ${clientEcid}.`,
-      );
-      debug("sendToClient: clientEcid=%s", clientEcid);
-      return resolved;
-   }
-
-   /**
-    * Starts or continues a conversation with a friend who may currently be OFFLINE, by ECID -
-    * resolved daemon-side through the friend's own stored address, which is what makes messaging
-    * an offline friend work at all. Correlate against `ChatSession.friendEcid` or `Friends`'s own
-    * entries.
-    */
-   public async sendToFriend(friendEcid: bigint, text: string): Promise<bigint> {
-      const resolved = await this.sendTo(
-         new ECUInt32Tag(ECTagNames.EC_TAG_FRIEND, Number(friendEcid)),
-         text,
-         `Failed to send to friend ${friendEcid}.`,
-      );
-      debug("sendToFriend: friendEcid=%s", friendEcid);
+   public async sendToAddress(ip: string, port: number, text: string): Promise<bigint> {
+      const resolved = await this.sendTo(chatClientId(ip, port), text, `Failed to send to ${ip}:${port}.`);
+      debug("sendToAddress: %s:%d", ip, port);
       return resolved;
    }
 

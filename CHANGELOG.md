@@ -9,6 +9,33 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-20
+
+### Added
+
+- `Chat.sendToAddress(ip, port, text)`: starts or continues a conversation with a peer addressed by its IPv4 address and TCP port,
+  the daemon's `GUI_ID(ip, port)` (`(ip << 16) + port`) being what `EC_TAG_CHAT_CLIENT_ID` carries. It reaches a friend who is
+  offline just as well: the daemon opens a session for an address it has never seen. An invalid address or a port outside 1-65535 is
+  refused with a `RangeError` before anything is sent. Live-tested against a daemon with #1498: the two removed forms sent raw are
+  answered `EC_OP_FAILED` ("Unknown chat target"), `sendToAddress()` returns exactly the expected id, the session appears in
+  `fetch()` under it and `closeSession()` removes it.
+- `UploadClient.userIp`/`.userPort` (`EC_TAG_CLIENT_USER_IP`/`_PORT`, sent unconditionally in the same block as the client's name
+  and hash): the address `Chat.sendToAddress()` takes, so a caller holding an upload queue entry needs no second lookup. `"0.0.0.0"`
+  and `0n` when absent. Live-tested against a real upload queue: real dotted-quad addresses and plausible ports.
+- `ClientHistoryEntry.scoreRatio` (`EC_TAG_CLIENT_SCORE_RATIO`): the credit modifier, now sent on each credit-store entry as well
+  (upstream #1479). `undefined` on a daemon predating it. Live-tested against a real credit store: present on all 3,569 entries.
+
+### Changed
+
+- **Breaking**: `Chat.sendToClient(clientEcid, text)` and `Chat.sendToFriend(friendEcid, text)` are removed. Upstream #1498 made
+  `EC_TAG_CHAT_CLIENT_ID` the only way `EC_OP_CHAT_SEND` addresses a target: the `EC_TAG_CLIENT` and `EC_TAG_FRIEND` forms these two
+  sent are gone, and a current daemon answers `EC_OP_FAILED` ("Unknown chat target") to them. Use `Chat.sendToAddress()` to open a
+  conversation and `Chat.sendToSession()` for one that is already open. Both keep working against a daemon predating #1498, which
+  accepted `EC_TAG_CHAT_CLIENT_ID` too. The `chat send` REPL command follows:
+  `chat send <session <client-id>|address <ip> <port>> <text>`.
+- `ClientUpdate.scoreRatio` (`EC_TAG_CLIENT_SCORE_RATIO`) is now the credit ratio without the secure-identification gate (upstream
+  #1479), so a peer reads the same connected or not, instead of 1.0 while its identity is pending. Same tag, same type.
+
 ## [3.2.0] - 2026-09-20
 
 ### Added

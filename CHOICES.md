@@ -135,8 +135,8 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
   `DebugLog`, `Friends`, `Chat`, `Categories`, `IPFilter`, `Preferences`, `Update` and `StatsTree`
 - REPL commands : `show dl`, `show ul`, `show shared`, `show servers`, `show log`, `reset log`, `show log last`, `addlog <text>`,
   `show debug log`, `reset debug log`, `adddebuglog <text>`, `show server log`, `reset server log`, `show chat`,
-  `chat send <session|client|friend> <id> <text>`, `chat close <client-id>`, `chat history <client-id> [cursor]`, `status`,
-  `show statsgraphs`, `connect <ip:port>`, `connect`, `disconnect`, `server disconnect`,
+  `chat send <session <client-id>|address <ip> <port>> <text>`, `chat close <client-id>`, `chat history <client-id> [cursor]`,
+  `status`, `show statsgraphs`, `connect <ip:port>`, `connect`, `disconnect`, `server disconnect`,
   `server priority <ecid> [static|nostatic] [normal|high|low]`, `server remove <ip:port>`, `server add <ip:port> [name]`,
   `server update <url>`, `search <keywords>`, `search stop`, `search more [id]`, `show searches`, `download <hash>...`,
   `cancel <hash>`, `pause <hash>`, `resume <hash>`, `stop <hash>`,

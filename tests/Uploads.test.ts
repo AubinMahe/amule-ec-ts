@@ -3,6 +3,20 @@ import * as ec from "../src/index.js";
 import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 /**
+ * The EC_TAG_CLIENT_USER_IP/_PORT children of `uploadClientTag()`, split out to keep it readable.
+ */
+function addressChildren(fields: { userIp?: number; userPort?: number }): ec.ECTag[] {
+   const children: ec.ECTag[] = [];
+   if (fields.userIp !== undefined) {
+      children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_USER_IP, fields.userIp));
+   }
+   if (fields.userPort !== undefined) {
+      children.push(new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CLIENT_USER_PORT, fields.userPort));
+   }
+   return children;
+}
+
+/**
  * Builds a synthetic EC_TAG_CLIENT tag, as UploadClient's constructor reads it.
  */
 function uploadClientTag(fields: {
@@ -18,6 +32,8 @@ function uploadClientTag(fields: {
    friendSlot?: boolean;
    connected?: boolean;
    modCapabilities?: number;
+   userIp?: number;
+   userPort?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.hash !== undefined) {
@@ -50,6 +66,7 @@ function uploadClientTag(fields: {
    if (fields.connected !== undefined) {
       children.push(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CLIENT_CONNECTED, fields.connected ? 1 : 0));
    }
+   children.push(...addressChildren(fields));
    if (fields.modCapabilities !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES, fields.modCapabilities));
    }
@@ -101,6 +118,18 @@ describe("UploadClient", () => {
    it("friendSlot defaults to false when the tag is absent (unconditional on the wire)", () => {
       const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
       expect(client.friendSlot).to.equal(false);
+   });
+
+   it("reads userIp (low-byte-first, as on the wire) and userPort", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1, userIp: 0x0100007f, userPort: 4662 }));
+      expect(client.userIp).to.equal("127.0.0.1");
+      expect(client.userPort).to.equal(4662n);
+   });
+
+   it("userIp/userPort default to 0.0.0.0 and 0 when the tags are absent", () => {
+      const client = new ec.UploadClient(uploadClientTag({ ecid: 1 }));
+      expect(client.userIp).to.equal("0.0.0.0");
+      expect(client.userPort).to.equal(0n);
    });
 
    it("reads connected true/false when present", () => {

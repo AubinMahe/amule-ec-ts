@@ -38,6 +38,13 @@ export class ClientHistoryEntry {
     */
    public readonly lastSeen: bigint;
    /**
+    * The credit modifier the daemon applies to this peer - `EC_TAG_CLIENT_SCORE_RATIO`, the same
+    * tag and the same value `ClientUpdate.scoreRatio` carries for a connected peer, computed from
+    * the same totals. `undefined` on a daemon predating upstream's #1479, which only sent the raw
+    * totals here.
+    */
+   public readonly scoreRatio: number | undefined;
+   /**
     * Unix timestamp (seconds) of the first time this daemon ever saw this peer - metadata trailer
     * only.
     */
@@ -78,6 +85,7 @@ export class ClientHistoryEntry {
       this.uploadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_TOTAL) ?? 0n;
       this.downloadTotal = tag.childInt(ECTagNames.EC_TAG_CLIENT_DOWNLOAD_TOTAL) ?? 0n;
       this.lastSeen = tag.childInt(ECTagNames.EC_TAG_CLIENT_LAST_SEEN) ?? 0n;
+      this.scoreRatio = tag.childDouble(ECTagNames.EC_TAG_CLIENT_SCORE_RATIO);
       this.firstSeen = tag.childInt(ECTagNames.EC_TAG_CLIENT_FIRST_SEEN);
       this.sessions = tag.childInt(ECTagNames.EC_TAG_CLIENT_SESSIONS);
       this.name = tag.childString(ECTagNames.EC_TAG_CLIENT_NAME);
