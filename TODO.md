@@ -168,23 +168,13 @@ TS client (2026-09-19). What is broken today is in `ISSUES.md`; below is what do
 review (a throwing `notification` listener stopping the read loop, a decode error leaving the connection half-alive, `reconnect()`
 not destroying the previous socket) were fixed instead of listed, see CHANGELOG.md's 2.30.1 entry, and so was outbound input
 validation (NUL in strings, request size, `http:`/`https:` only for the URLs the daemon fetches), see CHANGELOG.md's 2.31.0 entry,
-and so was the pairing of requests with replies (atomic `request()` with a timeout), see CHANGELOG.md's 2.32.0 entry, and the
-handling of a failed authentication (socket closed, no endless reconnection on a refused password), see `[Unreleased]`.
+and so was the pairing of requests with replies (atomic `request()` with a timeout), see CHANGELOG.md's 2.32.0 entry, the handling
+of a failed authentication (socket closed, no endless reconnection on a refused password), see CHANGELOG.md's 2.33.0 entry, and the
+receive-side limits plus a decoder fuzz test, see CHANGELOG.md's `[Unreleased]` section.
 
 Priorities assume the worst case for a package published on npm rather than any one deployment: the daemon may be reached over a
 network and be hostile or impersonated, the session can be intercepted, callers may forward untrusted input, and peers of the
 ed2k/Kad network control much of the data coming back.
-
-### Receive-side limits
-
-Configurable maximum announced packet size, maximum inflated size (`maxOutputLength`, ideally asynchronous inflate), maximum tag
-depth and tag count, and a connect timeout. The daemon's own bounds are a reference for defaults: 16 MiB before authentication, 256
-MiB after (`CECSocket::ReadHeader` in the C++ `ECSocket.cpp`). `EC_FLAG_ZLIB` in an incoming header would be honoured only when
-`zlib` was negotiated. See `ISSUES.md`: "No upper bound on the announced packet size", "Decompression is unbounded and synchronous",
-"Tag tree decoding has no depth or total-count limit".
-
-- **Priority**: High
-- **Effort**: Medium
 
 ### Read-only mode or opcode allowlist
 
@@ -220,14 +210,6 @@ empty (keeping a copy) instead of failing `ECEngine.start()`; validate the loade
 
 - **Priority**: High
 - **Effort**: Low
-
-### Decoder fuzz test
-
-Randomly mutated valid packets and random bytes fed to `ECPacket.decode()`, asserting that the only error ever thrown is
-`ECDecodeError` (or `RangeError` from the tag constructors) and within a bounded time. No such test exists.
-
-- **Priority**: High
-- **Effort**: Medium
 
 ### TypeScript above 6.0: lift the Dependabot ignore once typescript-eslint follows
 

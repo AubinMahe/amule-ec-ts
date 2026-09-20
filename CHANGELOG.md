@@ -9,6 +9,38 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-20
+
+### Added
+
+- `ECConnection.maxPacketBytesUnauthenticated`/`.maxPacketBytesAuthenticated` (default 16 MiB/256 MiB, matching the daemon's own
+  `CECSocket::ReadHeader` bounds): a reply whose transmission header announces a body past the applicable one is refused, and the
+  connection aborted, before any of that body is read. Live-tested reproduction of the defect this fixes: a header announcing a 1 GB
+  body used to take the process from 92 MB to 512 MB RSS reading the stream behind it, with no error and no disconnect.
+- `ECConnection.maxInflatedBytes` (default 256 MiB), passed as zlib's own `maxOutputLength` when inflating a compressed reply: a
+  small compressed body can no longer decompress to the runtime's maximum buffer size.
+- `ECConnection.maxTagDepth`/`.maxTagCount` (defaults 32 and 2,000,000) and matching parameters on `ECPacket.decode()`: a reply
+  nested past `maxTagDepth`, or containing more tags in total than `maxTagCount`, now fails with `ECDecodeError` instead of
+  recursing arbitrarily deep or building an arbitrarily large decoded tree from a small announced body.
+- `ECConnection.connectTimeoutMs` (default 10 s), a third argument to `ECConnection.connect()`/`.reconnect()`: neither had a timeout
+  of its own before, so connecting to an unresponsive host wandered off into the operating system's own TCP timeout, typically
+  minutes rather than seconds. `reconnect()` defaults to whatever value `connect()` (or a direct assignment) already gave the
+  connection, so it does not have to be repeated on every call.
+- `ECDecodeError` is now exported: a caller decoding raw EC bytes of their own can tell a graceful, expected framing/limit violation
+  from any other exception.
+
+### Fixed
+
+- A compressed reply is now rejected unless `localCapabilities.zlib` was set before authenticating: the wire flag used to be
+  honoured unconditionally, so a peer could force a decompression attempt this connection never asked for and was not prepared to
+  receive.
+
+### Changed
+
+- `tests/ECPacketFuzz.test.ts` feeds `ECPacket.decode()` thousands of randomly mutated valid packets and random byte buffers (a
+  fixed seed, so a failure is reproducible), asserting the only errors it ever throws are `ECDecodeError` or `RangeError`, and
+  specifically that a deeply nested tree never reaches a native stack overflow instead of `maxTagDepth`.
+
 ## [3.0.0] - 2026-09-19
 
 ### Changed

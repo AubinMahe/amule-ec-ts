@@ -362,6 +362,7 @@ describe("ECConnection.send/receive", () => {
 
    it("decodes a compressed reply from the server", async () => {
       const { connection, peer } = await connectPeer(server);
+      connection.localCapabilities.zlib = true;
 
       const receivePromise = connection.receive();
       peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "zipped")), {
@@ -521,6 +522,236 @@ describe("ECConnection.send request size limit", () => {
       // The server reads the small packet next: nothing of the refused one was written.
       expect((await peer.readPacket()).tags).to.have.lengthOf(0);
    });
+});
+
+describe("ECConnection receive-side packet size limit", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("defaults to 16 MiB unauthenticated and 256 MiB authenticated", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_MAX_PACKET_BYTES_UNAUTHENTICATED).to.equal(16 * 1024 * 1024);
+      expect(ec.ECConnection.DEFAULT_MAX_PACKET_BYTES_AUTHENTICATED).to.equal(256 * 1024 * 1024);
+      expect(connection.maxPacketBytesUnauthenticated).to.equal(16 * 1024 * 1024);
+      expect(connection.maxPacketBytesAuthenticated).to.equal(256 * 1024 * 1024);
+   });
+
+   it("aborts the connection on an oversized announced body, before reading any of it", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.maxPacketBytesUnauthenticated = 100;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const pending = expectRejection(connection.receive(), /Announced packet body of 200 bytes exceeds the 100-byte limit/);
+
+      // No body is ever sent - the header announcing 200 bytes is refused on its own.
+      peer.socket.write(new ec.TransmissionHeader(ec.ECFlags.create(), 200).encode());
+
+      await pending;
+      await disconnected;
+   });
+
+   it("accepts a real packet within the unauthenticated limit", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const reply = connection.receive();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "small")));
+
+      expect(((await reply).find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal("small");
+   });
+
+   it("applies the higher authenticated bound once the handshake has completed, and the lower one again after reconnect()", async () => {
+      const { connection, peer: firstPeer } = await connectPeer(server);
+      connection.maxPacketBytesUnauthenticated = 50;
+      connection.maxPacketBytesAuthenticated = 5_000;
+      const bigValue = "x".repeat(2_000);
+      await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(firstPeer)]);
+
+      const authenticatedReply = connection.receive();
+      firstPeer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, bigValue)));
+      expect(((await authenticatedReply).find(ec.ECTagNames.EC_TAG_STRING) as ec.ECStringTag).value).to.equal(bigValue);
+
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const [, secondPeer] = await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
+
+      const pending = expectRejection(connection.receive(), /exceeds the 50-byte limit \(unauthenticated connection\)/);
+      secondPeer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, bigValue)));
+
+      await pending;
+      await disconnected;
+   });
+});
+
+describe("ECConnection receive-side decompression", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("defaults maxInflatedBytes to 256 MiB", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_MAX_INFLATED_BYTES).to.equal(256 * 1024 * 1024);
+      expect(connection.maxInflatedBytes).to.equal(256 * 1024 * 1024);
+   });
+
+   it("rejects a compressed packet when zlib was never negotiated on this connection", async () => {
+      const { connection, peer } = await connectPeer(server);
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+
+      const pending = expectRejection(connection.receive(), /zlib was never negotiated/);
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "zipped")), {
+         compressed: true,
+      });
+
+      await pending;
+      await disconnected;
+   });
+
+   it("rejects a compressed reply that would inflate past maxInflatedBytes, a small wire payload included", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.localCapabilities.zlib = true;
+      connection.maxInflatedBytes = 1_000;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+
+      const pending = expectRejection(connection.receive(), /RangeError|maxOutputLength|larger than/i);
+      // Highly compressible: a tiny wire payload that inflates to well past the 1,000-byte bound.
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "a".repeat(1_000_000))),
+         { compressed: true },
+      );
+
+      await pending;
+      await disconnected;
+   });
+});
+
+describe("ECConnection receive-side tag tree limits", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   function nest(depth: number): ec.ECTag {
+      let tag: ec.ECTag = new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STRING, new Uint8Array());
+      for (let i = 0; i < depth; i++) {
+         tag = new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STRING, new Uint8Array(), [tag]);
+      }
+      return tag;
+   }
+
+   it("defaults to a 32-level depth and a 2,000,000-tag count", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_MAX_TAG_DEPTH).to.equal(32);
+      expect(ec.ECConnection.DEFAULT_MAX_TAG_COUNT).to.equal(2_000_000);
+      expect(connection.maxTagDepth).to.equal(32);
+      expect(connection.maxTagCount).to.equal(2_000_000);
+   });
+
+   it("aborts the connection on a tag tree nested past maxTagDepth", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.maxTagDepth = 10;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+
+      const pending = expectRejection(connection.receive(), /nesting exceeds the 10-level depth limit/);
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(nest(20)));
+
+      await pending;
+      await disconnected;
+   });
+
+   it("accepts a tag tree within maxTagDepth", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.maxTagDepth = 10;
+
+      const reply = connection.receive();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(nest(5)));
+
+      expect((await reply).tags).to.have.lengthOf(1);
+   });
+
+   it("aborts the connection past maxTagCount, siblings included in the same total as their parent", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.maxTagCount = 100;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      const siblings = Array.from({ length: 200 }, () => new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STRING, new Uint8Array()));
+      const parent = new ec.ECCustomTag(ec.ECTagNames.EC_TAG_STRING, new Uint8Array(), siblings);
+
+      const pending = expectRejection(connection.receive(), /Tag count exceeds the 100-tag limit/);
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(parent));
+
+      await pending;
+      await disconnected;
+   });
+});
+
+describe("ECConnection.connect()/reconnect() connect timeout", () => {
+   it("defaults to 10 s", async () => {
+      const server = await startFakeEcServer();
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_CONNECT_TIMEOUT_MS).to.equal(10_000);
+      expect(connection.connectTimeoutMs).to.equal(10_000);
+
+      await server.close();
+   });
+
+   it("gives up connecting to an address that never answers, instead of waiting for the OS's own TCP timeout", async () => {
+      // 192.0.2.1 is in the TEST-NET-1 range (RFC 5737), reserved for documentation and testing,
+      // and already this project's own convention for a placeholder IP elsewhere in the tests -
+      // confirmed in this environment that a connection to it gets no "connect" and no "error"
+      // at all, so only the timeout below ever settles this promise.
+      await expectRejection(
+         ec.ECConnection.connect("192.0.2.1", 4712, 300),
+         /Could not connect to 192\.0\.2\.1:4712 within 300 ms\./,
+      );
+   }).timeout(3_000);
+
+   it("reconnect() reuses the connectTimeoutMs connect() was given, without repeating it", async () => {
+      const server = await startFakeEcServer();
+      const { connection, peer: firstPeer } = await connectPeer(server);
+      // connect() above used the default (10 s); lower it directly, the same effect a caller
+      // passing a third argument to connect() would have had from the start.
+      connection.connectTimeoutMs = 300;
+      const disconnected = new Promise<void>((resolve) => {
+         connection.once("disconnected", resolve);
+      });
+      firstPeer.socket.destroy();
+      await disconnected;
+
+      await expectRejection(connection.reconnect("192.0.2.1", 4712), /Could not connect to 192\.0\.2\.1:4712 within 300 ms\./);
+
+      await server.close();
+   }).timeout(3_000);
 });
 
 describe("ECConnection disconnect/reconnect", () => {

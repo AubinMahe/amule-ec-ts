@@ -20,56 +20,6 @@ Confirmed to work: open a second, dedicated `ECConnection` purely for `notify: t
 shared by any number of `onNotification()` listeners - the safety property is "never mixed with polling," not "one per consumer."
 Documented on `dispatchPacket()` and `ECEngineStartOptions.notify` themselves.
 
-## No upper bound on the announced packet size
-
-### Risk
-
-`ECConnection.readPacket()` (`ECConnection.ts`) reads `bodyLength` bytes as announced by the 8-byte transmission header, a uint32
-(up to 4 GiB), and buffers them in `receiveChunks` with no limit before decoding. Reproduced against a local fake server: a header
-announcing a 1 GB body, followed by a stream of bytes, took the process from 92 MB to 512 MB RSS after 400 MB, with no error and no
-disconnect. A compromised or impersonated endpoint (EC is not encrypted, see below) can exhaust the memory of the process using this
-library. The daemon itself bounds this: `CECSocket::ReadHeader` in the C++ `ECSocket.cpp` drops a peer announcing more than 16 MiB
-before authentication and more than 256 MiB after.
-
-### Mitigation
-
-None in the library. Connect only to a trusted, loopback or tunnelled `amuled`.
-
-## Decompression is unbounded and synchronous
-
-### Risk
-
-`zlib.inflateSync()` in `ECConnection.readPacket()` has no `maxOutputLength`, so a small compressed body can inflate to the
-runtime's maximum buffer size, and the synchronous call blocks the event loop meanwhile. The `compressed` flag of an incoming header
-is also honoured whether or not `zlib` was negotiated for this connection. Read from the code, not reproduced.
-
-### Mitigation
-
-None in the library.
-
-## Tag tree decoding has no depth or total-count limit
-
-### Risk
-
-`ECTagDecoder.readTag()` (`ECTags.ts`) recurses once per nesting level with no depth limit, so a body made of deeply nested tags can
-overflow the call stack; the resulting `RangeError` is caught by the pump loop, like any decode error. The number of tags is only
-bounded by the body size. Read from the code, not reproduced.
-
-### Mitigation
-
-None in the library; bounding the packet size (see above) bounds the depth reachable.
-
-## No timeout on connecting
-
-### Risk
-
-`ECConnection.connect()` and `reconnect()` have no timeout of their own: a connect to an unresponsive host waits for the operating
-system's TCP timeout. (Requests, the authentication handshake included, are covered by `ECConnection.requestTimeoutMs`.)
-
-### Mitigation
-
-None in the library; callers can race the call against their own timer.
-
 ## `AlternateNamesCache` file handling
 
 ### Risk

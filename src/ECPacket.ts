@@ -50,11 +50,17 @@ export class ECPacket {
     * Decodes application-layer bytes (already zlib-decompressed, if
     * applicable) into an ECPacket. `capabilities` must reflect the encoding
     * that was actually used for this buffer (typically derived from the
-    * transmission-layer flags of the packet that carried it).
+    * transmission-layer flags of the packet that carried it). `maxDepth`/`maxTagCount` bound the
+    * tag tree - see ECTagDecoder's own doc on its defaults.
     */
-   public static decode(buffer: Uint8Array, capabilities: ECCapabilities): ECPacket {
+   public static decode(
+      buffer: Uint8Array,
+      capabilities: ECCapabilities,
+      maxDepth: number = ECTagDecoder.DEFAULT_MAX_DEPTH,
+      maxTagCount: number = ECTagDecoder.DEFAULT_MAX_TAG_COUNT,
+   ): ECPacket {
       const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-      const decoder = new ECTagDecoder(data, capabilities);
+      const decoder = new ECTagDecoder(data, capabilities, maxDepth, maxTagCount);
       const opcode: ECOpcode = decoder.readByte();
       debug("decode: opcode=%s", ECOpcode[opcode]);
       const count = decoder.readCount();

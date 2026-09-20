@@ -10,7 +10,7 @@ import { ECTagNames } from "./ECTagNames.js";
 import { ECFlags } from "./ECFlags.js";
 import { ECVersion } from "./ECVersion.js";
 import { TransmissionHeader } from "./Transmission.js";
-import { ECUInt16Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag } from "./ECTags.js";
+import { ECUInt16Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag, ECTagDecoder } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:connection");
 
@@ -101,6 +101,85 @@ export class ECConnection extends events.EventEmitter {
     */
    public requestTimeoutMs = ECConnection.DEFAULT_REQUEST_TIMEOUT_MS;
 
+   /**
+    * Default for `connectTimeoutMs`.
+    */
+   public static readonly DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+
+   /**
+    * How long connect()/reconnect() wait for the TCP handshake before giving up (`Infinity`
+    * disables it) - neither has a timeout of its own otherwise, so connecting to an unresponsive
+    * host waits for the operating system's own TCP timeout, which is typically minutes, not
+    * seconds. connect() reads this off the instance created by its own call (see its doc);
+    * reconnect() defaults to whatever value is already set here, so a value passed to connect()
+    * (or set directly) is reused on every later reconnect without having to repeat it.
+    */
+   public connectTimeoutMs: number;
+
+   /**
+    * Default for `maxPacketBytesUnauthenticated`.
+    */
+   public static readonly DEFAULT_MAX_PACKET_BYTES_UNAUTHENTICATED = 16 * 1024 * 1024;
+
+   /**
+    * Default for `maxPacketBytesAuthenticated`.
+    */
+   public static readonly DEFAULT_MAX_PACKET_BYTES_AUTHENTICATED = 256 * 1024 * 1024;
+
+   /**
+    * A packet whose transmission header announces a body larger than this, before this
+    * connection has authenticated, is refused and the connection aborted (see readPacket()) -
+    * mirrors the bound the daemon itself applies to a peer before authentication
+    * (`CECSocket::ReadHeader` in the C++ `ECSocket.cpp`). Checked against the announced length,
+    * before any of the body is read, so an oversized announcement never gets buffered at all -
+    * confirmed live: an earlier version with no such bound took a process from 92 MB to 512 MB
+    * RSS reading a stream behind a header announcing a 1 GB body, with no error and no
+    * disconnect.
+    */
+   public maxPacketBytesUnauthenticated = ECConnection.DEFAULT_MAX_PACKET_BYTES_UNAUTHENTICATED;
+
+   /**
+    * Same as `maxPacketBytesUnauthenticated`, once this connection has authenticated - mirrors
+    * the daemon's own higher post-authentication bound, for the same reason it exists there: a
+    * `SharedFiles.fetch()`-style full-detail reply against a large library can legitimately run
+    * to tens of megabytes uncompressed.
+    */
+   public maxPacketBytesAuthenticated = ECConnection.DEFAULT_MAX_PACKET_BYTES_AUTHENTICATED;
+
+   /**
+    * Default for `maxInflatedBytes`.
+    */
+   public static readonly DEFAULT_MAX_INFLATED_BYTES = 256 * 1024 * 1024;
+
+   /**
+    * Upper bound passed as zlib's own `maxOutputLength` when inflating a compressed reply -
+    * without it, a small compressed body can decompress to the runtime's maximum buffer size,
+    * and the synchronous inflate blocks the event loop while it does.
+    */
+   public maxInflatedBytes = ECConnection.DEFAULT_MAX_INFLATED_BYTES;
+
+   /**
+    * Default for `maxTagDepth`.
+    */
+   public static readonly DEFAULT_MAX_TAG_DEPTH = ECTagDecoder.DEFAULT_MAX_DEPTH;
+
+   /**
+    * How deeply a reply's tag tree may nest before decoding it fails with `ECDecodeError` - see
+    * ECTagDecoder's own doc on why this exists and on this default.
+    */
+   public maxTagDepth = ECConnection.DEFAULT_MAX_TAG_DEPTH;
+
+   /**
+    * Default for `maxTagCount`.
+    */
+   public static readonly DEFAULT_MAX_TAG_COUNT = ECTagDecoder.DEFAULT_MAX_TAG_COUNT;
+
+   /**
+    * How many tags in total a single reply's tree may contain before decoding it fails with
+    * `ECDecodeError` - see ECTagDecoder's own doc on why this exists and on this default.
+    */
+   public maxTagCount = ECConnection.DEFAULT_MAX_TAG_COUNT;
+
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
    /**
@@ -130,9 +209,19 @@ export class ECConnection extends events.EventEmitter {
    private closed = false;
    private closeError: Error | undefined;
    private intentionalClose = false;
+   /**
+    * Whether authenticateWithHash() has completed successfully on the current socket - gates
+    * maxPacketBytesUnauthenticated/Authenticated in readPacket(). reconnect() resets this: the
+    * fresh socket needs its own handshake, same as the daemon's own `IsAuthorized()`.
+    */
+   private authenticated = false;
 
-   public constructor(private socket: net.Socket) {
+   public constructor(
+      private socket: net.Socket,
+      connectTimeoutMs: number = ECConnection.DEFAULT_CONNECT_TIMEOUT_MS,
+   ) {
       super();
+      this.connectTimeoutMs = connectTimeoutMs;
       this.localCapabilities.zlib = false;
       this.localCapabilities.largeTagCount = false;
       this.wireSocket();
@@ -177,25 +266,46 @@ export class ECConnection extends events.EventEmitter {
       void this.pump(this.socket);
    }
 
-   private static connectSocket(host: string, port: number): Promise<net.Socket> {
+   private static connectSocket(host: string, port: number, timeoutMs: number): Promise<net.Socket> {
       return new Promise<net.Socket>((resolve, reject) => {
          const candidate = net.createConnection({ host, port });
-         const onConnect = (): void => {
+         let timer: NodeJS.Timeout | undefined;
+         const cleanup = (): void => {
+            clearTimeout(timer);
+            candidate.removeListener("connect", onConnect);
             candidate.removeListener("error", onError);
+         };
+         const onConnect = (): void => {
+            cleanup();
             resolve(candidate);
          };
          const onError = (error: Error): void => {
-            candidate.removeListener("connect", onConnect);
+            cleanup();
             reject(error);
          };
          candidate.once("connect", onConnect);
          candidate.once("error", onError);
+         if (Number.isFinite(timeoutMs)) {
+            timer = setTimeout(() => {
+               cleanup();
+               candidate.destroy();
+               reject(new Error(`Could not connect to ${host}:${port} within ${timeoutMs} ms.`));
+            }, timeoutMs);
+         }
       });
    }
 
-   public static async connect(host = "localhost", port = 4712): Promise<ECConnection> {
-      const socket = await ECConnection.connectSocket(host, port);
-      const connection = new ECConnection(socket);
+   /**
+    * `connectTimeoutMs` becomes this connection's own `connectTimeoutMs` (see its doc), reused
+    * by `reconnect()` by default so it doesn't have to be repeated on every call.
+    */
+   public static async connect(
+      host = "localhost",
+      port = 4712,
+      connectTimeoutMs: number = ECConnection.DEFAULT_CONNECT_TIMEOUT_MS,
+   ): Promise<ECConnection> {
+      const socket = await ECConnection.connectSocket(host, port, connectTimeoutMs);
+      const connection = new ECConnection(socket, connectTimeoutMs);
       connection.beginPump();
       return connection;
    }
@@ -214,8 +324,9 @@ export class ECConnection extends events.EventEmitter {
     * socket so), and would otherwise stay open on the daemon's side for as long
     * as the daemon tolerates it.
     */
-   public async reconnect(host: string, port: number): Promise<void> {
-      const socket = await ECConnection.connectSocket(host, port);
+   public async reconnect(host: string, port: number, connectTimeoutMs: number = this.connectTimeoutMs): Promise<void> {
+      const socket = await ECConnection.connectSocket(host, port, connectTimeoutMs);
+      this.connectTimeoutMs = connectTimeoutMs;
       const previous = this.socket;
       this.socket = socket;
       const replaced = new Error("EC connection replaced by reconnect().");
@@ -223,6 +334,7 @@ export class ECConnection extends events.EventEmitter {
       previous.destroy();
       this.closed = false;
       this.closeError = undefined;
+      this.authenticated = false;
       this.receiveChunks.length = 0;
       this.receiveBufferedLength = 0;
       this.wireSocket();
@@ -362,6 +474,9 @@ export class ECConnection extends events.EventEmitter {
       if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
          throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
       }
+      // From here on, readPacket() applies maxPacketBytesAuthenticated rather than
+      // maxPacketBytesUnauthenticated - mirrors the daemon's own IsAuthorized() gate.
+      this.authenticated = true;
       // The client must not use a capability unless the server echoed it.
       this.remoteCapabilities.largeTagCount =
          this.localCapabilities.largeTagCount && reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
@@ -583,9 +698,23 @@ export class ECConnection extends events.EventEmitter {
    private async readPacket(): Promise<ECPacket> {
       const headerBuffer = await this.readBytes(TransmissionHeader.SIZE);
       const header = TransmissionHeader.decode(headerBuffer);
+      const maxPacketBytes = this.authenticated ? this.maxPacketBytesAuthenticated : this.maxPacketBytesUnauthenticated;
+      if (header.bodyLength > maxPacketBytes) {
+         throw new RangeError(
+            `Announced packet body of ${header.bodyLength} bytes exceeds the ${maxPacketBytes}-byte limit ` +
+               `(${this.authenticated ? "authenticated" : "unauthenticated"} connection).`,
+         );
+      }
       let body = await this.readBytes(header.bodyLength);
       if (header.compressed) {
-         body = zlib.inflateSync(body);
+         // Reject rather than trust the wire flag blindly: this only ever inflates a reply this
+         // connection is prepared to receive compressed, because it is the one that asked for
+         // zlib in the first place (localCapabilities.zlib) - not something an unauthenticated,
+         // possibly hostile, peer gets to switch on by merely setting a bit in the header.
+         if (!this.localCapabilities.zlib) {
+            throw new RangeError("Received a compressed packet, but zlib was never negotiated on this connection.");
+         }
+         body = zlib.inflateSync(body, { maxOutputLength: this.maxInflatedBytes });
       }
       // The transmission-layer flags tell us exactly how *this* packet's
       // application-layer data was encoded, so we decode against those
@@ -593,7 +722,7 @@ export class ECConnection extends events.EventEmitter {
       const wireCapabilities = new ECCapabilities();
       wireCapabilities.utf8Numbers = header.utf8Numbers;
       wireCapabilities.largeTagCount = header.largeTagCount;
-      return ECPacket.decode(body, wireCapabilities);
+      return ECPacket.decode(body, wireCapabilities, this.maxTagDepth, this.maxTagCount);
    }
 
    private onData(chunk: Buffer): void {
