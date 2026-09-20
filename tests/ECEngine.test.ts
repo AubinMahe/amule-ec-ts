@@ -123,6 +123,22 @@ describe("ECEngine.start", () => {
       expect(ec.ECEngine.connection.requestTimeoutMs).to.equal(1234);
    });
 
+   it("keeps the default (no pacing) unless minRequestIntervalMs is given, and applies it when it is", async () => {
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+      expect(ec.ECEngine.connection.minRequestIntervalMs).to.equal(0);
+
+      ec.ECEngine.connection.removeAllListeners("disconnected");
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH, minRequestIntervalMs: 1234 }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+
+      expect(ec.ECEngine.connection.minRequestIntervalMs).to.equal(1234);
+   });
+
    it("sets localCapabilities and sends EC_TAG_CAN_NOTIFY/EC_TAG_CAN_MULTI_SEARCH when requested", async () => {
       const [, authRequest] = await Promise.all([
          ec.ECEngine.start({

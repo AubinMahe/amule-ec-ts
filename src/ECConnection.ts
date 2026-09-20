@@ -3,6 +3,7 @@ import * as events from "node:events";
 import * as crypto from "node:crypto";
 import * as zlib from "node:zlib";
 import { debuglog } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { ECCapabilities } from "./ECCapabilities.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
@@ -240,6 +241,30 @@ export class ECConnection extends events.EventEmitter {
     * `Daemon.shutdown()`, delete a download or shared file, or write `Preferences`.
     */
    public readOnly = false;
+
+   /**
+    * Default for `minRequestIntervalMs`.
+    */
+   public static readonly DEFAULT_MIN_REQUEST_INTERVAL_MS = 0;
+
+   /**
+    * Minimum time between the start of two consecutive `request()` exchanges on this connection -
+    * `0` (the default) applies no pacing. `request()` already runs at most one exchange at a time
+    * per connection (see its own doc); this adds a floor under how soon the next one may start
+    * once the previous settles, so a caller polling a full-detail listing (`SharedFiles.fetch()`
+    * against a large library, say) on a tight timer cannot send request after request with no gap
+    * for `amuled`'s own single-threaded main loop to do anything else in between. Only paces this
+    * one connection - a caller opening several concurrently is its own choice to make, the same
+    * way `dispatchPacket()`'s own doc asks for a second, dedicated connection for `notify: true`
+    * rather than a limit this library could enforce across every connection at once.
+    */
+   public minRequestIntervalMs = ECConnection.DEFAULT_MIN_REQUEST_INTERVAL_MS;
+
+   /**
+    * `Date.now()` when the last `request()` exchange started - `0` (its initial value) means
+    * "none yet", so the very first request is never paced.
+    */
+   private lastExchangeStartedAt = 0;
 
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
@@ -606,12 +631,30 @@ export class ECConnection extends events.EventEmitter {
     * daemon never answers (Daemon.shutdown() keeps using send()).
     */
    public request(packet: ECPacket): Promise<ECPacket> {
-      const exchange = this.requestQueue.then(() => this.exchange(packet));
+      const exchange = this.requestQueue.then(() => this.pacedExchange(packet));
       this.requestQueue = exchange.then(
          () => undefined,
          () => undefined,
       );
       return exchange;
+   }
+
+   /**
+    * Applies `minRequestIntervalMs` (if set) before running `exchange()` - split out from
+    * `exchange()` itself so that the authentication handshake's own two direct `exchange()` calls
+    * (in `handshake()`) are never paced: pacing exists to space out repeated `request()` polling,
+    * not to slow down the one-time handshake every connection needs regardless of how it is used
+    * afterward.
+    */
+   private async pacedExchange(packet: ECPacket): Promise<ECPacket> {
+      if (this.minRequestIntervalMs > 0) {
+         const remaining = this.minRequestIntervalMs - (Date.now() - this.lastExchangeStartedAt);
+         if (remaining > 0) {
+            await delay(remaining);
+         }
+      }
+      this.lastExchangeStartedAt = Date.now();
+      return this.exchange(packet);
    }
 
    private async exchange(packet: ECPacket): Promise<ECPacket> {
