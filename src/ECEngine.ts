@@ -75,6 +75,14 @@ export interface ECEngineStartOptions {
     */
    requestTimeoutMs?: number;
    /**
+    * Sets connection.minRequestIntervalMs before authenticating - the minimum time between the
+    * start of two consecutive `request()` exchanges on this connection, `0` (the default) applying
+    * no pacing. See `ECConnection.minRequestIntervalMs`'s own doc for why this exists (giving
+    * `amuled`'s own single-threaded main loop room to breathe between heavy, tightly-polled
+    * requests) and what it does not cover (several connections polling concurrently).
+    */
+   minRequestIntervalMs?: number;
+   /**
     * Sets connection.allowNonLoopback before connecting - a non-loopback `host` is refused
     * otherwise, since EC is neither encrypted nor authenticated per packet (see
     * assertLoopbackOrAllowed()'s doc). Defaults to `false`; the reconnect loop reuses whatever
@@ -189,6 +197,9 @@ export const ECEngine = {
       connection.readOnly = options.readOnly ?? false;
       if (options.requestTimeoutMs !== undefined) {
          connection.requestTimeoutMs = options.requestTimeoutMs;
+      }
+      if (options.minRequestIntervalMs !== undefined) {
+         connection.minRequestIntervalMs = options.minRequestIntervalMs;
       }
       await connection.authenticateWithHash(options.passwordHash);
       instance = connection;

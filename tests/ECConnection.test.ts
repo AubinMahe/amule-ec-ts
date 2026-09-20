@@ -799,6 +799,67 @@ describe("ECConnection.readOnly", () => {
    });
 });
 
+describe("ECConnection.minRequestIntervalMs", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("defaults to 0 (no pacing)", async () => {
+      const { connection } = await connectPeer(server);
+
+      expect(ec.ECConnection.DEFAULT_MIN_REQUEST_INTERVAL_MS).to.equal(0);
+      expect(connection.minRequestIntervalMs).to.equal(0);
+   });
+
+   it("does not delay the very first request() even when set", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.minRequestIntervalMs = 1_000;
+
+      const start = Date.now();
+      const reply = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_GET_SERVER_LIST));
+      await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_SERVER_LIST));
+      await reply;
+
+      expect(Date.now() - start).to.be.lessThan(300);
+   }).timeout(3_000);
+
+   it("delays the start of the next request() until minRequestIntervalMs has passed since the previous one started", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.minRequestIntervalMs = 300;
+
+      const firstStart = Date.now();
+      const firstReply = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_GET_SERVER_LIST));
+      await peer.readPacket();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_SERVER_LIST));
+      await firstReply;
+
+      const secondReply = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_GET_SERVER_LIST));
+      await peer.readPacket();
+      const secondPacketReceivedAt = Date.now();
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_SERVER_LIST));
+      await secondReply;
+
+      expect(secondPacketReceivedAt - firstStart).to.be.at.least(270);
+   }).timeout(3_000);
+
+   it("never paces the authentication handshake, however high minRequestIntervalMs is set", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.minRequestIntervalMs = 2_000;
+
+      const start = Date.now();
+      await Promise.all([connection.authenticateWithHash(PASSWORD_HASH), acceptAuthentication(peer)]);
+
+      expect(Date.now() - start).to.be.lessThan(500);
+   }).timeout(3_000);
+});
+
 describe("ECConnection non-loopback host", () => {
    it("defaults allowNonLoopback to false", async () => {
       const server = await startFakeEcServer();

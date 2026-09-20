@@ -9,6 +9,8 @@ verified against that source before being reflected here.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-09-20
+
 ### Added
 
 - `ECConnection.allowNonLoopback` (default `false`) and a fourth argument of the same name on `connect()`/`.reconnect()`, plus
@@ -36,6 +38,13 @@ verified against that source before being reflected here.
   tested against a real daemon: `Status.fetch()`/`SharedFiles.fetch()` succeed under `readOnly: true`, `Daemon.shutdown()` and
   `Log.reset()` are both refused before either packet reaches the daemon, and the connection stays fully usable afterward. See
   `CHOICES.md` for the one known gap this opcode-level check leaves (`Friends.browseSharedFiles()`).
+- `ECConnection.minRequestIntervalMs` (default `0`, no pacing) and `ECEngineStartOptions.minRequestIntervalMs`: the minimum time
+  between the start of two consecutive `request()` exchanges on a connection, so a caller polling a full-detail listing (for
+  instance `SharedFiles.fetch()` on a large library) on a tight timer cannot send request after request with no gap for `amuled`'s
+  own single-threaded main loop to do anything else in between. Only paces `request()`, never the authentication handshake, and
+  only this one connection - a caller opening several concurrently is its own choice to make. Live-tested against a real daemon:
+  with `minRequestIntervalMs` set to 800 ms, consecutive `request()` calls are spaced by that amount while the handshake itself
+  still completes in a few milliseconds regardless.
 
 ### Fixed
 
