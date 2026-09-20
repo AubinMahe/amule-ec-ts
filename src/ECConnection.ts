@@ -11,6 +11,7 @@ import { ECFlags } from "./ECFlags.js";
 import { ECVersion } from "./ECVersion.js";
 import { TransmissionHeader } from "./Transmission.js";
 import { ECUInt16Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag, ECTagDecoder } from "./ECTags.js";
+import { assertLoopbackOrAllowed } from "./ECValidation.js";
 
 const debug = debuglog("amule-ec:connection");
 
@@ -117,6 +118,14 @@ export class ECConnection extends events.EventEmitter {
    public connectTimeoutMs: number;
 
    /**
+    * Whether connect()/reconnect() may target a non-loopback `host` - refused by default (see
+    * assertLoopbackOrAllowed()'s own doc for why: EC is neither encrypted nor authenticated per
+    * packet). connect() reads this off the instance created by its own call, the same way
+    * connectTimeoutMs works; reconnect() defaults to whatever value is already set here.
+    */
+   public allowNonLoopback: boolean;
+
+   /**
     * Default for `maxPacketBytesUnauthenticated`.
     */
    public static readonly DEFAULT_MAX_PACKET_BYTES_UNAUTHENTICATED = 16 * 1024 * 1024;
@@ -219,9 +228,11 @@ export class ECConnection extends events.EventEmitter {
    public constructor(
       private socket: net.Socket,
       connectTimeoutMs: number = ECConnection.DEFAULT_CONNECT_TIMEOUT_MS,
+      allowNonLoopback = false,
    ) {
       super();
       this.connectTimeoutMs = connectTimeoutMs;
+      this.allowNonLoopback = allowNonLoopback;
       this.localCapabilities.zlib = false;
       this.localCapabilities.largeTagCount = false;
       this.wireSocket();
@@ -296,16 +307,20 @@ export class ECConnection extends events.EventEmitter {
    }
 
    /**
-    * `connectTimeoutMs` becomes this connection's own `connectTimeoutMs` (see its doc), reused
-    * by `reconnect()` by default so it doesn't have to be repeated on every call.
+    * `connectTimeoutMs`/`allowNonLoopback` become this connection's own (see their own doc),
+    * reused by `reconnect()` by default so neither has to be repeated on every call. A
+    * non-loopback `host` is refused unless `allowNonLoopback` is set - see
+    * assertLoopbackOrAllowed()'s doc.
     */
    public static async connect(
       host = "localhost",
       port = 4712,
       connectTimeoutMs: number = ECConnection.DEFAULT_CONNECT_TIMEOUT_MS,
+      allowNonLoopback = false,
    ): Promise<ECConnection> {
+      assertLoopbackOrAllowed(host, allowNonLoopback);
       const socket = await ECConnection.connectSocket(host, port, connectTimeoutMs);
-      const connection = new ECConnection(socket, connectTimeoutMs);
+      const connection = new ECConnection(socket, connectTimeoutMs, allowNonLoopback);
       connection.beginPump();
       return connection;
    }
@@ -324,9 +339,16 @@ export class ECConnection extends events.EventEmitter {
     * socket so), and would otherwise stay open on the daemon's side for as long
     * as the daemon tolerates it.
     */
-   public async reconnect(host: string, port: number, connectTimeoutMs: number = this.connectTimeoutMs): Promise<void> {
+   public async reconnect(
+      host: string,
+      port: number,
+      connectTimeoutMs: number = this.connectTimeoutMs,
+      allowNonLoopback: boolean = this.allowNonLoopback,
+   ): Promise<void> {
+      assertLoopbackOrAllowed(host, allowNonLoopback);
       const socket = await ECConnection.connectSocket(host, port, connectTimeoutMs);
       this.connectTimeoutMs = connectTimeoutMs;
+      this.allowNonLoopback = allowNonLoopback;
       const previous = this.socket;
       this.socket = socket;
       const replaced = new Error("EC connection replaced by reconnect().");

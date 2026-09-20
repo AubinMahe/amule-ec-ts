@@ -140,6 +140,13 @@ describe("ECEngine.start", () => {
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_NOTIFY)).to.equal(true);
       expect(authRequest.has(ec.ECTagNames.EC_TAG_CAN_MULTI_SEARCH)).to.equal(true);
    });
+
+   it("refuses a non-loopback host by default, before ever opening a socket", async () => {
+      await expectRejection(
+         ec.ECEngine.start({ host: "203.0.113.5", port: server.port, passwordHash: PASSWORD_HASH }),
+         /Refusing to connect to "203\.0\.113\.5": not a loopback address, and allowNonLoopback was not set\./,
+      );
+   });
 });
 
 async function refuseAuthentication(peer: FakeEcPeer, salt: bigint): Promise<void> {

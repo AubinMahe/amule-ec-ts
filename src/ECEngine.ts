@@ -75,6 +75,13 @@ export interface ECEngineStartOptions {
     */
    requestTimeoutMs?: number;
    /**
+    * Sets connection.allowNonLoopback before connecting - a non-loopback `host` is refused
+    * otherwise, since EC is neither encrypted nor authenticated per packet (see
+    * assertLoopbackOrAllowed()'s doc). Defaults to `false`; the reconnect loop reuses whatever
+    * value the initial connection was given, so it does not have to be repeated here.
+    */
+   allowNonLoopback?: boolean;
+   /**
     * Path to a JSON file persisting alternate filenames observed for downloads - see
     * AlternateNamesCache's doc for what it stores and why, Downloads.ts's
     * cacheAltNamesIfEligible() for the population policy (progress threshold, fetch()/notification
@@ -167,7 +174,7 @@ export const ECEngine = {
       const notify = options.notify ?? false;
       const multiSearch = options.multiSearch ?? false;
       const chatSessions = options.chatSessions ?? false;
-      const connection = await ECConnection.connect(host, options.port);
+      const connection = await ECConnection.connect(host, options.port, undefined, options.allowNonLoopback ?? false);
       connection.localCapabilities.notify = notify;
       connection.localCapabilities.multiSearch = multiSearch;
       connection.localCapabilities.chatSessions = chatSessions;

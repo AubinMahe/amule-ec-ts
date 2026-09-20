@@ -714,6 +714,47 @@ describe("ECConnection receive-side tag tree limits", () => {
    });
 });
 
+describe("ECConnection non-loopback host", () => {
+   it("defaults allowNonLoopback to false", async () => {
+      const server = await startFakeEcServer();
+      const { connection } = await connectPeer(server);
+
+      expect(connection.allowNonLoopback).to.equal(false);
+
+      await server.close();
+   });
+
+   it("refuses a non-loopback host by default, without ever attempting a socket", async () => {
+      await expectRejection(
+         ec.ECConnection.connect("203.0.113.5", 4712),
+         /Refusing to connect to "203\.0\.113\.5": not a loopback address, and allowNonLoopback was not set\./,
+      );
+   });
+
+   it("refuses a hostname that merely contains a loopback-looking substring", async () => {
+      await expectRejection(
+         ec.ECConnection.connect("127.0.0.1.example.com", 4712),
+         /Refusing to connect to "127\.0\.0\.1\.example\.com"/,
+      );
+   });
+
+   it("accepts 'localhost' as loopback, case-insensitively ('127.0.0.1' is exercised by every other test in this file)", async () => {
+      const server = await startFakeEcServer();
+
+      const [connection] = await Promise.all([ec.ECConnection.connect("LOCALHOST", server.port), server.nextPeer()]);
+
+      expect(connection).to.be.instanceOf(ec.ECConnection);
+      connection.close();
+      await server.close();
+   });
+
+   it("accepts '::1' as loopback (reaches the real TCP layer instead of being refused outright)", async () => {
+      // Nothing listens on this port; ECONNREFUSED proves the loopback check let the attempt
+      // through rather than refusing it, without needing an actual ::1-bound fake server.
+      await expectRejection(ec.ECConnection.connect("::1", 59_999), /ECONNREFUSED/);
+   });
+});
+
 describe("ECConnection.connect()/reconnect() connect timeout", () => {
    it("defaults to 10 s", async () => {
       const server = await startFakeEcServer();
@@ -730,18 +771,21 @@ describe("ECConnection.connect()/reconnect() connect timeout", () => {
       // and already this project's own convention for a placeholder IP elsewhere in the tests -
       // confirmed in this environment that a connection to it gets no "connect" and no "error"
       // at all, so only the timeout below ever settles this promise.
+      // Non-loopback, so allowNonLoopback: true is required for the attempt to even start - see
+      // the "ECConnection non-loopback host" describe block for that check on its own.
       await expectRejection(
-         ec.ECConnection.connect("192.0.2.1", 4712, 300),
+         ec.ECConnection.connect("192.0.2.1", 4712, 300, true),
          /Could not connect to 192\.0\.2\.1:4712 within 300 ms\./,
       );
    }).timeout(3_000);
 
-   it("reconnect() reuses the connectTimeoutMs connect() was given, without repeating it", async () => {
+   it("reconnect() reuses the connectTimeoutMs/allowNonLoopback connect() was given, without repeating them", async () => {
       const server = await startFakeEcServer();
       const { connection, peer: firstPeer } = await connectPeer(server);
-      // connect() above used the default (10 s); lower it directly, the same effect a caller
-      // passing a third argument to connect() would have had from the start.
+      // connect() above used the defaults (10 s, loopback-only); lower/flip them directly, the
+      // same effect passing the third/fourth arguments to connect() would have had from the start.
       connection.connectTimeoutMs = 300;
+      connection.allowNonLoopback = true;
       const disconnected = new Promise<void>((resolve) => {
          connection.once("disconnected", resolve);
       });
