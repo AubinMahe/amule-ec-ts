@@ -6,6 +6,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
 import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag } from "./ECTags.js";
+import { ipFromUint32 } from "./Update.js";
 
 const debug = debuglog("amule-ec:uploads");
 
@@ -130,6 +131,16 @@ export class UploadClient {
     */
    public readonly uploadFileEcid: bigint;
    /**
+    * The peer's IPv4 address - `EC_TAG_CLIENT_USER_IP`, added unconditionally in the same block as
+    * `name`/`hash`. `"0.0.0.0"` when the daemon holds none, which is also what an IPv6-only peer
+    * reads as. With `userPort`, what `Chat.sendToAddress()` takes to open a conversation.
+    */
+   public readonly userIp: string;
+   /**
+    * The peer's TCP port - `EC_TAG_CLIENT_USER_PORT`, see `userIp`.
+    */
+   public readonly userPort: bigint;
+   /**
     * Whether this client holds the upload slot reserved for a friend - `EC_TAG_CLIENT_FRIEND_SLOT`
     * (`client->GetFriendSlot()`), distinct from friends-list membership
     * (`EC_TAG_CLIENT_IS_FRIEND`, decoded as `ClientUpdate.isFriend` in `Update.ts`, not exposed
@@ -165,6 +176,8 @@ export class UploadClient {
       this.fileName = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME);
       this.ecid = tag.intValue ?? 0n;
       this.uploadFileEcid = tag.childInt(ECTagNames.EC_TAG_CLIENT_UPLOAD_FILE) ?? 0n;
+      this.userIp = ipFromUint32(tag.childInt(ECTagNames.EC_TAG_CLIENT_USER_IP) ?? 0n);
+      this.userPort = tag.childInt(ECTagNames.EC_TAG_CLIENT_USER_PORT) ?? 0n;
       this.friendSlot = (tag.childInt(ECTagNames.EC_TAG_CLIENT_FRIEND_SLOT) ?? 0n) !== 0n;
       this.connected = (tag.childInt(ECTagNames.EC_TAG_CLIENT_CONNECTED) ?? 0n) !== 0n;
       this.modCapabilities = parseClientModCapabilities(tag.childInt(ECTagNames.EC_TAG_CLIENT_MOD_CAPABILITIES) ?? 0n);

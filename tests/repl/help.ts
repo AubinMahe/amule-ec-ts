@@ -119,7 +119,10 @@ const HELP_ENTRIES: readonly (readonly [command: string, description: string])[]
    ["kadnotes <hash>", "search Kad for a file's community notes"],
    ["refreshmedia [hash]", "re-extract audio/video metadata for one shared file, or the whole share"],
    ["show chat", "poll the chat session store"],
-   ["chat send <session|client|friend> <id> <text>", "send a chat message, addressed by session/client/friend id"],
+   [
+      "chat send <session <client-id>|address <ip> <port>> <text>",
+      "send a chat message, addressed by session id or by peer address",
+   ],
    ["chat close <client-id>", "close a chat session globally"],
    ["chat history <client-id> [cursor]", "backfill one chat session's messages"],
    ["quit / exit / Ctrl-D", "leave the REPL"],

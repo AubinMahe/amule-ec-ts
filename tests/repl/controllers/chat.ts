@@ -36,20 +36,14 @@ export class ChatController {
 
    public async send(args: string[]): Promise<void> {
       const mode = args[0]?.toLowerCase();
-      const idText = args[1];
-      const text = args.slice(2).join(" ");
-      if (!idText || !text || (mode !== "session" && mode !== "client" && mode !== "friend")) {
-         console.error("Usage: chat send <session|client|friend> <id> <text>");
-         return;
-      }
-      const id = BigInt(idText);
       let clientId: bigint;
-      if (mode === "session") {
-         clientId = await this.chat.sendToSession(id, text);
-      } else if (mode === "client") {
-         clientId = await this.chat.sendToClient(id, text);
+      if (mode === "session" && args[1] && args.length > 2) {
+         clientId = await this.chat.sendToSession(BigInt(args[1]), args.slice(2).join(" "));
+      } else if (mode === "address" && args[1] && args[2] && args.length > 3) {
+         clientId = await this.chat.sendToAddress(args[1], Number(args[2]), args.slice(3).join(" "));
       } else {
-         clientId = await this.chat.sendToFriend(id, text);
+         console.error("Usage: chat send <session <client-id>|address <ip> <port>> <text>");
+         return;
       }
       console.log(`Message sent: client-id=${clientId}.`);
    }
@@ -68,6 +62,8 @@ export class ChatController {
          await this.history(args.slice(1));
          return;
       }
-      console.error("Usage: chat <send <session|client|friend> <id> <text>|close <client-id>|history <client-id> [cursor]>");
+      console.error(
+         "Usage: chat <send <session <client-id>|address <ip> <port>> <text>|close <client-id>|history <client-id> [cursor]>",
+      );
    }
 }

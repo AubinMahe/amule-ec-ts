@@ -212,7 +212,7 @@ describe("Chat.fetchHistory", () => {
    });
 });
 
-describe("Chat.sendToSession/sendToClient/sendToFriend", () => {
+describe("Chat.sendToSession/sendToAddress", () => {
    it("sendToSession sends EC_TAG_CHAT + EC_TAG_CHAT_CLIENT_ID and returns the resolved id", async () => {
       const fake = createFakeConnection();
       withChatCapability(fake);
@@ -229,26 +229,35 @@ describe("Chat.sendToSession/sendToClient/sendToFriend", () => {
       expect(resolved).to.equal(99n);
    });
 
-   it("sendToClient sends EC_TAG_CLIENT as the target", async () => {
+   it("sendToAddress sends EC_TAG_CHAT_CLIENT_ID = (ip << 16) + port, ip in the daemon's low-byte-first order", async () => {
       const fake = createFakeConnection();
       withChatCapability(fake);
       const chat = new ec.Chat(fake.connection);
-      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      const expected = (0x0100007fn << 16n) + 4662n;
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP);
+      reply.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CHAT_CLIENT_ID, expected));
+      fake.queueReply(reply);
 
-      await chat.sendToClient(7n, "hi");
+      const resolved = await chat.sendToAddress("127.0.0.1", 4662, "hi");
 
-      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CLIENT)?.intValue).to.equal(7n);
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CHAT_SEND);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CHAT_CLIENT_ID)?.intValue).to.equal(expected);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CLIENT)).to.be.undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_FRIEND)).to.be.undefined;
+      expect(resolved).to.equal(expected);
    });
 
-   it("sendToFriend sends EC_TAG_FRIEND as the target", async () => {
+   it("sendToAddress refuses an invalid address or port before sending anything", async () => {
       const fake = createFakeConnection();
       withChatCapability(fake);
       const chat = new ec.Chat(fake.connection);
-      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
 
-      await chat.sendToFriend(3n, "hi");
-
-      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_FRIEND)?.intValue).to.equal(3n);
+      await expectRejection(chat.sendToAddress("not-an-ip", 4662, "hi"), /Invalid IPv4 address/);
+      await expectRejection(chat.sendToAddress("127.0.0.1", 0, "hi"), /Invalid port/);
+      await expectRejection(chat.sendToAddress("127.0.0.1", 65536, "hi"), /Invalid port/);
+      expect(fake.sent).to.have.length(0);
    });
 
    it("throws the daemon's reason on EC_OP_FAILED (empty text or unknown target)", async () => {
@@ -259,7 +268,7 @@ describe("Chat.sendToSession/sendToClient/sendToFriend", () => {
       failure.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Unknown chat target"));
       fake.queueReply(failure);
 
-      await expectRejection(chat.sendToClient(7n, "hi"), /Unknown chat target/);
+      await expectRejection(chat.sendToAddress("127.0.0.1", 4662, "hi"), /Unknown chat target/);
    });
 });
 

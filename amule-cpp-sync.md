@@ -42,6 +42,38 @@ three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT
 comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
 `EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
 
+## 2026-09-20
+
+Local C++ checkout **not** pulled for the review itself: local HEAD (`f98d790a2`, the 2026-09-07 baseline) is 169 commits behind
+`origin/master` (`23dda72d8`), read with `git diff`/`git log HEAD..origin/master`. `ECCodes.abstract` is identical between the two:
+no `EC_OP_*`/`EC_TAG_*` value added, changed or removed. Commit-by-commit review of every commit touching `src/libs/ec/`,
+`ExternalConn.{cpp,h}`, `ECSpecialCoreTags.cpp` or `amule-remote-gui.cpp`, and of every one whose changed lines mention an
+`EC_OP_*`/`EC_TAG_*` name outside `src/webapi`:
+
+- `175d61289` (#1498, "address a chat by ip:port and nothing else"): `ResolveChatTarget()` lost its `EC_TAG_CLIENT` and
+  `EC_TAG_FRIEND` branches, `EC_TAG_CHAT_CLIENT_ID` is the only target left for `EC_OP_CHAT_SEND` -
+  `Chat.sendToClient()`/`.sendToFriend()` would get `EC_OP_FAILED` ("Unknown chat target"). Followed, not preserved: both removed,
+  `Chat.sendToAddress()` added (the id is `GUI_ID(ip, port)`), `UploadClient.userIp`/`.userPort` decoded so an upload queue entry
+  carries the address - 4.0.0, see `CHANGELOG.md`. Live-tested on a freshly rebuilt daemon: the old ECID forms sent raw get
+  `EC_OP_FAILED` ("Unknown chat target"), `sendToAddress()` returns the computed `GUI_ID`, the session shows up in `fetch()`.
+  (`amuled --version` still printed the previous snapshot revision after the rebuild - probably fixed at configure time - so the
+  behavior, not that string, is what tells the daemon has #1498.)
+- `3a0648f6c` (#1479, "one credit modifier for every peer list"): `EC_TAG_CLIENT_SCORE_RATIO` now also on each
+  `Get_EC_Response_ClientHistory()` entry (`ClientHistoryEntry.scoreRatio`), and its value on live clients becomes
+  `GetCreditRatio()`, without the identity gate (`ClientUpdate.scoreRatio`'s doc updated). Live-tested: `scoreRatio` is present on
+  all 3,569 entries of a real credit store, 10 for peers we only downloaded from, 1 for peers we only uploaded to.
+- `8ceb22e00` (#1424): the daemon now frees a removed client/server/friend's incremental-update cache entry per EC connection
+  (`ExternalConn::ForgetObject()`); an ECID without an entry is sent in full, so transparent to a client.
+- `2ef1a164c`, `d22a86629`, `0734db2ec`: comment-only in every core, GUI and EC file - checked by comparing each changed file
+  before/after with comments stripped (`gcc -fpreprocessed -dD -E`); the only files whose stripped content differs are under
+  `src/webapi`, out of scope.
+- `2b2e9351f`: `CECTag::InitInt` picks type and length in locals instead of reading the members back (a GCC 13 false positive) -
+  same behavior.
+- `7096b6854`, `97a2d2765`: `amulegui`-side only (a `case` for `BrowseSearch`, the statistics tree fetched on the first poll).
+  `c69c36970`: which of the "Kad started."/"Kad stopped." log lines is emitted, no tag involved.
+- The rest (uTP, native IPv6 and address-keyed peer identity, Kad, `amuleapi`/web-ui, CI, packaging, translations) touches neither
+  the EC encoder nor any tag this library decodes.
+
 ## 2026-09-13
 
 Local C++ checkout **not** pulled/rebuilt this time - checked whether it was worth it first. Local HEAD (`f98d790a2`, the 2026-09-07

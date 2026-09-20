@@ -14,6 +14,7 @@ function clientHistoryTag(fields: {
    firstSeen?: number;
    sessions?: number;
    name?: string;
+   scoreRatio?: number;
 }): ec.ECTag {
    const children: ec.ECTag[] = [];
    if (fields.uploadTotal !== undefined) {
@@ -30,6 +31,9 @@ function clientHistoryTag(fields: {
    }
    if (fields.sessions !== undefined) {
       children.push(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CLIENT_SESSIONS, fields.sessions));
+   }
+   if (fields.scoreRatio !== undefined) {
+      children.push(new ec.ECDoubleTag(ec.ECTagNames.EC_TAG_CLIENT_SCORE_RATIO, fields.scoreRatio));
    }
    if (fields.name !== undefined) {
       children.push(new ec.ECStringTag(ec.ECTagNames.EC_TAG_CLIENT_NAME, fields.name));
@@ -70,6 +74,22 @@ describe("ClientHistory.fetch", () => {
       expect(history.entries[0]?.uploadTotal).to.equal(1_000_000n);
       expect(history.entries[0]?.downloadTotal).to.equal(2_000_000n);
       expect(history.entries[0]?.lastSeen).to.equal(1_735_689_600n);
+   });
+
+   it("decodes scoreRatio when the daemon sends it, undefined on one predating upstream's #1479", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.clientHistory = true;
+      const history = new ec.ClientHistory(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_CLIENT_HISTORY);
+      reply.add(clientHistoryTag({ hash: hexHash("a"), scoreRatio: 2.5 }));
+      reply.add(clientHistoryTag({ hash: hexHash("b") }));
+      fake.queueReply(reply);
+
+      await history.fetch();
+
+      expect(history.entries[0]?.scoreRatio).to.equal(2.5);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- chai's getter-style assertion
+      expect(history.entries[1]?.scoreRatio).to.be.undefined;
    });
 
    it("decodes the metadata trailer (firstSeen/sessions/name) when present, undefined when absent", async () => {

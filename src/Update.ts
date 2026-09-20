@@ -125,7 +125,9 @@ export class ClientUpdate {
    public readonly isFriend: boolean | undefined;
    /**
     * The GUI's "DL/UP modifier" - `EC_TAG_CLIENT_SCORE_RATIO`, a double unlike every other
-    * ratio-like field on this class.
+    * ratio-like field on this class. Since upstream's #1479 it is the credit ratio without the
+    * secure-identification gate, so a peer reads the same connected or not (and the same as
+    * `ClientHistoryEntry.scoreRatio`), instead of swinging to 1.0 while its identity is pending.
     */
    public readonly scoreRatio: number | undefined;
    /**
