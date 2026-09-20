@@ -189,6 +189,58 @@ export class ECConnection extends events.EventEmitter {
     */
    public maxTagCount = ECConnection.DEFAULT_MAX_TAG_COUNT;
 
+   /**
+    * Every opcode `send()` accepts while `readOnly` is set: the handshake (`EC_OP_AUTH_REQ`/
+    * `_PASSWD`, without which the connection could not do anything at all) plus every opcode this
+    * library ever sends that only fetches or polls state (a `fetch()`/`get*()`-style method, or
+    * polling an already-running search's own progress/results) rather than changing something on
+    * the daemon, a peer, or the network. Classified by reading every `public async` method of
+    * every class in `src/` that builds a request and checking whether it reports state or changes
+    * it - not by opcode name alone, since e.g. `EC_OP_SEARCH_PROGRESS`/`_RESULTS` (polling) sit
+    * right next to `EC_OP_SEARCH_START`/`_STOP` (an action) in the same family.
+    *
+    * One real gap this coarseness leaves: `Friends.ts` sends every one of its methods - including
+    * `browseSharedFiles()`, which only starts a search and reports nothing that mutates this
+    * daemon's own state - as `EC_OP_FRIEND`, the same opcode `addByEcid()`/`addByHash()`/
+    * `remove()`/`setFriendSlot()` use to mutate the friend list. The check below only ever sees
+    * the opcode, not which method built the packet or what its tags ask for, so `EC_OP_FRIEND` is
+    * classified by the riskiest thing it can do: `browseSharedFiles()` is refused in read-only
+    * mode along with the rest of `Friends.ts`, not just the mutating calls.
+    */
+   public static readonly READ_ONLY_OPCODES: ReadonlySet<ECOpcode> = new Set([
+      ECOpcode.EC_OP_AUTH_REQ,
+      ECOpcode.EC_OP_AUTH_PASSWD,
+      ECOpcode.EC_OP_STAT_REQ,
+      ECOpcode.EC_OP_GET_CONNSTATE,
+      ECOpcode.EC_OP_GET_DLOAD_QUEUE,
+      ECOpcode.EC_OP_GET_ULOAD_QUEUE,
+      ECOpcode.EC_OP_GET_SHARED_FILES,
+      ECOpcode.EC_OP_GET_SHARED_DIRS,
+      ECOpcode.EC_OP_SEARCH_RESULTS,
+      ECOpcode.EC_OP_SEARCH_PROGRESS,
+      ECOpcode.EC_OP_SEARCH_LIST,
+      ECOpcode.EC_OP_GET_SERVER_LIST,
+      ECOpcode.EC_OP_GET_SERVERINFO,
+      ECOpcode.EC_OP_GET_LOG,
+      ECOpcode.EC_OP_GET_DEBUGLOG,
+      ECOpcode.EC_OP_GET_LAST_LOG_ENTRY,
+      ECOpcode.EC_OP_GET_PREFERENCES,
+      ECOpcode.EC_OP_GET_STATSGRAPHS,
+      ECOpcode.EC_OP_GET_STATSTREE,
+      ECOpcode.EC_OP_GET_UPDATE,
+      ECOpcode.EC_OP_GET_CLIENT_HISTORY,
+      ECOpcode.EC_OP_GET_CHAT_SESSIONS,
+      ECOpcode.EC_OP_GET_CHAT_MESSAGES,
+   ]);
+
+   /**
+    * Whether this connection may send anything but the opcodes in `READ_ONLY_OPCODES` - refused
+    * with a `RangeError` in `send()`, before anything is written, when set. A consumer that only
+    * monitors `amuled` can set this instead of relying on its own code never happening to call
+    * `Daemon.shutdown()`, delete a download or shared file, or write `Preferences`.
+    */
+   public readOnly = false;
+
    public readonly localCapabilities = new ECCapabilities();
    public readonly remoteCapabilities = new ECCapabilities();
    /**
@@ -517,6 +569,9 @@ export class ECConnection extends events.EventEmitter {
    }
 
    public async send(packet: ECPacket): Promise<void> {
+      if (this.readOnly && !ECConnection.READ_ONLY_OPCODES.has(packet.opcode)) {
+         throw new RangeError(`Refusing to send opcode 0x${packet.opcode.toString(16)} on a read-only connection.`);
+      }
       let body = packet.encode(this.localCapabilities);
       if (body.length > ECConnection.MAX_REQUEST_BYTES) {
          throw new RangeError(`EC request of ${body.length} bytes exceeds the ${ECConnection.MAX_REQUEST_BYTES}-byte limit.`);

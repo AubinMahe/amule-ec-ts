@@ -156,6 +156,24 @@ The REPL (`tests/repl/`) drives all 19 feature classes:
   `prefs remotecontrols gzip <on|off>`, `show prefs ip2country`, `prefs ip2country autoupdate <on|off>`, `show prefs coretweaks`,
   `prefs coretweaks verbose <on|off>`, `show categories`, `show update`, `show statstree`, `show statstree <key>`.
 
+## Read-only mode is opcode-based, not request-aware
+
+`ECConnection.readOnly`/`ECEngineStartOptions.readOnly` refuse every opcode outside a fixed allowlist
+(`ECConnection.READ_ONLY_OPCODES`), classified once by reading every `public async` method of every service class and checking
+whether it reports state or changes something on the daemon, a peer or the network. The check in `send()` only ever sees the opcode
+a packet carries, not which method built it or what its tags ask for - the simplest choke point, since every outgoing packet passes
+through `send()` regardless of which service or which `request()`/fire-and-forget call sent it.
+
+This has one known consequence: `Friends.ts` sends every one of its methods - `addByEcid()`, `addByHash()`, `remove()`,
+`setFriendSlot()`, and `browseSharedFiles()` - as the same opcode, `EC_OP_FRIEND`. The first four mutate the friend list;
+`browseSharedFiles()` only starts a search and reports nothing that changes this daemon's own state, arguably as safe as
+`Search.start()` (allowed nowhere in `READ_ONLY_OPCODES` either, for the same "starts something" reasoning, to be fair) or
+`SharedFiles.getSharedDirs()`. Since the opcode is shared, `EC_OP_FRIEND` is classified by the riskiest thing it can do, and
+`browseSharedFiles()` is refused in read-only mode along with the rest of `Friends.ts`. Making the check request-aware (inspecting
+tags, not just the opcode) would fix this, at the cost of duplicating protocol-shape knowledge already encoded in each service class
+into the safety layer - rejected as disproportionate to the one method it would unblock; revisit if a second such opcode-sharing
+case turns up.
+
 ## Comparison with amule-ec-node
 
 [amule-ec-node](https://github.com/vetler/amule-ec-node) is another independent JavaScript client for the same EC protocol.

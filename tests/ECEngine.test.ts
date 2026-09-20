@@ -147,6 +147,26 @@ describe("ECEngine.start", () => {
          /Refusing to connect to "203\.0\.113\.5": not a loopback address, and allowNonLoopback was not set\./,
       );
    });
+
+   it("keeps readOnly false unless requested, and the handshake still goes through when it is set", async () => {
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+      expect(ec.ECEngine.connection.readOnly).to.equal(false);
+
+      ec.ECEngine.connection.removeAllListeners("disconnected");
+      await Promise.all([
+         ec.ECEngine.start({ host: "127.0.0.1", port: server.port, passwordHash: PASSWORD_HASH, readOnly: true }),
+         server.nextPeer().then((peer) => acceptAuthentication(peer)),
+      ]);
+
+      expect(ec.ECEngine.connection.readOnly).to.equal(true);
+      await expectRejection(
+         ec.ECEngine.connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_SHUTDOWN)),
+         /Refusing to send opcode 0x8 on a read-only connection\./,
+      );
+   });
 });
 
 async function refuseAuthentication(peer: FakeEcPeer, salt: bigint): Promise<void> {

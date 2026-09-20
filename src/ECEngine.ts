@@ -82,6 +82,14 @@ export interface ECEngineStartOptions {
     */
    allowNonLoopback?: boolean;
    /**
+    * Sets connection.readOnly right after connecting, before authenticating - a consumer that
+    * only monitors `amuled` can set this instead of relying on its own code never happening to
+    * call a method that mutates something on the daemon, a peer or the network. See
+    * `ECConnection.READ_ONLY_OPCODES`' own doc for exactly what stays allowed, and for one real
+    * gap this coarseness leaves (`Friends.browseSharedFiles()`).
+    */
+   readOnly?: boolean;
+   /**
     * Path to a JSON file persisting alternate filenames observed for downloads - see
     * AlternateNamesCache's doc for what it stores and why, Downloads.ts's
     * cacheAltNamesIfEligible() for the population policy (progress threshold, fetch()/notification
@@ -178,6 +186,7 @@ export const ECEngine = {
       connection.localCapabilities.notify = notify;
       connection.localCapabilities.multiSearch = multiSearch;
       connection.localCapabilities.chatSessions = chatSessions;
+      connection.readOnly = options.readOnly ?? false;
       if (options.requestTimeoutMs !== undefined) {
          connection.requestTimeoutMs = options.requestTimeoutMs;
       }
