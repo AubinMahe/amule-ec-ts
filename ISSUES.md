@@ -20,23 +20,6 @@ Confirmed to work: open a second, dedicated `ECConnection` purely for `notify: t
 shared by any number of `onNotification()` listeners - the safety property is "never mixed with polling," not "one per consumer."
 Documented on `dispatchPacket()` and `ECEngineStartOptions.notify` themselves.
 
-## `AlternateNamesCache` file handling
-
-### Risk
-
-- The alternate names come from remote peers; neither the number of entries, the number of names per entry nor a name's length is
-  bounded, and the whole file is rewritten on every change.
-- `persist()` writes in place (no temporary file plus rename), so an interrupted write leaves a truncated file, and `load()` only
-  tolerates a missing file: any other read or `JSON.parse` failure makes `ECEngine.start()` throw on every later start until the
-  file is removed.
-- The loaded JSON is not validated: an entry whose `names` is not an array makes `add()` throw, and a non-string `lastUpdated` is
-  never purged.
-- The file is created with the process's default mode (typically world-readable) although it lists filenames.
-
-### Mitigation
-
-Point `altNamesCachePath` at a private directory and remove a corrupted file by hand.
-
 ## Peer-supplied data is returned unmodified
 
 ### Risk
