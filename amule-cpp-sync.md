@@ -42,6 +42,113 @@ three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT
 comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
 `EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
 
+## 2026-10-31
+
+Local C++ checkout pulled (HEAD `f0f054ce3`, 632 commits ahead of the 2026-09-20 baseline `23dda72d8`).
+
+### Mechanical diff of `ECCodes.abstract`
+
+- **2 new opcodes**:
+   - `EC_OP_GET_KAD_LOOKUPS` (`0x69`, #1741): user-triggered bounded Kad lookup diagnostics snapshot. Reply contains
+     `EC_TAG_KAD_LOOKUP` children with typed peer and referral records. Gated on server capability `EC_TAG_CAN_KAD_LOOKUPS`
+     (`0x002A`).
+   - `EC_OP_KNOWNFILE_DELETE` (`0x6A`, #1950): deletes a completed shared file from disk. Requires `EC_TAG_KNOWNFILE` (MD4),
+     `EC_TAG_ECID`, `EC_TAG_KNOWNFILE_PATH` (directory), and `EC_TAG_PARTFILE_NAME` (basename). Returns `EC_OP_NOOP` on success,
+     `EC_OP_FAILED` + `EC_TAG_STRING` on failure. Gated on server capability `EC_TAG_CAN_DELETE_COMPLETE` (`0x002B`) advertised in
+     `AUTH_OK`.
+- **3 tags retired / removed**:
+   - `EC_TAG_PASSWD_SALT` (`0x000B`): replaced by SRP-6a challenge salt (`EC_TAG_SRP_SALT`).
+   - `EC_TAG_AEAD_CLIENT_CONFIRM` (`0x0023`) / `EC_TAG_AEAD_SERVER_CONFIRM` (`0x0024`): legacy password-keyed AEAD confirmation tags
+     retired in favor of SRP proofs M1/M2.
+- **6 new capability and connection tags**:
+   - `EC_TAG_CAN_CHAT_PEER_HASH` (`0x0028`, #1551): client advertises support for `EC_TAG_CHAT_PEER_HASH` in chat operations.
+   - `EC_TAG_CAN_SEARCH_ALL` (`0x0029`, #1670): server accepts simultaneous eD2k+Kad search (`EC_SEARCH_ALL`).
+   - `EC_TAG_CAN_KAD_LOOKUPS` (`0x002A`, #1741): server supports `EC_OP_GET_KAD_LOOKUPS`.
+   - `EC_TAG_CAN_DELETE_COMPLETE` (`0x002B`, #1950): server supports disk deletion via `EC_OP_KNOWNFILE_DELETE`.
+   - `EC_TAG_NETWORKS_ENABLED` (`0x002C`, #2010): optional child of `EC_TAG_CONNSTATE` (uint8: bit 0 = ED2K, bit 1 = Kad).
+- **7 new SRP-6a authentication tags** (#2032-#2035):
+   - `EC_TAG_SRP_A` (`0x002D`): client ephemeral public key A (384 bytes, RFC 5054 3072-bit group).
+   - `EC_TAG_SRP_B` (`0x002E`): server public key B (384 bytes).
+   - `EC_TAG_SRP_PROFILE` (`0x002F`): KDF profile (4 bytes: `01 0f 08 01` for scrypt N=32768, r=8, p=1).
+   - `EC_TAG_SRP_SALT` (`0x0030`): 16-byte random challenge salt.
+   - `EC_TAG_SRP_CREDENTIAL` (`0x0031`): credential selector (0 = password, 1 = API token, 2 = amuleweb token).
+   - `EC_TAG_SRP_M1` (`0x0032`): client proof M1 (32 bytes HMAC-SHA256).
+   - `EC_TAG_SRP_M2` (`0x0033`): server proof M2 (32 bytes HMAC-SHA256).
+- **1 new search kind & 4 search tags** (#1670):
+   - `EC_SEARCH_ALL` (`0x05`): combined eD2k + Kad search.
+   - `EC_TAG_SEARCH_KAD_ACTIVE` (`0x0717`) / `EC_TAG_SEARCH_ED2K_ACTIVE` (`0x071A`): reports active network components
+     independently.
+   - `EC_TAG_SEARCHFILE_ED2K_SOURCES` (`0x0718`) / `EC_TAG_SEARCHFILE_KAD_SOURCES` (`0x0719`): split source counts per network.
+- **5 new chat & CAPTCHA tags**:
+   - `EC_TAG_CHAT_PEER_HASH` (`0x0908`, #1551): peer MD4 hash, for peers unreachable via `GUI_ID` (IPv6, ambiguous or provisional).
+   - `EC_TAG_CHAT_MESSAGE_KIND` (`0x0909`, #1829/#2089): message kind (0 text, 1 CAPTCHA challenge, 2 CAPTCHA result).
+   - `EC_TAG_CHAT_CAPTCHA_IMAGE` (`0x090A`): base64-encoded validated BMP challenge.
+   - `EC_TAG_CHAT_CAPTCHA_STATUS` (`0x090B`): challenge outcome (0 accepted, 1 retry allowed, 2 no attempts remain).
+   - `EC_TAG_CHAT_CAPTCHA_ID` (`0x090C`): pending challenge message ID.
+- **5 new statistics & partfile tags**:
+   - `EC_TAG_STATS_KAD_DISTRIBUTION` (`0x021E`, #1743): fixed-size contact histogram.
+   - `EC_TAG_STATS_SESSION_SENT_BYTES` (`0x021F`) / `EC_TAG_STATS_SESSION_RECEIVED_BYTES` (`0x0220`): session transfer totals.
+   - `EC_TAG_STATS_ACTIVE_CONNECTIONS` (`0x0221`) / `EC_TAG_STATS_UPTIME_SECONDS` (`0x0222`): live metrics on `EC_OP_STATS`.
+   - `EC_TAG_PARTFILE_SPEED_SMOOTHED` (`0x0324`, #2007): smoothed transfer rate (KiB/s) for time-remaining calculations.
+- **3 new knownfile verification tags & 2 file preferences tags**:
+   - `EC_TAG_KNOWNFILE_VERIFY_DATE` (`0x041D`, #1691) / `_VERIFY_CORRUPT_MD4` (`0x041E`) / `_VERIFY_CORRUPT_AICH` (`0x041F`):
+     results of local data verification.
+   - `EC_TAG_FILES_SHARED_REVERIFY_DAYS` (`0x1816`, #1948): scheduled verification interval.
+   - `EC_TAG_FILES_MEDIA_METADATA_AVAILABLE` (`0x1817`, #2185): whether media metadata extraction helper is available.
+- **1 server update flag**:
+   - `EC_TAG_SERVER_UPDATE_BUSY` (`0x0513`, #1923): optional flag on `EC_OP_FAILED` when server list update is refused during an
+     active download.
+- **15 new preferences tags**:
+   - `EC_TAG_MSGFILTER_ADVANCED` (`0x140A`) / `EC_TAG_MSGFILTER_CAPTCHA` (`0x140B`, #2089): spam protection settings.
+   - `EC_TAG_EXTERNALCONN_ENABLED` (`0x150C`) through `EC_TAG_EXTERNALCONN_PASSWD` (`0x1513`, #1614): read-only reporting of the EC
+     listener configuration.
+   - `EC_TAG_CONN_ADDRESS_FAMILIES` (`0x131A`) / `EC_TAG_CONN_ADVERTISE_IPV6` (`0x131B`, #1957): IPv6 connectivity preferences.
+   - `EC_TAG_SERVERS_ED2K_ACCELERATED_PUBLICATION` (`0x170D`, #1715): OFFERFILES v1 acceleration toggle.
+   - `EC_TAG_DIRECTORIES_ALLOWED_ROOTS` (`0x1A09`, #2172): confinement boundaries for shared directory configuration.
+   - `EC_TAG_KADEMLIA_PROTOCOL10` (`0x1E02`, #1663) / `EC_TAG_KADEMLIA_STRICT_AICH_PUBLISHERS` (`0x1E03`, #1751): Kad runtime
+     options.
+- **21 Kad lookup diagnostics tags** (`0x2100`–`0x2127`, #1741):
+   - `EC_TAG_KAD_LOOKUP` (`0x2100`) container, with target (`0x2101`), type (`0x2102`), keyword (`0x2103`), active/overdue flags,
+     peer records (`0x2110`–`0x211C`), and referral records (`0x2120`–`0x2127`).
+
+### Commit-by-commit review (behavior changes on protocol)
+
+- **CRITICAL BREAKING: SRP-6a authentication and mandatory AEAD session encryption (#2032-#2035, `718545e1c`, `569775238`,
+  `33bb29657`, `827e60270`, `b2046ccb8`)**: Upstream has completed its transition to authenticated, encrypted EC sessions. The
+  daemon now requires SRP-6a mutual proof verification bound to the X25519 transcript (`EC_SRP.md`), and enforces encryption even on
+  loopback connections (`--disable-ec-encryption` was removed). Legacy challenge/response authentication via `EC_TAG_PASSWD_SALT`
+  and MD5 digests is completely retired. When facing a client that does not initiate the SRP handshake, the daemon sends
+  `EC_OP_AUTH_FAIL` with the reason: `"An EC client of version 3.3.0 or later is required."`. Connecting to current and future
+  `amuled` builds will require implementing X25519/AEAD encryption and the 4-step SRP handshake.
+- **Chat peer addressing & CAPTCHA (#1512 `569529a40`, #1555 `d595653d3`, #1551 `0d9db6338`, #1578 `01f02a34f`, #1829 `7a291a9c2`,
+  #2089 `e7d5689e0`)**: Chat sessions are now keyed by stable peer identity (`CMD4Hash`). Upstream restored legacy target support
+  for older clients (#1555) and introduced `EC_TAG_CHAT_PEER_HASH` gated by `EC_TAG_CAN_CHAT_PEER_HASH`. This solves addressing IPv6
+  peers, which `GUI_ID(ip, port)` cannot represent. In addition, chat spam protection and CAPTCHA challenge messages were
+  implemented with dedicated tags and message kinds.
+- **Completed file deletion from disk (#1950 `4a2832ca2`, #1854 `3ddd19ac0`)**: `EC_OP_KNOWNFILE_DELETE` allows deleting finished
+  files from disk (requiring hash, ECID, path, and name validation). Meanwhile, `EC_OP_PARTFILE_DELETE` now strictly rejects
+  completed/completing files to prevent accidental file deletion during cancel requests.
+- **Simultaneous eD2k+Kad AllSearch (#1670 `b72f12f6c`, #1632 `beb8e6cb5`)**: `EC_SEARCH_ALL` queries both networks in parallel
+  under a single search ID. Results report a breakdown via `EC_TAG_SEARCHFILE_ED2K_SOURCES` and `_KAD_SOURCES`. Active status of
+  each network component is tracked via `EC_TAG_SEARCH_KAD_ACTIVE` and `EC_TAG_SEARCH_ED2K_ACTIVE`. Each EC connection now also
+  receives an isolated default search context (#1632).
+- **Kad lookup diagnostics (#1741 `4d94967ac`, #1743 `843f8a97b`)**: New diagnostic opcode `EC_OP_GET_KAD_LOOKUPS` and contact
+  distribution histogram `EC_TAG_STATS_KAD_DISTRIBUTION` for inspecting Kad internals.
+- **Protocol framing and daemon security hardening**:
+   - `e6b5f7ebb` (#2151): EC tag nesting depth is now strictly bounded in `ECSocket.cpp`.
+   - `9784a32e9` (#2160): Tags whose byte length does not match their data type are rejected.
+   - `698d8a90a` (#2158): Cleartext packets arriving after key setup are rejected.
+   - `f023c3add` (#2150): Directory traversal checks applied to rename and shared directory operations.
+   - `131f7ce79` (#2093): Buffered packet dispatch stops immediately after disconnect.
+   - `ebc250f6e` (#1875): Capped push notifications resume reliably on the main event loop.
+   - `2d9aeacf9` (#1863): Fixed a daemon crash on category create/update requests omitting a path tag.
+   - `9c25b0901` (#1865): Newlines in ed2k links are rejected, category index is bounded.
+- **Statistics & Preferences**:
+   - `1397d3c49` (#2228): Added NAT traversal and IPv6 statistics nodes to the statistics tree (`EC_OP_GET_STATSTREE`).
+   - `14af15fd3` (#1614), `455598945` (#1957), `8021d8afd` (#1715), `7a360e688` (#1663), `4860c55b0` (#1751), `567345c50` (#2172):
+     Exposed preferences for EC listener configuration, IPv6, server publication acceleration, Kad protocol versions, and allowed
+     roots.
+
 ## 2026-09-20
 
 Local C++ checkout **not** pulled for the review itself: local HEAD (`f98d790a2`, the 2026-09-07 baseline) is 169 commits behind

@@ -7,7 +7,21 @@ Beyond bug fixes, future changes are driven by the upstream [amule-org/amule](ht
 EC opcodes/tags or protocol behavior changes there are what this client tracks - see CONTRIBUTING.md for how such changes are
 verified against that source before being reflected here.
 
-## [Unreleased]
+## [4.1.0] - 2026-11-01
+
+### Added
+
+- Modern SRP-6a authentication and AEAD transport encryption (#2035, upstream master):
+   - Added `ECSRPClient` and SRP-6a 3072-bit group (RFC 5054) math with Scrypt key derivation
+     (`N=32768, r=8, p=1`) in `ECSRP.ts`.
+   - Added `ECAEADSession` supporting X25519 ephemeral key exchange, HKDF-SHA256 session key derivation, and
+     authenticated encryption with AES-128-GCM and ChaCha20-Poly1305 in `ECAEADCipher.ts`.
+   - Added `ECFlag.ENCRYPTED` (bit 3 / `0x08`) and wire framing support in `ECFlags.ts` and `Transmission.ts`.
+   - Added `requireEncryption` option to `ECConnection` and `ECEngine.start({ requireEncryption })` (defaults to
+     `false` with automatic fallback to legacy MD5 challenge-response for older `amuled` versions).
+   - Added new EC opcodes `EC_OP_GET_KAD_LOOKUPS` (`0x69`) and `EC_OP_KNOWNFILE_DELETE` (`0x6a`), along with
+     capability tags `EC_TAG_CAN_CHAT_PEER_HASH`, `EC_TAG_CAN_SEARCH_ALL`, `EC_TAG_CAN_KAD_LOOKUPS`,
+     `EC_TAG_CAN_DELETE_COMPLETE`, `EC_TAG_NETWORKS_ENABLED`, and SRP tags `EC_TAG_SRP_A` through `EC_TAG_SRP_M2`.
 
 ## [4.0.0] - 2026-09-20
 
@@ -68,10 +82,10 @@ verified against that source before being reflected here.
 - `ECConnection.minRequestIntervalMs` (default `0`, no pacing) and `ECEngineStartOptions.minRequestIntervalMs`: the minimum time
   between the start of two consecutive `request()` exchanges on a connection, so a caller polling a full-detail listing (for
   instance `SharedFiles.fetch()` on a large library) on a tight timer cannot send request after request with no gap for `amuled`'s
-  own single-threaded main loop to do anything else in between. Only paces `request()`, never the authentication handshake, and
-  only this one connection - a caller opening several concurrently is its own choice to make. Live-tested against a real daemon:
-  with `minRequestIntervalMs` set to 800 ms, consecutive `request()` calls are spaced by that amount while the handshake itself
-  still completes in a few milliseconds regardless.
+  own single-threaded main loop to do anything else in between. Only paces `request()`, never the authentication handshake, and only
+  this one connection - a caller opening several concurrently is its own choice to make. Live-tested against a real daemon: with
+  `minRequestIntervalMs` set to 800 ms, consecutive `request()` calls are spaced by that amount while the handshake itself still
+  completes in a few milliseconds regardless.
 
 ### Fixed
 

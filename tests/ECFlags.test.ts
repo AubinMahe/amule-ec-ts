@@ -52,6 +52,14 @@ describe("ECFlags enable/disable helpers", () => {
       expect(ec.ECFlags.usesLargeTagCount(enabled)).to.equal(true);
       expect(ec.ECFlags.usesLargeTagCount(ec.ECFlags.disableLargeTagCount(enabled))).to.equal(false);
    });
+
+   it("enableEncryption/disableEncryption round-trip", () => {
+      const base = ec.ECFlags.create();
+      expect(ec.ECFlags.isEncrypted(base)).to.equal(false);
+      const enabled = ec.ECFlags.enableEncryption(base);
+      expect(ec.ECFlags.isEncrypted(enabled)).to.equal(true);
+      expect(ec.ECFlags.isEncrypted(ec.ECFlags.disableEncryption(enabled))).to.equal(false);
+   });
 });
 
 describe("ECFlags.validate", () => {

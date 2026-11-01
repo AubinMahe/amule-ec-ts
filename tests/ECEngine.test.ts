@@ -1,6 +1,12 @@
 import { expect } from "chai";
 import * as ec from "../src/index.js";
-import { startFakeEcServer, computeSaltedHash, type FakeEcServer, type FakeEcPeer } from "./fakeEcServer.js";
+import {
+   startFakeEcServer,
+   computeSaltedHash,
+   acceptModernSRPAuthentication,
+   type FakeEcServer,
+   type FakeEcPeer,
+} from "./fakeEcServer.js";
 import { expectRejection, hexHash } from "./testUtils.js";
 
 describe("ECEngine.connection", () => {
@@ -182,6 +188,20 @@ describe("ECEngine.start", () => {
          ec.ECEngine.connection.send(new ec.ECPacket(ec.ECOpcode.EC_OP_SHUTDOWN)),
          /Refusing to send opcode 0x8 on a read-only connection\./,
       );
+   });
+
+   it("propagates requireEncryption to the active connection", async () => {
+      await Promise.all([
+         ec.ECEngine.start({
+            host: "127.0.0.1",
+            port: server.port,
+            passwordHash: PASSWORD_HASH,
+            requireEncryption: true,
+         }),
+         server.nextPeer().then((peer) => acceptModernSRPAuthentication(peer, PASSWORD_HASH)),
+      ]);
+      expect(ec.ECEngine.connection.requireEncryption).to.equal(true);
+      expect(ec.ECEngine.connection.isEncrypted).to.equal(true);
    });
 });
 

@@ -16,10 +16,11 @@ describe("TransmissionHeader", () => {
    });
 
    it("exposes compressed/utf8Numbers/largeTagCount from the flags it was built with", () => {
-      const header = new ec.TransmissionHeader(ec.ECFlags.create(true, true, true), 0);
+      const header = new ec.TransmissionHeader(ec.ECFlags.create(true, true, true, true), 0);
       expect(header.compressed).to.equal(true);
       expect(header.utf8Numbers).to.equal(true);
       expect(header.largeTagCount).to.equal(true);
+      expect(header.encrypted).to.equal(true);
    });
 
    it("reports false for every capability when none were requested", () => {
@@ -27,6 +28,7 @@ describe("TransmissionHeader", () => {
       expect(header.compressed).to.equal(false);
       expect(header.utf8Numbers).to.equal(false);
       expect(header.largeTagCount).to.equal(false);
+      expect(header.encrypted).to.equal(false);
    });
 
    it("rejects a buffer shorter than SIZE", () => {
