@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 
 import * as ec from "../../src/index.js";
 import { Repl } from "./Repl.js";
@@ -12,18 +14,55 @@ interface ExternalConnectSettings {
    passwordHash: string;
 }
 
+function getPasswordFromEnv(): string | undefined {
+   const envHash = process.env["EC_PASSWORD_HASH"];
+   if (envHash) {
+      return envHash.toLowerCase();
+   }
+   const envPass = process.env["EC_PASSWORD"];
+   if (envPass !== undefined) {
+      // eslint-disable-next-line sonarjs/hashing
+      return createHash("md5").update(envPass, "utf8").digest("hex").toLowerCase();
+   }
+   return undefined;
+}
+
+async function promptForPassword(configPath: string): Promise<string> {
+   if (process.stdin.isTTY) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+         const answer = await rl.question("Enter EC password: ");
+         if (answer) {
+            // eslint-disable-next-line sonarjs/hashing
+            return createHash("md5").update(answer, "utf8").digest("hex").toLowerCase();
+         }
+      } finally {
+         rl.close();
+      }
+   }
+   throw new Error(
+      `No ECPassword found in [ExternalConnect] section of ${configPath}. ` +
+         "Set EC_PASSWORD / EC_PASSWORD_HASH environment variable or enter it interactively.",
+   );
+}
+
 /**
  * Reads the local amuled's own ~/.aMule/amule.conf [ExternalConnect]
  * section - this REPL's only filesystem dependency, kept local to the tool
  * itself (the library has none, see ECEngine's doc: it takes host/port/
  * passwordHash directly and has no opinion on where they come from).
  */
-function readExternalConnectSettings(): ExternalConnectSettings {
+async function readExternalConnectSettings(): Promise<ExternalConnectSettings> {
+   let passwordHash = getPasswordFromEnv();
    const path = join(homedir(), ".aMule", "amule.conf");
-   const lines = readFileSync(path, "utf8").split(/\r?\n/);
+   let lines: string[] = [];
+   try {
+      lines = readFileSync(path, "utf8").split(/\r?\n/);
+   } catch {
+      // amule.conf may not exist if credentials were provided via environment
+   }
    let inSection = false;
    let port = 4712;
-   let passwordHash: string | undefined;
    for (const rawLine of lines) {
       const line = rawLine.trim();
       if (line.startsWith("[")) {
@@ -38,14 +77,14 @@ function readExternalConnectSettings(): ExternalConnectSettings {
          port = Number(portMatch[1]);
          continue;
       }
-      const passwordMatch = /^ECPassword=([0-9a-fA-F]{32})$/.exec(line);
-      if (passwordMatch?.[1]) {
-         passwordHash = passwordMatch[1].toLowerCase();
+      if (!passwordHash) {
+         const passwordMatch = /^ECPassword=([0-9a-fA-F]{32})$/.exec(line);
+         if (passwordMatch?.[1]) {
+            passwordHash = passwordMatch[1].toLowerCase();
+         }
       }
    }
-   if (!passwordHash) {
-      throw new Error(`No ECPassword found in [ExternalConnect] section of ${path}.`);
-   }
+   passwordHash ??= await promptForPassword(path);
    return { port, passwordHash };
 }
 
@@ -70,7 +109,7 @@ function parseArgs(argv: string[]): CliOptions {
 
 async function main(): Promise<void> {
    const options = parseArgs(process.argv.slice(2));
-   const { port, passwordHash } = readExternalConnectSettings();
+   const { port, passwordHash } = await readExternalConnectSettings();
    await ec.ECEngine.start({ host: HOST, port, passwordHash, notify: options.notify, multiSearch: true, chatSessions: true });
    const repl = new Repl(ec.ECEngine.connection);
    try {

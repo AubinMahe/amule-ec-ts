@@ -44,6 +44,10 @@ export class TransmissionHeader {
       return ECFlags.usesLargeTagCount(this.flags);
    }
 
+   public get encrypted(): boolean {
+      return ECFlags.isEncrypted(this.flags);
+   }
+
    private static validateUint32(value: number, name: string): void {
       if (!Number.isInteger(value)) {
          throw new TypeError(`${name} must be an integer.`);

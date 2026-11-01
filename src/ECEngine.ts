@@ -106,6 +106,11 @@ export interface ECEngineStartOptions {
     * other option only ever talks to amuled over the network.
     */
    altNamesCachePath?: string;
+   /**
+    * Whether the connection must strictly require transport encryption (SRP-6a + AEAD).
+    * Defaults to false (modern encryption preferred with automatic legacy fallback).
+    */
+   requireEncryption?: boolean;
 }
 
 /**
@@ -195,6 +200,9 @@ export const ECEngine = {
       connection.localCapabilities.multiSearch = multiSearch;
       connection.localCapabilities.chatSessions = chatSessions;
       connection.readOnly = options.readOnly ?? false;
+      if (options.requireEncryption !== undefined) {
+         connection.requireEncryption = options.requireEncryption;
+      }
       if (options.requestTimeoutMs !== undefined) {
          connection.requestTimeoutMs = options.requestTimeoutMs;
       }

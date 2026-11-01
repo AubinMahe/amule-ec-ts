@@ -174,6 +174,23 @@ tags, not just the opcode) would fix this, at the cost of duplicating protocol-s
 into the safety layer - rejected as disproportionate to the one method it would unblock; revisit if a second such opcode-sharing
 case turns up.
 
+## EC session encryption and SRP-6a authentication (zero dependencies)
+
+Upstream breaking change #2035 (`827e60270`) removed legacy MD5 challenge-response authentication and cleartext EC sessions in favor
+of mandatory SRP-6a authentication (RFC 5054 3072-bit group, scrypt N=32768, r=8, p=1) and AEAD transport encryption (X25519,
+HKDF-SHA256, AES-128-GCM or ChaCha20-Poly1305 with 64-bit nonces).
+
+`amule-ec-ts` implements this full cryptographic stack using exclusively Node.js `>=22` native built-ins (`node:crypto` and native
+`BigInt` modular arithmetic):
+
+- Zero third-party npm dependencies.
+- Modular exponentiation $base^{exp} \pmod N$ using native `BigInt` square-and-multiply, computing SRP-6a public keys and proofs in
+  ~2 ms on modern hardware.
+- Scrypt derivation via `crypto.scryptSync` with official aMule test vectors verified.
+- Automatic backward compatibility: the client advertises SRP-6a and AEAD tags on `EC_OP_AUTH_REQ` by default, but seamlessly falls
+  back to legacy MD5 challenge-response if connecting to an older `amuled` (< 3.3.0) that only offers `EC_TAG_PASSWD_SALT`. Users
+  wishing to enforce strict encryption can pass `requireEncryption: true`.
+
 ## Comparison with amule-ec-node
 
 [amule-ec-node](https://github.com/vetler/amule-ec-node) is another independent JavaScript client for the same EC protocol.
@@ -186,7 +203,7 @@ protocol now existing, both codebases were reviewed against the aMule C++ source
 |Connection & authentication (salt + double MD5 hash)|✓|✓|✓|
 |zlib packet compression|✓|✗|✓|
 |Push / live notifications|✓|✗|✓|
-|Session encryption (X25519 / AEAD)|✓ (1)|✗|✗|
+|Session encryption (X25519 / AEAD)|✓|✗|✓ (1)|
 |Download queue|✓|✓|✓|
 |Alternate source filenames (`EC_TAG_PARTFILE_SOURCE_NAMES`)|✓|✗|✓ (2)|
 |Chunk / gap / requested-block / part-availability status|✓|✓ (3)|✓ (3)|
@@ -204,8 +221,9 @@ protocol now existing, both codebases were reviewed against the aMule C++ source
 |Preferences (get / set)|✓|✓ (5)|✓|
 |Statistics / graphs / tree|✓|✓|✓|
 
-(1) Recently added upstream (an optional forward-secrecy handshake over X25519). Neither client implements the handshake yet - it's
-tracked as open work on the `amule-ec-ts` side too.
+(1) Upstream made SRP-6a authentication and AEAD session encryption mandatory in master (#2035). `amule-ec-ts` implements this using
+Node.js >=22 native built-in crypto (X25519, HKDF-SHA256, AES-128-GCM, ChaCha20-Poly1305, BigInt SRP-6a math) with zero runtime
+dependencies, preserving automatic fallback to legacy MD5 challenge/response for older `amuled` versions.
 
 (2) The daemon delta-encodes this per EC connection - a name is only sent once, and that delta state turns out to be shared across
 every request type touching the same file (download-queue fetch, shared-files fetch, incremental update alike), confirmed against

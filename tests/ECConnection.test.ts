@@ -1,6 +1,12 @@
 import { expect } from "chai";
 import * as ec from "../src/index.js";
-import { startFakeEcServer, computeSaltedHash, type FakeEcServer, type FakeEcPeer } from "./fakeEcServer.js";
+import {
+   startFakeEcServer,
+   computeSaltedHash,
+   acceptModernSRPAuthentication,
+   type FakeEcServer,
+   type FakeEcPeer,
+} from "./fakeEcServer.js";
 import { expectRejection, hexHash } from "./testUtils.js";
 
 const PASSWORD_HASH = hexHash("a");
@@ -311,6 +317,133 @@ describe("ECConnection.authenticateWithHash", () => {
       peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
 
       await expectRejection(authPromise, /EC_OP_AUTH_SALT/);
+   });
+});
+
+describe("ECConnection modern SRP-6a and AEAD encryption", () => {
+   let server: FakeEcServer;
+
+   beforeEach(async () => {
+      server = await startFakeEcServer();
+   });
+
+   afterEach(async () => {
+      await server.close();
+   });
+
+   it("completes SRP-6a handshake with AES-128-GCM and encrypts subsequent communication", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const [authResult] = await Promise.all([
+         acceptModernSRPAuthentication(peer, PASSWORD_HASH, { cipherId: ec.ECAEADCipherId.AES_128_GCM }),
+         connection.authenticateWithHash(PASSWORD_HASH),
+      ]);
+
+      expect(authResult.cipherId).to.equal(ec.ECAEADCipherId.AES_128_GCM);
+      expect(connection.isEncrypted).to.equal(true);
+
+      // Verify encrypted roundtrip of an application request
+      const replyPromise = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      const clientPacket = await peer.readPacket();
+      expect(clientPacket.opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);
+
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      const reply = await replyPromise;
+      expect(reply.opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);
+   });
+
+   it("completes SRP-6a handshake with ChaCha20-Poly1305 and encrypts subsequent communication", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const [authResult] = await Promise.all([
+         acceptModernSRPAuthentication(peer, PASSWORD_HASH, { cipherId: ec.ECAEADCipherId.CHACHA20_POLY1305 }),
+         connection.authenticateWithHash(PASSWORD_HASH),
+      ]);
+
+      expect(authResult.cipherId).to.equal(ec.ECAEADCipherId.CHACHA20_POLY1305);
+      expect(connection.isEncrypted).to.equal(true);
+
+      // Verify encrypted roundtrip of an application request
+      const replyPromise = connection.request(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      const clientPacket = await peer.readPacket();
+      expect(clientPacket.opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);
+
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+      const reply = await replyPromise;
+      expect(reply.opcode).to.equal(ec.ECOpcode.EC_OP_NOOP);
+   });
+
+   it("requireEncryption rejects legacy server when server only offers legacy MD5 salt", async () => {
+      const { connection, peer } = await connectPeer(server);
+      connection.requireEncryption = true;
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT).add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_PASSWD_SALT, SALT)),
+      );
+
+      await expectRejection(authPromise, /Server does not support encryption, but requireEncryption was set/);
+      expect(connection.isEncrypted).to.equal(false);
+   });
+
+   it("rejects authentication when server SRP-6a M2 verification proof fails", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      const authReq = await peer.readPacket();
+      const clientPubTag = authReq.find(ec.ECTagNames.EC_TAG_AEAD_CLIENT_PUBKEY);
+      const clientNonceTag = authReq.find(ec.ECTagNames.EC_TAG_AEAD_CLIENT_NONCE);
+      const canAeadTag = authReq.find(ec.ECTagNames.EC_TAG_CAN_AEAD);
+
+      const clientPub = clientPubTag?.bytesValue;
+      const clientNonce = clientNonceTag?.bytesValue;
+      const offeredCiphers = canAeadTag?.bytesValue;
+      if (!clientPub || !clientNonce || !offeredCiphers) {
+         throw new Error("Missing AEAD tags in client AUTH_REQ");
+      }
+
+      const serverKeys = ec.generateX25519KeyPair();
+      const serverNonce = Buffer.alloc(32, 1);
+      const salt = Buffer.alloc(16, 2);
+      const serverB = Buffer.alloc(384, 3); // Valid 384-byte integer < N
+
+      const transcript = ec.buildAEADTranscript({
+         offeredCiphers,
+         selectedCipherId: ec.ECAEADCipherId.AES_128_GCM,
+         clientNonce,
+         serverNonce,
+         clientPublicKey: clientPub,
+         serverPublicKey: serverKeys.rawPublicKey,
+      });
+
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_SALT)
+            .add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SRP_B, serverB))
+            .add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SRP_SALT, salt))
+            .add(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_AEAD_CIPHER, ec.ECAEADCipherId.AES_128_GCM))
+            .add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_AEAD_SERVER_NONCE, serverNonce))
+            .add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_AEAD_SERVER_PUBKEY, serverKeys.rawPublicKey)),
+      );
+
+      peer.aeadSession = new ec.ECAEADSession({
+         sharedSecret: ec.computeX25519SharedSecret(serverKeys.privateKey, clientPub),
+         clientNonce,
+         serverNonce,
+         selectedCipherId: ec.ECAEADCipherId.AES_128_GCM,
+         transcript,
+         isServer: true,
+      });
+
+      await peer.readPacket(); // AUTH_PASSWD
+
+      // Send bogus M2 proof
+      const bogusM2 = Buffer.alloc(32, 0xaa);
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SRP_M2, bogusM2)),
+      );
+
+      await expectRejection(authPromise, /Server SRP-6a verification proof failed \(M2 mismatch\)/);
    });
 });
 

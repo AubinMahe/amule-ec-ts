@@ -13,6 +13,14 @@ import { ECVersion } from "./ECVersion.js";
 import { TransmissionHeader } from "./Transmission.js";
 import { ECUInt16Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, ECCustomTag, ECTagDecoder } from "./ECTags.js";
 import { assertLoopbackOrAllowed } from "./ECValidation.js";
+import {
+   ECAEADCipherId,
+   ECAEADSession,
+   generateX25519KeyPair,
+   computeX25519SharedSecret,
+   buildAEADTranscript,
+} from "./ECAEADCipher.js";
+import { ECSRPClient } from "./ECSRP.js";
 
 const debug = debuglog("amule-ec:connection");
 
@@ -125,6 +133,22 @@ export class ECConnection extends events.EventEmitter {
     * connectTimeoutMs works; reconnect() defaults to whatever value is already set here.
     */
    public allowNonLoopback: boolean;
+
+   /**
+    * Whether the authentication handshake must enforce transport encryption (SRP-6a + AEAD).
+    * When `false` (the default), modern SRP-6a / AEAD encryption is offered and preferred, but
+    * the connection falls back gracefully to legacy MD5 challenge-response if the daemon only
+    * speaks the legacy protocol. When `true`, reaching a daemon that does not support encryption
+    * fails with ECAuthenticationError.
+    */
+   public requireEncryption = false;
+
+   /**
+    * Whether this connection currently has an active AEAD encryption session.
+    */
+   public get isEncrypted(): boolean {
+      return this.aeadSession !== undefined;
+   }
 
    /**
     * Default for `maxPacketBytesUnauthenticated`.
@@ -301,6 +325,7 @@ export class ECConnection extends events.EventEmitter {
     * fresh socket needs its own handshake, same as the daemon's own `IsAuthorized()`.
     */
    private authenticated = false;
+   private aeadSession: ECAEADSession | undefined;
 
    public constructor(
       private socket: net.Socket,
@@ -434,6 +459,7 @@ export class ECConnection extends events.EventEmitter {
       this.closed = false;
       this.closeError = undefined;
       this.authenticated = false;
+      this.aeadSession = undefined;
       this.receiveChunks.length = 0;
       this.receiveBufferedLength = 0;
       this.wireSocket();
@@ -548,30 +574,49 @@ export class ECConnection extends events.EventEmitter {
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE, new Uint8Array()));
       // Unconditional too - see ECCapabilities.clientHistory's doc.
       authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CLIENT_HISTORY, new Uint8Array()));
+
+      // Modern SRP-6a & AEAD transport encryption negotiation
+      const srpClient = new ECSRPClient();
+      const clientKeys = generateX25519KeyPair();
+      const clientNonce = crypto.randomBytes(32);
+      const offeredCiphers = Buffer.from([ECAEADCipherId.AES_128_GCM, ECAEADCipherId.CHACHA20_POLY1305]);
+
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_AEAD, offeredCiphers));
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_AEAD_CLIENT_NONCE, clientNonce));
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_AEAD_CLIENT_PUBKEY, clientKeys.rawPublicKey));
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_SRP_A, srpClient.clientABytes));
+      authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_SRP_CREDENTIAL, Buffer.from([0])));
+
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       const saltPacket = await this.exchange(authRequest);
-      if (saltPacket.opcode !== ECOpcode.EC_OP_AUTH_SALT) {
-         throw new Error(`Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`);
-      }
-      const saltTag = saltPacket.find(ECTagNames.EC_TAG_PASSWD_SALT);
-      if (!saltTag || !(saltTag instanceof ECUInt64Tag)) {
-         throw new Error("Server did not send a valid EC_TAG_PASSWD_SALT.");
-      }
-      const salt = saltTag.value;
-      const saltHex = salt.toString(16).toUpperCase();
-      const saltHash = md5Hex(saltHex);
-      const finalHash = md5Digest(passwordHash + saltHash);
-      const saltedHash = new Uint8Array(finalHash);
-      const authPasswd = new ECPacket(ECOpcode.EC_OP_AUTH_PASSWD);
-      authPasswd.add(new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, saltedHash));
-      const reply = await this.exchange(authPasswd);
-      if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
-         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+      if (saltPacket.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
+         const reasonTag = saltPacket.find(ECTagNames.EC_TAG_STRING);
          const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
          throw new ECAuthenticationError(reason);
       }
-      if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
-         throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
+      if (saltPacket.opcode !== ECOpcode.EC_OP_AUTH_SALT) {
+         throw new Error(`Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`);
+      }
+
+      let reply: ECPacket;
+      const isModern =
+         saltPacket.has(ECTagNames.EC_TAG_SRP_B) &&
+         saltPacket.has(ECTagNames.EC_TAG_SRP_SALT) &&
+         saltPacket.has(ECTagNames.EC_TAG_AEAD_CIPHER) &&
+         saltPacket.has(ECTagNames.EC_TAG_AEAD_SERVER_NONCE) &&
+         saltPacket.has(ECTagNames.EC_TAG_AEAD_SERVER_PUBKEY);
+
+      if (isModern) {
+         reply = await this.performSRPHandshake(
+            saltPacket,
+            passwordHash,
+            srpClient,
+            clientKeys,
+            clientNonce,
+            offeredCiphers,
+         );
+      } else {
+         reply = await this.performLegacyHandshake(saltPacket, passwordHash);
       }
       // From here on, readPacket() applies maxPacketBytesAuthenticated rather than
       // maxPacketBytesUnauthenticated - mirrors the daemon's own IsAuthorized() gate.
@@ -593,6 +638,108 @@ export class ECConnection extends events.EventEmitter {
       this.sessionId = reply.find(ECTagNames.EC_TAG_SESSION_ID)?.intValue;
    }
 
+   private async performSRPHandshake(
+      saltPacket: ECPacket,
+      passwordHash: string,
+      srpClient: ECSRPClient,
+      clientKeys: { privateKey: crypto.KeyObject; rawPublicKey: Uint8Array },
+      clientNonce: Uint8Array,
+      offeredCiphers: Uint8Array,
+   ): Promise<ECPacket> {
+      const srpBTag = saltPacket.find(ECTagNames.EC_TAG_SRP_B);
+      const srpSaltTag = saltPacket.find(ECTagNames.EC_TAG_SRP_SALT);
+      const cipherTag = saltPacket.find(ECTagNames.EC_TAG_AEAD_CIPHER);
+      const serverNonceTag = saltPacket.find(ECTagNames.EC_TAG_AEAD_SERVER_NONCE);
+      const serverPubKeyTag = saltPacket.find(ECTagNames.EC_TAG_AEAD_SERVER_PUBKEY);
+
+      const rawCipherId = Number(cipherTag?.intValue ?? cipherTag?.bytesValue?.[0]);
+      if (rawCipherId !== 1 && rawCipherId !== 2) {
+         throw new Error(`Unsupported cipher negotiated by server: ${rawCipherId}`);
+      }
+      const selectedCipherId: ECAEADCipherId = rawCipherId;
+      const serverPublicKey = serverPubKeyTag?.bytesValue;
+      const serverNonce = serverNonceTag?.bytesValue;
+      const serverB = srpBTag?.bytesValue;
+      const salt = srpSaltTag?.bytesValue;
+      if (!serverPublicKey || !serverNonce || !serverB || !salt) {
+         throw new Error("Malformed SRP-6a / AEAD parameters in EC_OP_AUTH_SALT");
+      }
+
+      const sharedSecret = computeX25519SharedSecret(clientKeys.privateKey, serverPublicKey);
+      const transcript = buildAEADTranscript({
+         offeredCiphers,
+         selectedCipherId,
+         clientNonce,
+         serverNonce,
+         clientPublicKey: clientKeys.rawPublicKey,
+         serverPublicKey,
+      });
+
+      this.aeadSession = new ECAEADSession({
+         sharedSecret,
+         clientNonce,
+         serverNonce,
+         selectedCipherId,
+         transcript,
+         isServer: false,
+      });
+
+      const { m1, verifyServerProof } = srpClient.completeHandshake({
+         serverB,
+         salt,
+         passwordHashHex: passwordHash,
+         transcript,
+         credential: 0,
+      });
+
+      const authPasswd = new ECPacket(ECOpcode.EC_OP_AUTH_PASSWD);
+      authPasswd.add(new ECCustomTag(ECTagNames.EC_TAG_SRP_M1, m1));
+      const reply = await this.exchange(authPasswd);
+
+      if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
+         throw new ECAuthenticationError(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
+         throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
+      }
+
+      const m2Tag = reply.find(ECTagNames.EC_TAG_SRP_M2);
+      if (!m2Tag?.bytesValue || !verifyServerProof(m2Tag.bytesValue)) {
+         throw new ECAuthenticationError("Server SRP-6a verification proof failed (M2 mismatch).");
+      }
+      return reply;
+   }
+
+   private async performLegacyHandshake(saltPacket: ECPacket, passwordHash: string): Promise<ECPacket> {
+      if (this.requireEncryption) {
+         throw new ECAuthenticationError("Server does not support encryption, but requireEncryption was set.");
+      }
+      const saltTag = saltPacket.find(ECTagNames.EC_TAG_PASSWD_SALT);
+      if (!(saltTag instanceof ECUInt64Tag)) {
+         throw new Error("Server did not send valid SRP-6a or legacy EC_TAG_PASSWD_SALT parameters.");
+      }
+      const salt = saltTag.value;
+      const saltHex = salt.toString(16).toUpperCase();
+      const saltHash = md5Hex(saltHex);
+      const finalHash = md5Digest(passwordHash + saltHash);
+      const saltedHash = new Uint8Array(finalHash);
+      const authPasswd = new ECPacket(ECOpcode.EC_OP_AUTH_PASSWD);
+      authPasswd.add(new ECHash16Tag(ECTagNames.EC_TAG_PASSWD_HASH, saltedHash));
+      const reply = await this.exchange(authPasswd);
+
+      if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
+         throw new ECAuthenticationError(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
+         throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
+      }
+      return reply;
+   }
+
    public async send(packet: ECPacket): Promise<void> {
       if (this.readOnly && !ECConnection.READ_ONLY_OPCODES.has(packet.opcode)) {
          throw new RangeError(`Refusing to send opcode 0x${packet.opcode.toString(16)} on a read-only connection.`);
@@ -608,8 +755,12 @@ export class ECConnection extends events.EventEmitter {
       }
       const flags = ECFlags.create(compress, this.localCapabilities.utf8Numbers, this.localCapabilities.largeTagCount);
       const header = new TransmissionHeader(flags, body.length);
+      let payload: Uint8Array = Buffer.concat([header.encode(), body]);
+      if (this.aeadSession) {
+         payload = this.aeadSession.sealPacket(payload);
+      }
       await new Promise<void>((resolve, reject) => {
-         this.socket.write(Buffer.concat([header.encode(), body]), (error) => {
+         this.socket.write(payload, (error) => {
             if (error) {
                reject(error);
             } else {
@@ -826,7 +977,19 @@ export class ECConnection extends events.EventEmitter {
          );
       }
       let body = await this.readBytes(header.bodyLength);
-      if (header.compressed) {
+      let clearFlags = header.flags;
+      if (this.aeadSession) {
+         if (!header.encrypted) {
+            throw new Error("Received an unencrypted packet while session encryption is active.");
+         }
+         const unsealed = this.aeadSession.unsealPacket(header.flags, body);
+         clearFlags = unsealed.clearFlags;
+         body = unsealed.body;
+      } else if (header.encrypted) {
+         throw new Error("Received an encrypted packet, but no AEAD session has been negotiated.");
+      }
+
+      if (ECFlags.isCompressed(clearFlags)) {
          // Reject rather than trust the wire flag blindly: this only ever inflates a reply this
          // connection is prepared to receive compressed, because it is the one that asked for
          // zlib in the first place (localCapabilities.zlib) - not something an unauthenticated,
@@ -840,8 +1003,8 @@ export class ECConnection extends events.EventEmitter {
       // application-layer data was encoded, so we decode against those
       // rather than assuming they match our negotiated remoteCapabilities.
       const wireCapabilities = new ECCapabilities();
-      wireCapabilities.utf8Numbers = header.utf8Numbers;
-      wireCapabilities.largeTagCount = header.largeTagCount;
+      wireCapabilities.utf8Numbers = ECFlags.usesUtf8Numbers(clearFlags);
+      wireCapabilities.largeTagCount = ECFlags.usesLargeTagCount(clearFlags);
       return ECPacket.decode(body, wireCapabilities, this.maxTagDepth, this.maxTagCount);
    }
 
