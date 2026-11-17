@@ -49,6 +49,32 @@ export interface ECSearchParams {
    availability?: number;
    minSize?: bigint;
    maxSize?: bigint;
+   /**
+    * Minimum bitrate filter in kbps (0..1000000) - EC_TAG_SEARCH_MIN_BITRATE.
+    * Added in aMule 3.3.0 (#2128).
+    */
+   minBitrate?: number;
+   /**
+    * Minimum duration filter in seconds (0..86400) - EC_TAG_SEARCH_MIN_LENGTH.
+    * Added in aMule 3.3.0 (#2128).
+    */
+   minLengthSeconds?: number;
+   /**
+    * Media codec name filter - EC_TAG_SEARCH_CODEC. Added in aMule 3.3.0 (#2128).
+    */
+   codec?: string;
+   /**
+    * Media title filter - EC_TAG_SEARCH_TITLE. Added in aMule 3.3.0 (#2128).
+    */
+   title?: string;
+   /**
+    * Media album filter - EC_TAG_SEARCH_ALBUM. Added in aMule 3.3.0 (#2128).
+    */
+   album?: string;
+   /**
+    * Media artist filter - EC_TAG_SEARCH_ARTIST. Added in aMule 3.3.0 (#2128).
+    */
+   artist?: string;
 }
 
 export interface ECSearchProgress {
@@ -341,6 +367,12 @@ export class Search {
          ...(params.availability ? [new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_AVAILABILITY, params.availability)] : []),
          ...(params.minSize ? [new ECUInt64Tag(ECTagNames.EC_TAG_SEARCH_MIN_SIZE, params.minSize)] : []),
          ...(params.maxSize ? [new ECUInt64Tag(ECTagNames.EC_TAG_SEARCH_MAX_SIZE, params.maxSize)] : []),
+         ...(params.minBitrate ? [new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_MIN_BITRATE, params.minBitrate)] : []),
+         ...(params.minLengthSeconds ? [new ECUInt32Tag(ECTagNames.EC_TAG_SEARCH_MIN_LENGTH, params.minLengthSeconds)] : []),
+         ...(params.codec ? [new ECStringTag(ECTagNames.EC_TAG_SEARCH_CODEC, params.codec)] : []),
+         ...(params.title ? [new ECStringTag(ECTagNames.EC_TAG_SEARCH_TITLE, params.title)] : []),
+         ...(params.album ? [new ECStringTag(ECTagNames.EC_TAG_SEARCH_ALBUM, params.album)] : []),
+         ...(params.artist ? [new ECStringTag(ECTagNames.EC_TAG_SEARCH_ARTIST, params.artist)] : []),
       ]);
       const request = new ECPacket(ECOpcode.EC_OP_SEARCH_START);
       request.add(searchTag);

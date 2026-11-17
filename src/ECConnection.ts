@@ -21,6 +21,7 @@ import {
    buildAEADTranscript,
 } from "./ECAEADCipher.js";
 import { ECSRPClient } from "./ECSRP.js";
+import { ECAuthFailReason } from "./ECAuthFailReason.js";
 
 const debug = debuglog("amule-ec:connection");
 
@@ -48,9 +49,14 @@ function md5Hex(input: string): string {
  * be transient.
  */
 export class ECAuthenticationError extends Error {
-   public constructor(message: string) {
+   public readonly reasonCode?: ECAuthFailReason;
+   public readonly retryAfterSeconds?: number;
+
+   public constructor(message: string, reasonCode?: ECAuthFailReason, retryAfterSeconds?: number) {
       super(message);
       this.name = "ECAuthenticationError";
+      this.reasonCode = reasonCode;
+      this.retryAfterSeconds = retryAfterSeconds;
    }
 }
 
@@ -590,9 +596,7 @@ export class ECConnection extends events.EventEmitter {
       debug("EC_OP_AUTH_REQ has(EC_TAG_CAN_NOTIFY) = %s", authRequest.has(ECTagNames.EC_TAG_CAN_NOTIFY));
       const saltPacket = await this.exchange(authRequest);
       if (saltPacket.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
-         const reasonTag = saltPacket.find(ECTagNames.EC_TAG_STRING);
-         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
-         throw new ECAuthenticationError(reason);
+         throw ECConnection.parseAuthFailure(saltPacket);
       }
       if (saltPacket.opcode !== ECOpcode.EC_OP_AUTH_SALT) {
          throw new Error(`Expected EC_OP_AUTH_SALT, received opcode 0x${saltPacket.opcode.toString(16)}.`);
@@ -607,14 +611,7 @@ export class ECConnection extends events.EventEmitter {
          saltPacket.has(ECTagNames.EC_TAG_AEAD_SERVER_PUBKEY);
 
       if (isModern) {
-         reply = await this.performSRPHandshake(
-            saltPacket,
-            passwordHash,
-            srpClient,
-            clientKeys,
-            clientNonce,
-            offeredCiphers,
-         );
+         reply = await this.performSRPHandshake(saltPacket, passwordHash, srpClient, clientKeys, clientNonce, offeredCiphers);
       } else {
          reply = await this.performLegacyHandshake(saltPacket, passwordHash);
       }
@@ -697,9 +694,7 @@ export class ECConnection extends events.EventEmitter {
       const reply = await this.exchange(authPasswd);
 
       if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
-         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
-         throw new ECAuthenticationError(reason);
+         throw ECConnection.parseAuthFailure(reply);
       }
       if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
          throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
@@ -730,14 +725,22 @@ export class ECConnection extends events.EventEmitter {
       const reply = await this.exchange(authPasswd);
 
       if (reply.opcode === ECOpcode.EC_OP_AUTH_FAIL) {
-         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
-         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
-         throw new ECAuthenticationError(reason);
+         throw ECConnection.parseAuthFailure(reply);
       }
       if (reply.opcode !== ECOpcode.EC_OP_AUTH_OK) {
          throw new Error(`Unexpected opcode 0x${reply.opcode.toString(16)} in reply to EC_OP_AUTH_PASSWD.`);
       }
       return reply;
+   }
+
+   private static parseAuthFailure(packet: ECPacket): ECAuthenticationError {
+      const reasonTag = packet.find(ECTagNames.EC_TAG_STRING);
+      const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
+      const reasonCodeTag = packet.find(ECTagNames.EC_TAG_AUTH_FAIL_REASON);
+      const reasonCode = reasonCodeTag?.intValue !== undefined ? Number(reasonCodeTag.intValue) : undefined;
+      const retryTag = packet.find(ECTagNames.EC_TAG_AUTH_RETRY_AFTER);
+      const retryAfterSeconds = retryTag?.intValue !== undefined ? Number(retryTag.intValue) : undefined;
+      return new ECAuthenticationError(reason, reasonCode, retryAfterSeconds);
    }
 
    public async send(packet: ECPacket): Promise<void> {

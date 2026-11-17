@@ -8,6 +8,10 @@ function statsReply(): ec.ECPacket {
    packet.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATS_DL_SPEED, 2_000n));
    packet.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATS_TEMP_FREE_SPACE, 500_000_000n));
    packet.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATS_INCOMING_FREE_SPACE, 300_000_000n));
+   packet.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATS_CPU_MILLISECONDS, 12_345n));
+   packet.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_STATS_RESIDENT_MEMORY_BYTES, 67_890_000n));
+   packet.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_STATS_ACTIVE_CONNECTIONS, 42));
+   packet.add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_STATS_UPTIME_SECONDS, 3_600));
    return packet;
 }
 
@@ -85,6 +89,10 @@ describe("Status.fetch", () => {
       expect(status.kadConnectedSince).to.equal(1_735_689_700n);
       expect(status.tempFreeSpace).to.equal(500_000_000n);
       expect(status.incomingFreeSpace).to.equal(300_000_000n);
+      expect(status.cpuMilliseconds).to.equal(12_345n);
+      expect(status.residentMemoryBytes).to.equal(67_890_000n);
+      expect(status.activeConnections).to.equal(42n);
+      expect(status.uptimeSeconds).to.equal(3_600n);
    });
 
    it("throws when the EC_OP_STAT_REQ reply has an unexpected opcode", async () => {

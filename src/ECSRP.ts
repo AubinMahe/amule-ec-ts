@@ -80,7 +80,10 @@ export function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
  * Multiplier k = H(PAD(N) || PAD(g)).
  */
 export const SRP_K = bufferToBigInt(
-   crypto.createHash("sha256").update(Buffer.concat([padBigInt(SRP_N), padBigInt(SRP_G)])).digest(),
+   crypto
+      .createHash("sha256")
+      .update(Buffer.concat([padBigInt(SRP_N), padBigInt(SRP_G)]))
+      .digest(),
 );
 
 /**
@@ -125,8 +128,14 @@ export function buildProofContext(
  */
 export function computeProofs(sharedSecret: bigint, ctx: Uint8Array): { m1: Buffer; m2: Buffer } {
    const key = crypto.createHash("sha256").update(padBigInt(sharedSecret)).digest();
-   const m1 = crypto.createHmac("sha256", key).update(Buffer.concat([Buffer.from("ec-srp-client"), Buffer.from(ctx)])).digest();
-   const m2 = crypto.createHmac("sha256", key).update(Buffer.concat([Buffer.from("ec-srp-server"), Buffer.from(ctx), m1])).digest();
+   const m1 = crypto
+      .createHmac("sha256", key)
+      .update(Buffer.concat([Buffer.from("ec-srp-client"), Buffer.from(ctx)]))
+      .digest();
+   const m2 = crypto
+      .createHmac("sha256", key)
+      .update(Buffer.concat([Buffer.from("ec-srp-server"), Buffer.from(ctx), m1]))
+      .digest();
    return { m1, m2 };
 }
 
@@ -179,7 +188,10 @@ export class ECSRPClient {
          throw new Error("Invalid server SRP B value: outside (0, N)");
       }
 
-      const uBuf = crypto.createHash("sha256").update(Buffer.concat([this.clientABytes, Buffer.from(params.serverB)])).digest();
+      const uBuf = crypto
+         .createHash("sha256")
+         .update(Buffer.concat([this.clientABytes, Buffer.from(params.serverB)]))
+         .digest();
       const u = bufferToBigInt(uBuf);
       if (u === 0n) {
          throw new Error("Invalid SRP parameter u: computed as zero");
@@ -191,7 +203,7 @@ export class ECSRPClient {
 
       // S = (B - k * (g^x mod N))^(a + u * x) mod N
       const gx = modPow(SRP_G, x, SRP_N);
-      let base = (B - (SRP_K * gx) % SRP_N) % SRP_N;
+      let base = (B - ((SRP_K * gx) % SRP_N)) % SRP_N;
       if (base < 0n) {
          base += SRP_N;
       }
@@ -213,4 +225,3 @@ export class ECSRPClient {
       };
    }
 }
-
