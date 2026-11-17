@@ -47,6 +47,31 @@ export interface CoreTweaksPrefs {
    kadMaxSourceSearches: number;
    kadSourceReaskMs: number;
    sourceReaskMs: number;
+   /**
+    * Download write buffer budget in MiB, 1..1024 (default 128) -
+    * EC_TAG_CORETW_WRITE_BUFFER_LIMIT_MIB. Added in aMule 3.3.0 (#2275).
+    */
+   writeBufferLimitMib?: number;
+   /**
+    * Direct debug messages to logfile only - EC_TAG_CORETW_VERBOSE_LOGFILE.
+    * Added in aMule 3.3.0 (#2330).
+    */
+   verboseLogfile?: boolean;
+   /**
+    * All available debug category names supported by the core (read-only) -
+    * EC_TAG_CORETW_DEBUG_CATEGORIES. Added in aMule 3.3.0 (#2330).
+    */
+   debugCategories?: string[];
+   /**
+    * Currently enabled debug category names -
+    * EC_TAG_CORETW_DEBUG_CATEGORIES_ENABLED. Added in aMule 3.3.0 (#2330).
+    */
+   debugCategoriesEnabled?: string[];
+   /**
+    * Maximum firewalled Kad nodes served as buddy (4..16, default 8) -
+    * EC_TAG_CORETW_KAD_MAX_SERVED_BUDDIES. Added in aMule 3.3.0 (#2457).
+    */
+   kadMaxServedBuddies?: number;
 }
 
 /**
@@ -345,6 +370,7 @@ export interface AmuleApiAccountPrefs {
  *    setting a new one.
  */
 export interface RemoteControlsPrefs {
+   // webserver* fields are retired in aMule 3.3.0 (#2503) and kept for backward compatibility.
    webserverPort: number;
    webserverAutorun: boolean;
    webserverPasswordHash?: string;
@@ -1053,6 +1079,29 @@ export class Preferences {
          kadSourceReaskMs: num(ECTagNames.EC_TAG_CORETW_KAD_REASK_MS),
          sourceReaskMs: num(ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS),
       };
+      const writeBufferLimit = section.childInt(ECTagNames.EC_TAG_CORETW_WRITE_BUFFER_LIMIT_MIB);
+      if (writeBufferLimit !== undefined) {
+         prefs.writeBufferLimitMib = Number(writeBufferLimit);
+      }
+      if (section.findChild(ECTagNames.EC_TAG_CORETW_VERBOSE_LOGFILE) !== undefined) {
+         prefs.verboseLogfile = true;
+      }
+      const debugCategoriesTag = section.findChild(ECTagNames.EC_TAG_CORETW_DEBUG_CATEGORIES);
+      if (debugCategoriesTag) {
+         prefs.debugCategories = debugCategoriesTag.children
+            .filter((t): t is ECStringTag => t instanceof ECStringTag)
+            .map((t) => t.value);
+      }
+      const debugCategoriesEnabledTag = section.findChild(ECTagNames.EC_TAG_CORETW_DEBUG_CATEGORIES_ENABLED);
+      if (debugCategoriesEnabledTag) {
+         prefs.debugCategoriesEnabled = debugCategoriesEnabledTag.children
+            .filter((t): t is ECStringTag => t instanceof ECStringTag)
+            .map((t) => t.value);
+      }
+      const kadMaxServedBuddies = section.childInt(ECTagNames.EC_TAG_CORETW_KAD_MAX_SERVED_BUDDIES);
+      if (kadMaxServedBuddies !== undefined) {
+         prefs.kadMaxServedBuddies = Number(kadMaxServedBuddies);
+      }
       debug("getCoreTweaks: %o", prefs);
       return prefs;
    }
@@ -1073,6 +1122,19 @@ export class Preferences {
          new ECUInt64Tag(ECTagNames.EC_TAG_CORETW_KAD_REASK_MS, BigInt(prefs.kadSourceReaskMs)),
          new ECUInt64Tag(ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS, BigInt(prefs.sourceReaskMs)),
       );
+      if (prefs.writeBufferLimitMib !== undefined) {
+         children.push(new ECUInt32Tag(ECTagNames.EC_TAG_CORETW_WRITE_BUFFER_LIMIT_MIB, prefs.writeBufferLimitMib));
+      }
+      if (prefs.verboseLogfile) {
+         children.push(new ECCustomTag(ECTagNames.EC_TAG_CORETW_VERBOSE_LOGFILE, new Uint8Array()));
+      }
+      if (prefs.debugCategoriesEnabled !== undefined) {
+         const categoryTags = prefs.debugCategoriesEnabled.map((cat) => new ECStringTag(ECTagNames.EC_TAG_STRING, cat));
+         children.push(new ECCustomTag(ECTagNames.EC_TAG_CORETW_DEBUG_CATEGORIES_ENABLED, new Uint8Array(), categoryTags));
+      }
+      if (prefs.kadMaxServedBuddies !== undefined) {
+         children.push(new ECUInt16Tag(ECTagNames.EC_TAG_CORETW_KAD_MAX_SERVED_BUDDIES, prefs.kadMaxServedBuddies));
+      }
       const section = new ECCustomTag(ECTagNames.EC_TAG_PREFS_CORETWEAKS, new Uint8Array(), children);
       await this.applySection(section);
       debug("setCoreTweaks: applied");

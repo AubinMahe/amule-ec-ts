@@ -70,10 +70,25 @@ describe("Search.start", () => {
       const search = new ec.Search(fake.connection);
       fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_STRINGS));
 
-      await search.start({ keywords: "cars", type: ec.ECSearchType.KAD });
+      await search.start({
+         keywords: "cars",
+         type: ec.ECSearchType.KAD,
+         minBitrate: 192,
+         minLengthSeconds: 180,
+         codec: "mp3",
+         title: "Life is a Highway",
+         album: "Cars Soundtrack",
+         artist: "Rascal Flatts",
+      });
 
       const searchTag = fake.sent[0]?.tags[0];
       expect(searchTag?.intValue).to.equal(BigInt(ec.ECSearchType.KAD));
+      expect(searchTag?.childInt(ec.ECTagNames.EC_TAG_SEARCH_MIN_BITRATE)).to.equal(192n);
+      expect(searchTag?.childInt(ec.ECTagNames.EC_TAG_SEARCH_MIN_LENGTH)).to.equal(180n);
+      expect(searchTag?.childString(ec.ECTagNames.EC_TAG_SEARCH_CODEC)).to.equal("mp3");
+      expect(searchTag?.childString(ec.ECTagNames.EC_TAG_SEARCH_TITLE)).to.equal("Life is a Highway");
+      expect(searchTag?.childString(ec.ECTagNames.EC_TAG_SEARCH_ALBUM)).to.equal("Cars Soundtrack");
+      expect(searchTag?.childString(ec.ECTagNames.EC_TAG_SEARCH_ARTIST)).to.equal("Rascal Flatts");
    });
 
    it("omits SEARCH_FILE_TYPE's sibling optional fields when not provided", async () => {

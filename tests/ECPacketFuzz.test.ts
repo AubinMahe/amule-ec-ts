@@ -131,7 +131,9 @@ function fuzzOnce(rng: () => number, corpus: readonly Seed[], iteration: number)
    } catch (error) {
       if (!(error instanceof ec.ECDecodeError) && !(error instanceof RangeError)) {
          const name = error instanceof Error ? error.constructor.name : typeof error;
-         expect.fail(`iteration ${iteration} threw ${name}, not ECDecodeError/RangeError: ${String(error)}\nbuffer: ${buffer.toString("hex")}`);
+         expect.fail(
+            `iteration ${iteration} threw ${name}, not ECDecodeError/RangeError: ${String(error)}\nbuffer: ${buffer.toString("hex")}`,
+         );
       }
       if (error instanceof RangeError && error.message.includes("call stack")) {
          expect.fail(`iteration ${iteration} overflowed the call stack instead of hitting maxTagDepth: ${String(error)}`);

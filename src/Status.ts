@@ -104,6 +104,24 @@ export class Status implements ECFetchable {
     */
    public tempFreeSpace: bigint | undefined;
    public incomingFreeSpace: bigint | undefined;
+   /**
+    * CPU time in milliseconds consumed by the daemon process -
+    * EC_TAG_STATS_CPU_MILLISECONDS. Added in aMule 3.3.0 (#2311).
+    */
+   public cpuMilliseconds: bigint | undefined;
+   /**
+    * Resident memory (RSS) in bytes used by the daemon process -
+    * EC_TAG_STATS_RESIDENT_MEMORY_BYTES. Added in aMule 3.3.0 (#2311).
+    */
+   public residentMemoryBytes: bigint | undefined;
+   /**
+    * Number of active connections - EC_TAG_STATS_ACTIVE_CONNECTIONS.
+    */
+   public activeConnections: bigint | undefined;
+   /**
+    * Daemon uptime in seconds - EC_TAG_STATS_UPTIME_SECONDS.
+    */
+   public uptimeSeconds: bigint | undefined;
 
    public constructor(public readonly connection: ECConnection) {}
 
@@ -176,6 +194,10 @@ export class Status implements ECFetchable {
          this.kadNodes = statsPacket.find(ECTagNames.EC_TAG_STATS_KAD_NODES)?.intValue;
          this.tempFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_TEMP_FREE_SPACE)?.intValue;
          this.incomingFreeSpace = statsPacket.find(ECTagNames.EC_TAG_STATS_INCOMING_FREE_SPACE)?.intValue;
+         this.cpuMilliseconds = statsPacket.find(ECTagNames.EC_TAG_STATS_CPU_MILLISECONDS)?.intValue;
+         this.residentMemoryBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_RESIDENT_MEMORY_BYTES)?.intValue;
+         this.activeConnections = statsPacket.find(ECTagNames.EC_TAG_STATS_ACTIVE_CONNECTIONS)?.intValue;
+         this.uptimeSeconds = statsPacket.find(ECTagNames.EC_TAG_STATS_UPTIME_SECONDS)?.intValue;
       }
       if (!connStateTag) {
          return;

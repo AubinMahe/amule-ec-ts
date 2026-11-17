@@ -7,21 +7,39 @@ Beyond bug fixes, future changes are driven by the upstream [amule-org/amule](ht
 EC opcodes/tags or protocol behavior changes there are what this client tracks - see CONTRIBUTING.md for how such changes are
 verified against that source before being reflected here.
 
+## [4.2.0] - 2026-11-17
+
+### Added
+
+- `ECAuthFailReason` enum and `EC_TAG_AUTH_FAIL_REASON` / `EC_TAG_AUTH_RETRY_AFTER` decode in `ECAuthenticationError` (#2333):
+  reports typed reason codes (`CLIENT_TOO_OLD`, `NO_PASSWORD`, `RATE_LIMITED`, `INCOMPATIBLE`, `REJECTED`) and lockout duration.
+- Media search filters in `ECSearchParams` (#2128): `minBitrate`, `minLengthSeconds`, `codec`, `title`, `album`, `artist`,
+  accompanied by capability tag `EC_TAG_CAN_SEARCH_METADATA` (`0x0035`).
+- Core debug logging and tweak preferences in `CoreTweaksPrefs` (#2275, #2330, #2457): `writeBufferLimitMib`, `verboseLogfile`,
+  `debugCategories`, `debugCategoriesEnabled`, and `kadMaxServedBuddies`.
+- Process statistics in `Status` (#2311): `cpuMilliseconds`, `residentMemoryBytes`, `activeConnections`, and `uptimeSeconds`.
+- New tags declared in `ECTagNames`: `EC_TAG_KAD_BUDDY` container (`0x2200`–`0x2242`), `EC_TAG_CLIENT_CONTACT_ROUTE` (`0x0634`), and
+  `EC_TAG_CLIENT_FROM_MASK` (`0x0635`).
+
+### Changed
+
+- `RemoteControlsPrefs`: documented `webserver*` properties as retired in aMule 3.3.0 (#2503) while maintaining full backward
+  compatibility.
+
 ## [4.1.0] - 2026-11-01
 
 ### Added
 
 - Modern SRP-6a authentication and AEAD transport encryption (#2035, upstream master):
-   - Added `ECSRPClient` and SRP-6a 3072-bit group (RFC 5054) math with Scrypt key derivation
-     (`N=32768, r=8, p=1`) in `ECSRP.ts`.
-   - Added `ECAEADSession` supporting X25519 ephemeral key exchange, HKDF-SHA256 session key derivation, and
-     authenticated encryption with AES-128-GCM and ChaCha20-Poly1305 in `ECAEADCipher.ts`.
+   - Added `ECSRPClient` and SRP-6a 3072-bit group (RFC 5054) math with Scrypt key derivation (`N=32768, r=8, p=1`) in `ECSRP.ts`.
+   - Added `ECAEADSession` supporting X25519 ephemeral key exchange, HKDF-SHA256 session key derivation, and authenticated
+     encryption with AES-128-GCM and ChaCha20-Poly1305 in `ECAEADCipher.ts`.
    - Added `ECFlag.ENCRYPTED` (bit 3 / `0x08`) and wire framing support in `ECFlags.ts` and `Transmission.ts`.
-   - Added `requireEncryption` option to `ECConnection` and `ECEngine.start({ requireEncryption })` (defaults to
-     `false` with automatic fallback to legacy MD5 challenge-response for older `amuled` versions).
-   - Added new EC opcodes `EC_OP_GET_KAD_LOOKUPS` (`0x69`) and `EC_OP_KNOWNFILE_DELETE` (`0x6a`), along with
-     capability tags `EC_TAG_CAN_CHAT_PEER_HASH`, `EC_TAG_CAN_SEARCH_ALL`, `EC_TAG_CAN_KAD_LOOKUPS`,
-     `EC_TAG_CAN_DELETE_COMPLETE`, `EC_TAG_NETWORKS_ENABLED`, and SRP tags `EC_TAG_SRP_A` through `EC_TAG_SRP_M2`.
+   - Added `requireEncryption` option to `ECConnection` and `ECEngine.start({ requireEncryption })` (defaults to `false` with
+     automatic fallback to legacy MD5 challenge-response for older `amuled` versions).
+   - Added new EC opcodes `EC_OP_GET_KAD_LOOKUPS` (`0x69`) and `EC_OP_KNOWNFILE_DELETE` (`0x6a`), along with capability tags
+     `EC_TAG_CAN_CHAT_PEER_HASH`, `EC_TAG_CAN_SEARCH_ALL`, `EC_TAG_CAN_KAD_LOOKUPS`, `EC_TAG_CAN_DELETE_COMPLETE`,
+     `EC_TAG_NETWORKS_ENABLED`, and SRP tags `EC_TAG_SRP_A` through `EC_TAG_SRP_M2`.
 
 ## [4.0.0] - 2026-09-20
 

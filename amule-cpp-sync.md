@@ -42,6 +42,47 @@ three real gaps: `EC_TAG_KNOWNFILE_COMMENT`/`_RATING`, `EC_TAG_FRIEND_FRIENDSLOT
 comment was incorrect (confirmed live: setting a shared file's comment/rating via `SharedFiles.setComment()`, then reading the raw
 `EC_OP_GET_SHARED_FILES` reply, shows both tags present with the value just set) and has been corrected.
 
+## 2026-11-17
+
+Local C++ checkout reviewed against `origin/master` (HEAD `0beaff37c`, 259 commits ahead of the 2026-10-31 baseline `f0f054ce3`).
+
+### Mechanical diff of `ECCodes.abstract`
+
+- **0 new opcodes**: Opcodes remain `0x01` through `0x6A`.
+- **6 tags retired / reserved**:
+   - `EC_TAG_WEBSERVER_*` (`0x1501`–`0x1506`): `amuleweb` completely removed (#2503, #2528).
+- **3 auth refusal and retry tags**:
+   - `EC_TAG_AUTH_FAIL_REASON` (`0x0034`, #2333): typed refusal reason code (`ECAuthFailReason`).
+   - `EC_TAG_CAN_SEARCH_METADATA` (`0x0035`, #2128): server validates media search filters.
+   - `EC_TAG_AUTH_RETRY_AFTER` (`0x0036`, #2333): rate-limit lockout delay in seconds.
+- **6 media search filter tags** (#2128):
+   - `EC_TAG_SEARCH_MIN_BITRATE` (`0x071B`), `EC_TAG_SEARCH_MIN_LENGTH` (`0x071C`), `EC_TAG_SEARCH_CODEC` (`0x071D`),
+     `EC_TAG_SEARCH_TITLE` (`0x071E`), `EC_TAG_SEARCH_ALBUM` (`0x071F`), `EC_TAG_SEARCH_ARTIST` (`0x0720`).
+- **5 process stats and buddy count tags**:
+   - `EC_TAG_STATS_CPU_MILLISECONDS` (`0x0223`) / `EC_TAG_STATS_RESIDENT_MEMORY_BYTES` (`0x0224`, #2311).
+   - `EC_TAG_STATS_BUDDY_SERVED` (`0x0225`) / `EC_TAG_STATS_BUDDY_SERVED_LIMIT` (`0x0226`, #2457).
+   - `EC_TAG_CONN_ADVERTISE_IPV6_MODE` (`0x131C`, #2366).
+- **2 download source routing tags**:
+   - `EC_TAG_CLIENT_CONTACT_ROUTE` (`0x0634`) / `EC_TAG_CLIENT_FROM_MASK` (`0x0635`, #2495/#2497).
+- **5 core tweaks & debug logging tags** (#2275, #2330, #2457):
+   - `EC_TAG_CORETW_WRITE_BUFFER_LIMIT_MIB` (`0x1D09`), `EC_TAG_CORETW_VERBOSE_LOGFILE` (`0x1D0A`), `EC_TAG_CORETW_DEBUG_CATEGORIES`
+     (`0x1D0B`), `EC_TAG_CORETW_DEBUG_CATEGORIES_ENABLED` (`0x1D0C`), `EC_TAG_CORETW_KAD_MAX_SERVED_BUDDIES` (`0x1D0D`).
+- **43 Kad Buddy diagnostics tags** (`0x2200`–`0x2242`, #2443, #2463).
+
+### Commit-by-commit review (behavior changes on protocol)
+
+- **One way to enter and store EC passwords (#2531 `31839d1ec`)**: `amuled --ec-config` replaced by `amuled --set-ec-pass-stdin`.
+  `amulecmd -P` replaced by `--password-stdin`. Client configs migrated to `[EC]/PasswordMD5`.
+- **Reason codes with `EC_OP_AUTH_FAIL` (#2333 `1285fbeda`)**: The daemon now sends `EC_TAG_AUTH_FAIL_REASON` and optional
+  `EC_TAG_AUTH_RETRY_AFTER` with failures, in addition to `EC_TAG_STRING`.
+- **Change amuled's debug settings over EC (#2330 `6bc1b0e29`)**: Core debug categories and logfile-only routing can now be read and
+  toggled over EC dynamically.
+- **Search media filters (#2128 `e71f64cf9`)**: Six audio/video metadata filters supported on Kad searches.
+- **Search result download validation (#2296 `198226eab`)**: `EC_OP_DOWNLOAD_SEARCH_RESULT` now returns `EC_OP_FAILED` when no open
+  search holds the result.
+- **Shared folders storage refactor (#2386 `8e726960a`)**: `shareddir.dat` migrated to `shareddir-explicit.dat` and
+  `shareddir-recursive.dat` and removed.
+
 ## 2026-10-31
 
 Local C++ checkout pulled (HEAD `f0f054ce3`, 632 commits ahead of the 2026-09-20 baseline `23dda72d8`).

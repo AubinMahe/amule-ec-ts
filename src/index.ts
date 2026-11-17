@@ -25,6 +25,7 @@ export * from "./ClientHistory.js";
 export * from "./Daemon.js";
 export * from "./Downloads.js";
 export * from "./ECAEADCipher.js";
+export * from "./ECAuthFailReason.js";
 export * from "./ECCapabilities.js";
 export * from "./ECConnection.js";
 export * from "./ECDetailLevel.js";
