@@ -116,4 +116,3 @@ describe("ECAEADCipher and session sealing", () => {
       });
    }
 });
-

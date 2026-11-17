@@ -81,4 +81,3 @@ describe("ECSRP math and official vectors", () => {
       }).to.throw("Invalid server SRP B width");
    });
 });
-

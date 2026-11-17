@@ -266,7 +266,10 @@ export async function acceptModernSRPAuthentication(
 
    // Server computes S and proofs M1/M2 to verify client proof
    const A = srp.bufferToBigInt(clientA);
-   const uBuf = crypto.createHash("sha256").update(Buffer.concat([Buffer.from(clientA), serverB])).digest();
+   const uBuf = crypto
+      .createHash("sha256")
+      .update(Buffer.concat([Buffer.from(clientA), serverB]))
+      .digest();
    const u = srp.bufferToBigInt(uBuf);
    const S = srp.modPow((A * srp.modPow(v, u, srp.SRP_N)) % srp.SRP_N, b, srp.SRP_N);
    const ctx = srp.buildProofContext(0, salt, transcript, A, B);

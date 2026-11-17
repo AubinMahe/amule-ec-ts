@@ -962,6 +962,16 @@ describe("Preferences.getCoreTweaks", () => {
             new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CORETW_KAD_MAX_SEARCHES, 2),
             new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CORETW_KAD_REASK_MS, 120000n),
             new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CORETW_SOURCE_REASK_MS, 180000n),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CORETW_WRITE_BUFFER_LIMIT_MIB, 128),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CORETW_VERBOSE_LOGFILE, new Uint8Array()),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CORETW_DEBUG_CATEGORIES, new Uint8Array(), [
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "General"),
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Kad"),
+            ]),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CORETW_DEBUG_CATEGORIES_ENABLED, new Uint8Array(), [
+               new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "General"),
+            ]),
+            new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_CORETW_KAD_MAX_SERVED_BUDDIES, 8),
          ]),
       );
       fake.queueReply(reply);
@@ -979,6 +989,11 @@ describe("Preferences.getCoreTweaks", () => {
          kadMaxSourceSearches: 2,
          kadSourceReaskMs: 120000,
          sourceReaskMs: 180000,
+         writeBufferLimitMib: 128,
+         verboseLogfile: true,
+         debugCategories: ["General", "Kad"],
+         debugCategoriesEnabled: ["General"],
+         kadMaxServedBuddies: 8,
       });
    });
 });

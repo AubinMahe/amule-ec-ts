@@ -288,6 +288,32 @@ describe("ECConnection.authenticateWithHash", () => {
       await serverSawClose;
    });
 
+   it("decodes EC_TAG_AUTH_FAIL_REASON and EC_TAG_AUTH_RETRY_AFTER on EC_OP_AUTH_FAIL", async () => {
+      const { connection, peer } = await connectPeer(server);
+
+      const authPromise = connection.authenticateWithHash(PASSWORD_HASH);
+      await peer.readPacket();
+      peer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_FAIL)
+            .add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Too many failed attempts."))
+            .add(new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_AUTH_FAIL_REASON, ec.ECAuthFailReason.RATE_LIMITED))
+            .add(new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_AUTH_RETRY_AFTER, 300)),
+      );
+
+      let caught: unknown;
+      try {
+         await authPromise;
+      } catch (error) {
+         caught = error;
+      }
+
+      expect(caught).to.be.instanceOf(ec.ECAuthenticationError);
+      const authErr = caught as ec.ECAuthenticationError;
+      expect(authErr.message).to.equal("Too many failed attempts.");
+      expect(authErr.reasonCode).to.equal(ec.ECAuthFailReason.RATE_LIMITED);
+      expect(authErr.retryAfterSeconds).to.equal(300);
+   });
+
    it("closes the connection when the handshake fails for any other reason, with a plain Error", async () => {
       const { connection, peer } = await connectPeer(server);
       const serverSawClose = new Promise<void>((resolve) => {
@@ -439,9 +465,7 @@ describe("ECConnection modern SRP-6a and AEAD encryption", () => {
 
       // Send bogus M2 proof
       const bogusM2 = Buffer.alloc(32, 0xaa);
-      peer.writePacket(
-         new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SRP_M2, bogusM2)),
-      );
+      peer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_AUTH_OK).add(new ec.ECCustomTag(ec.ECTagNames.EC_TAG_SRP_M2, bogusM2)));
 
       await expectRejection(authPromise, /Server SRP-6a verification proof failed \(M2 mismatch\)/);
    });
@@ -718,7 +742,9 @@ describe("ECConnection receive-side packet size limit", () => {
       const [, secondPeer] = await Promise.all([connection.reconnect("127.0.0.1", server.port), server.nextPeer()]);
 
       const pending = expectRejection(connection.receive(), /exceeds the 50-byte limit \(unauthenticated connection\)/);
-      secondPeer.writePacket(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, bigValue)));
+      secondPeer.writePacket(
+         new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP).add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, bigValue)),
+      );
 
       await pending;
       await disconnected;

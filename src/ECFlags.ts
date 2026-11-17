@@ -23,7 +23,8 @@ export const enum ECFlag {
 
 const VALIDATION_MASK = (1 << 5) | (1 << 6);
 
-const RESERVED_MASK = ~(ECFlag.ZLIB | ECFlag.UTF8_NUMBERS | ECFlag.ENCRYPTED | ECFlag.LARGE_TAG_COUNT | ECFlag.PROTOCOL_MARKER) >>> 0;
+const RESERVED_MASK =
+   ~(ECFlag.ZLIB | ECFlag.UTF8_NUMBERS | ECFlag.ENCRYPTED | ECFlag.LARGE_TAG_COUNT | ECFlag.PROTOCOL_MARKER) >>> 0;
 
 function has(flags: number, flag: ECFlag): boolean {
    return (flags & flag) !== 0;

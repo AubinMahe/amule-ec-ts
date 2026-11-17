@@ -104,11 +104,7 @@ export class ECAEADSession {
       const salt = Buffer.concat([Buffer.from(params.serverNonce), Buffer.from(params.clientNonce)]);
 
       // info = "aMule EC AEAD v1" || cipher_id || transcript
-      const info = Buffer.concat([
-         Buffer.from("aMule EC AEAD v1"),
-         Buffer.from([this.cipherId]),
-         Buffer.from(params.transcript),
-      ]);
+      const info = Buffer.concat([Buffer.from("aMule EC AEAD v1"), Buffer.from([this.cipherId]), Buffer.from(params.transcript)]);
 
       const okmLen = 2 * keyLen + 8;
       const okm = Buffer.from(crypto.hkdfSync("sha256", params.sharedSecret, salt, info, okmLen));
