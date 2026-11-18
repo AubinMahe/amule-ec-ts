@@ -775,12 +775,7 @@ export class SharedFiles implements ECFetchable {
     * (advertised in `remoteCapabilities.deleteComplete`).
     * The target requires its MD4 hash, ECID, containing directory path, and filename.
     */
-   public async deleteCompletedFile(file: {
-      hash: string;
-      ecid: bigint | number;
-      path: string;
-      name: string;
-   }): Promise<void> {
+   public async deleteCompletedFile(file: { hash: string; ecid: bigint | number; path: string; name: string }): Promise<void> {
       if (!this.connection.remoteCapabilities.deleteComplete) {
          throw new Error("Server does not support EC_OP_KNOWNFILE_DELETE (EC_TAG_CAN_DELETE_COMPLETE not advertised).");
       }

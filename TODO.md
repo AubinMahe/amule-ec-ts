@@ -74,8 +74,8 @@ retired, replaced by `EC_TAG_SRP_A`, `EC_TAG_SRP_B`, `EC_TAG_SRP_PROFILE` (scryp
   `_VERIFY_CORRUPT_AICH` (`0x041F`). Decoded in `SharedFile`.
 - Live metrics and stats: `EC_TAG_NETWORKS_ENABLED` (`0x002C`), `EC_TAG_STATS_SESSION_SENT_BYTES` (`0x021F`),
   `_SESSION_RECEIVED_BYTES` (`0x0220`), `_ACTIVE_CONNECTIONS` (`0x0221`), `_UPTIME_SECONDS` (`0x0222`), `_UP_OVERHEAD`,
-  `_DOWN_OVERHEAD`, `_BANNED_COUNT`, `_TOTAL_SENT_BYTES`, `_TOTAL_RECEIVED_BYTES`, `_SHARED_FILE_COUNT` in `Status.ts`,
-  and `EC_TAG_PARTFILE_SPEED_SMOOTHED` (`0x0324`) in `Downloads.ts`.
+  `_DOWN_OVERHEAD`, `_BANNED_COUNT`, `_TOTAL_SENT_BYTES`, `_TOTAL_RECEIVED_BYTES`, `_SHARED_FILE_COUNT` in `Status.ts`, and
+  `EC_TAG_PARTFILE_SPEED_SMOOTHED` (`0x0324`) in `Downloads.ts`.
 - Complete enum parity in `ECTagNames.ts`: all 55 missing tags ported from `ECCodes.abstract`.
 
 - **Status**: Completed
