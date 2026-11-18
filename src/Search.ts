@@ -22,6 +22,12 @@ export enum ECSearchType {
     * a `KnownSearch.browsePeerEcid`.
     */
    BROWSE = 0x04,
+   /**
+    * Search all available networks simultaneously (eD2k local + global + Kad).
+    * Requires server capability `remoteCapabilities.searchAll` (EC_TAG_CAN_SEARCH_ALL).
+    * Added in aMule 3.3.0 (#1670).
+    */
+   ALL = 0x05,
 }
 
 /**
@@ -86,6 +92,16 @@ export interface ECSearchProgress {
    kind: ECSearchType;
    percent: number;
    resultCount: number;
+   /**
+    * Whether the Kad component of this search is currently running (including EC_SEARCH_ALL).
+    * Decoded from EC_TAG_SEARCH_KAD_ACTIVE.
+    */
+   kadActive?: boolean;
+   /**
+    * Whether the eD2k component of this search is currently running (including EC_SEARCH_ALL).
+    * Decoded from EC_TAG_SEARCH_ED2K_ACTIVE.
+    */
+   ed2kActive?: boolean;
 }
 
 /**
@@ -133,6 +149,24 @@ export class SearchResult {
    public readonly sizeFull: bigint;
    public readonly sources: bigint;
    /**
+    * Complete source count - EC_TAG_PARTFILE_SOURCE_COUNT_XFER.
+    */
+   public readonly sourcesComplete: bigint;
+   /**
+    * Split source count from eD2k network (on EC_SEARCH_ALL results) -
+    * EC_TAG_SEARCHFILE_ED2K_SOURCES.
+    */
+   public readonly sourcesEd2k: bigint | undefined;
+   /**
+    * Split source count from Kad network (on EC_SEARCH_ALL results) -
+    * EC_TAG_SEARCHFILE_KAD_SOURCES.
+    */
+   public readonly sourcesKad: bigint | undefined;
+   /**
+    * Download status of this search result (0 = not downloading) - EC_TAG_PARTFILE_STATUS.
+    */
+   public readonly status: bigint | undefined;
+   /**
     * Community ratings/comments (Kad NOTES) - see FileComment/parseFileComments' doc.
     */
    public readonly comments: readonly FileComment[];
@@ -162,6 +196,10 @@ export class SearchResult {
       this.name = tag.childString(ECTagNames.EC_TAG_PARTFILE_NAME) ?? "";
       this.sizeFull = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL) ?? 0n;
       this.sources = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n;
+      this.sourcesComplete = tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT_XFER) ?? 0n;
+      this.sourcesEd2k = tag.childInt(ECTagNames.EC_TAG_SEARCHFILE_ED2K_SOURCES);
+      this.sourcesKad = tag.childInt(ECTagNames.EC_TAG_SEARCHFILE_KAD_SOURCES);
+      this.status = tag.childInt(ECTagNames.EC_TAG_PARTFILE_STATUS);
       this.comments = parseFileComments(tag) ?? [];
       this.kadCommentSearching = parseKadCommentSearching(tag);
       this.media = parseMediaMetadata(tag);
@@ -267,11 +305,15 @@ export class SearchSession {
       const kindTag = reply.find(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_KIND);
       const percentTag = reply.find(ECTagNames.EC_TAG_SEARCH_LIFECYCLE_PERCENT);
       const countTag = reply.find(ECTagNames.EC_TAG_SEARCH_RESULT_COUNT);
+      const kadActiveTag = reply.find(ECTagNames.EC_TAG_SEARCH_KAD_ACTIVE);
+      const ed2kActiveTag = reply.find(ECTagNames.EC_TAG_SEARCH_ED2K_ACTIVE);
       const progress: ECSearchProgress = {
          state: Number(stateTag?.intValue ?? 0n),
          kind: Number(kindTag?.intValue ?? 0n),
          percent: Number(percentTag?.intValue ?? 0n),
          resultCount: Number(countTag?.intValue ?? 0n),
+         ...(kadActiveTag ? { kadActive: kadActiveTag.intValue !== 0n } : {}),
+         ...(ed2kActiveTag ? { ed2kActive: ed2kActiveTag.intValue !== 0n } : {}),
       };
       debug(
          "progress: id=%s, state=%s, kind=%s, percent=%d, resultCount=%d",

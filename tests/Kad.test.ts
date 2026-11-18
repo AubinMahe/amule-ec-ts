@@ -188,3 +188,58 @@ describe("Kad.disconnect", () => {
       await expectRejection(kad.disconnect(), /EC_OP_STRINGS/);
    });
 });
+
+describe("Kad.getLookups", () => {
+   it("throws when remoteCapabilities.kadLookups is false", async () => {
+      const fake = createFakeConnection();
+      const kad = new ec.Kad(fake.connection);
+
+      await expectRejection(kad.getLookups(), /EC_OP_GET_KAD_LOOKUPS/);
+   });
+
+   it("sends EC_OP_GET_KAD_LOOKUPS and decodes Kad lookup reports", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.kadLookups = true;
+      const kad = new ec.Kad(fake.connection);
+
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_GET_KAD_LOOKUPS);
+      const lookupTag = new ec.ECCustomTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP, new Uint8Array(), [
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_TARGET, "target-hash"),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_KEYWORD, "debian"),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_TYPE, ec.KadLookupType.Keyword),
+         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_ACTIVE, 1),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_OVERDUE, 0),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_OMITTED_PEERS, 2),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_EVICTED_REFERRALS, 1),
+         new ec.ECCustomTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER, new Uint8Array(), [
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_IP, 0x7f000001),
+            new ec.ECUInt16Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_PORT, 4672),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_ID, new Uint8Array(16)),
+            new ec.ECCustomTag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_DISTANCE, new Uint8Array(16)),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_VERSION, 2),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_REQUESTS, 1),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_REPLIES, 1),
+            new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_RTT, 45n),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_ITEM_REQUESTS, 0),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_ITEM_REPLIES, 0),
+            new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_RESULTS, 5),
+            new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_KAD_LOOKUP_PEER_PENDING, 0),
+         ]),
+      ]);
+      reply.add(lookupTag);
+      fake.queueReply(reply);
+
+      const reports = await kad.getLookups();
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_GET_KAD_LOOKUPS);
+      expect(reports).to.have.lengthOf(1);
+      expect(reports[0]?.target).to.equal("target-hash");
+      expect(reports[0]?.keyword).to.equal("debian");
+      expect(reports[0]?.type).to.equal(ec.KadLookupType.Keyword);
+      expect(reports[0]?.active).to.equal(true);
+      expect(reports[0]?.peers).to.have.lengthOf(1);
+      expect(reports[0]?.peers[0]?.ip).to.equal("127.0.0.1");
+      expect(reports[0]?.peers[0]?.port).to.equal(4672);
+      expect(reports[0]?.peers[0]?.results).to.equal(5);
+   });
+});

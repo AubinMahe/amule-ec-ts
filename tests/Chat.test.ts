@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import * as ec from "../src/index.js";
-import { createFakeConnection, expectRejection } from "./testUtils.js";
+import { createFakeConnection, expectRejection, hexHash } from "./testUtils.js";
 
 /**
  * Builds a synthetic EC_TAG_CHAT_MESSAGE tag, as ChatMessage.fromTag() reads it.
@@ -295,5 +295,39 @@ describe("Chat.closeSession", () => {
       fake.queueReply(failure);
 
       await expectRejection(chat.closeSession(42n), /No such chat session/);
+   });
+});
+
+describe("Chat.sendToPeerHash and CAPTCHA", () => {
+   it("sends EC_TAG_CHAT_PEER_HASH and optional EC_TAG_CHAT_CAPTCHA_ID", async () => {
+      const fake = createFakeConnection();
+      withChatCapability(fake);
+      const chat = new ec.Chat(fake.connection);
+      const reply = new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP);
+      reply.add(new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CHAT_CLIENT_ID, 12345n));
+      fake.queueReply(reply);
+
+      const resolved = await chat.sendToPeerHash(hexHash("b"), "solution123", 99);
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_CHAT_SEND);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CHAT_PEER_HASH)).to.be.instanceOf(ec.ECHash16Tag);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_CHAT_CAPTCHA_ID)?.intValue).to.equal(99n);
+      expect(resolved).to.equal(12345n);
+   });
+
+   it("decodes CAPTCHA challenge and result on ChatMessage", () => {
+      const msgTag = new ec.ECCustomTag(ec.ECTagNames.EC_TAG_CHAT_MESSAGE, new Uint8Array(), [
+         new ec.ECUInt64Tag(ec.ECTagNames.EC_TAG_CHAT_MSG_ID, 1n),
+         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CHAT_DIRECTION, ec.ChatDirection.IN),
+         new ec.ECUInt32Tag(ec.ECTagNames.EC_TAG_CHAT_TIMESTAMP, 1000),
+         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CHAT_MESSAGE_KIND, ec.ChatMessageKind.CAPTCHA_CHALLENGE),
+         new ec.ECStringTag(ec.ECTagNames.EC_TAG_CHAT_CAPTCHA_IMAGE, "base64image"),
+         new ec.ECUInt8Tag(ec.ECTagNames.EC_TAG_CHAT_CAPTCHA_STATUS, 0),
+      ]);
+      const msg = ec.ChatMessage.fromTag(msgTag);
+
+      expect(msg.kind).to.equal(ec.ChatMessageKind.CAPTCHA_CHALLENGE);
+      expect(msg.captchaImage).to.equal("base64image");
+      expect(msg.captchaStatus).to.equal(0);
    });
 });

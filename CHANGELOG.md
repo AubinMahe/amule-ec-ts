@@ -7,6 +7,30 @@ Beyond bug fixes, future changes are driven by the upstream [amule-org/amule](ht
 EC opcodes/tags or protocol behavior changes there are what this client tracks - see CONTRIBUTING.md for how such changes are
 verified against that source before being reflected here.
 
+## [4.3.0] - 2026-11-18
+
+### Added
+
+- Kad Lookups diagnostics service via `Kad.getLookups()` (`EC_OP_GET_KAD_LOOKUPS`, opcode `0x69`)
+  guarded on negotiated capability `ECCapabilities.kadLookups` (`EC_TAG_CAN_KAD_LOOKUPS`). Exposes active
+  Kad lookups with typed metrics (`KadLookupReport`, `KadLookupPeer`, `KadLookupReferral`, `KadLookupType`).
+- Disk deletion service for completed files in `SharedFiles.deleteCompletedFile()` (`EC_OP_KNOWNFILE_DELETE`,
+  opcode `0x6a`) guarded on negotiated capability `ECCapabilities.deleteComplete` (`EC_TAG_CAN_DELETE_COMPLETE`).
+- Unified search (`ECSearchType.ALL = 0x05`) support in `Search`, reporting split source counters (`sourcesEd2k`,
+  `sourcesKad`, `sourcesComplete`), completion status (`status`), and decoupled component activity tracking
+  (`kadActive`, `ed2kActive` in `ECSearchProgress`).
+- Enhanced Chat with peer hash targeting and anti-spam CAPTCHA handling: added `ChatMessageKind` (`TEXT`,
+  `CAPTCHA_CHALLENGE`, `CAPTCHA_RESULT`), `Chat.sendToPeerHash()` supporting IPv6/Kad targets, session-level
+  `peerHash`, and CAPTCHA challenge decoding/response.
+- Comprehensive telemetry metrics decoded in `Status`: session sent/received bytes (`EC_TAG_STATS_SESSION_*_BYTES`),
+  lifetime total sent/received bytes (`EC_TAG_STATS_TOTAL_*_BYTES`), protocol overhead (`upOverhead`, `downOverhead`),
+  banned client count (`bannedCount`), local shared files count (`sharedFileCount`), and network activation mask
+  (`networksEnabled`).
+- Smoothed transfer speed `speedSmoothed` (`EC_TAG_PARTFILE_SPEED_SMOOTHED`) decoded in `DownloadFile`.
+- Full tag parity with upstream C++ `amuled` (`0beaff37c`): added all 55 missing tag declarations in `ECTagNames`
+  (reaching 100% parity across all 574 tags), including Kad lookup containers (`0x2100`–`0x2127`), integrity
+  verification dates/counters (`0x041D`–`0x041F`), and server update busy flags (`0x0513`).
+
 ## [4.2.0] - 2026-11-17
 
 ### Added

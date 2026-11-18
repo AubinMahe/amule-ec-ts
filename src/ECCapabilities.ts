@@ -58,4 +58,30 @@ export class ECCapabilities {
     * before authenticating, same timing constraint as multiSearch.
     */
    public chatSessions = false;
+   /**
+    * Whether this connection negotiated addressing chat sessions by peer MD4 hash
+    * (EC_TAG_CAN_CHAT_PEER_HASH / EC_TAG_CHAT_PEER_HASH) - unlocks chats with peers
+    * unreachable via GUI_ID(ip, port) such as IPv6 endpoints. Opt-in on localCapabilities.
+    */
+   public chatPeerHash = false;
+   /**
+    * Whether the daemon supports simultaneous eD2k+Kad search (EC_SEARCH_ALL) -
+    * advertised unconditionally by modern daemons via EC_TAG_CAN_SEARCH_ALL on AUTH_OK.
+    */
+   public searchAll = false;
+   /**
+    * Whether the daemon supports and validates media search filters (bitrate, length,
+    * codec, title, album, artist) - advertised via EC_TAG_CAN_SEARCH_METADATA.
+    */
+   public searchMetadata = false;
+   /**
+    * Whether the daemon supports Kad lookup diagnostics snapshots via EC_OP_GET_KAD_LOOKUPS -
+    * advertised via EC_TAG_CAN_KAD_LOOKUPS on AUTH_OK.
+    */
+   public kadLookups = false;
+   /**
+    * Whether the daemon supports physical deletion of completed shared files from disk via
+    * EC_OP_KNOWNFILE_DELETE - advertised via EC_TAG_CAN_DELETE_COMPLETE on AUTH_OK.
+    */
+   public deleteComplete = false;
 }

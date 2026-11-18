@@ -68,6 +68,11 @@ export interface ECEngineStartOptions {
     */
    chatSessions?: boolean;
    /**
+    * Sets connection.localCapabilities.chatPeerHash before authenticating - enables chat
+    * session addressing by peer MD4 hash (requires `chatSessions`).
+    */
+   chatPeerHash?: boolean;
+   /**
     * Sets connection.requestTimeoutMs before authenticating, so the handshake itself is covered:
     * how long every request waits for its reply before the connection is closed (and
     * reconnected by this engine). Defaults to ECConnection.DEFAULT_REQUEST_TIMEOUT_MS (30 s);
@@ -136,10 +141,11 @@ export function armReconnect(
    multiSearch: boolean,
    chatSessions: boolean,
    initialDelayMs = RECONNECT_INITIAL_DELAY_MS,
+   chatPeerHash = false,
 ): void {
    connection.once("disconnected", () => {
       console.error("amule-ec: connection to amuled lost, reconnecting...");
-      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs);
+      void reconnectLoop(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs, chatPeerHash);
    });
 }
 
@@ -152,6 +158,7 @@ async function reconnectLoop(
    multiSearch: boolean,
    chatSessions: boolean,
    initialDelayMs: number,
+   chatPeerHash = false,
 ): Promise<void> {
    let delayMs = initialDelayMs;
    for (let attempt = 1; ; attempt++) {
@@ -162,9 +169,10 @@ async function reconnectLoop(
          connection.localCapabilities.notify = notify;
          connection.localCapabilities.multiSearch = multiSearch;
          connection.localCapabilities.chatSessions = chatSessions;
+         connection.localCapabilities.chatPeerHash = chatPeerHash;
          await connection.authenticateWithHash(passwordHash);
          console.log("amule-ec: reconnected to amuled.");
-         armReconnect(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs);
+         armReconnect(connection, host, port, passwordHash, notify, multiSearch, chatSessions, initialDelayMs, chatPeerHash);
          return;
       } catch (error) {
          if (error instanceof ECAuthenticationError) {
@@ -195,10 +203,12 @@ export const ECEngine = {
       const notify = options.notify ?? false;
       const multiSearch = options.multiSearch ?? false;
       const chatSessions = options.chatSessions ?? false;
+      const chatPeerHash = options.chatPeerHash ?? false;
       const connection = await ECConnection.connect(host, options.port, undefined, options.allowNonLoopback ?? false);
       connection.localCapabilities.notify = notify;
       connection.localCapabilities.multiSearch = multiSearch;
       connection.localCapabilities.chatSessions = chatSessions;
+      connection.localCapabilities.chatPeerHash = chatPeerHash;
       connection.readOnly = options.readOnly ?? false;
       if (options.requireEncryption !== undefined) {
          connection.requireEncryption = options.requireEncryption;
@@ -215,7 +225,7 @@ export const ECEngine = {
       if (altNamesCacheInstance) {
          await altNamesCacheInstance.init(ALT_NAMES_CACHE_MAX_AGE_MS);
       }
-      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch, chatSessions);
+      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch, chatSessions, undefined, chatPeerHash);
    },
 
    get connection(): ECConnection {

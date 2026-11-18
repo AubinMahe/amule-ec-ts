@@ -518,3 +518,44 @@ describe("SharedFileTracker", () => {
       expect(tracker.files[0]?.comments).to.have.lengthOf(1);
    });
 });
+
+describe("SharedFiles.deleteCompletedFile", () => {
+   it("throws when remoteCapabilities.deleteComplete is false", async () => {
+      const fake = createFakeConnection();
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+
+      await expectRejection(
+         sharedFiles.deleteCompletedFile({ hash: hexHash("a"), ecid: 1, path: "/incoming", name: "one.avi" }),
+         /EC_OP_KNOWNFILE_DELETE/,
+      );
+   });
+
+   it("sends EC_OP_KNOWNFILE_DELETE with 4 required tags and succeeds on EC_OP_NOOP", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.deleteComplete = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      fake.queueReply(new ec.ECPacket(ec.ECOpcode.EC_OP_NOOP));
+
+      await sharedFiles.deleteCompletedFile({ hash: hexHash("a"), ecid: 42, path: "/incoming", name: "one.avi" });
+
+      expect(fake.sent[0]?.opcode).to.equal(ec.ECOpcode.EC_OP_KNOWNFILE_DELETE);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE)).to.be.instanceOf(ec.ECHash16Tag);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_ECID)?.intValue).to.equal(42n);
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_KNOWNFILE_PATH)?.stringValue).to.equal("/incoming");
+      expect(fake.sent[0]?.find(ec.ECTagNames.EC_TAG_PARTFILE_NAME)?.stringValue).to.equal("one.avi");
+   });
+
+   it("throws on EC_OP_FAILED with the reason from the daemon", async () => {
+      const fake = createFakeConnection();
+      fake.connection.remoteCapabilities.deleteComplete = true;
+      const sharedFiles = new ec.SharedFiles(fake.connection);
+      const fail = new ec.ECPacket(ec.ECOpcode.EC_OP_FAILED);
+      fail.add(new ec.ECStringTag(ec.ECTagNames.EC_TAG_STRING, "Permission denied"));
+      fake.queueReply(fail);
+
+      await expectRejection(
+         sharedFiles.deleteCompletedFile({ hash: hexHash("a"), ecid: 42, path: "/incoming", name: "one.avi" }),
+         /Permission denied/,
+      );
+   });
+});

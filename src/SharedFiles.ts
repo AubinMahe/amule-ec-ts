@@ -5,7 +5,7 @@ import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECDetailLevel } from "./ECDetailLevel.js";
-import { ECTag, ECUInt8Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
+import { ECTag, ECUInt8Tag, ECUInt32Tag, ECHash16Tag, ECStringTag } from "./ECTags.js";
 import type { ECDownloadPriority } from "./Downloads.js";
 import { resolveSourceNames } from "./PartFileSourceNames.js";
 import { resolveGaps, resolveRequestedRanges, resolvePartAvailability } from "./PartFileStatus.js";
@@ -259,6 +259,18 @@ export class SharedFile {
     * Probed audio/video metadata, if any - see MediaMetadata's doc.
     */
    public readonly media: MediaMetadata | undefined;
+   /**
+    * Timestamp of the last local data verification - EC_TAG_KNOWNFILE_VERIFY_DATE.
+    */
+   public readonly verifyDate: bigint | undefined;
+   /**
+    * Corrupt parts count found during MD4 verification - EC_TAG_KNOWNFILE_VERIFY_CORRUPT_MD4.
+    */
+   public readonly verifyCorruptMd4: bigint | undefined;
+   /**
+    * Corrupt parts count found during AICH verification - EC_TAG_KNOWNFILE_VERIFY_CORRUPT_AICH.
+    */
+   public readonly verifyCorruptAich: bigint | undefined;
 
    private constructor(fields: {
       hash: string | undefined;
@@ -280,6 +292,9 @@ export class SharedFile {
       media: MediaMetadata | undefined;
       comment: string | undefined;
       rating: FileRating | undefined;
+      verifyDate?: bigint;
+      verifyCorruptMd4?: bigint;
+      verifyCorruptAich?: bigint;
    }) {
       this.hash = fields.hash;
       this.name = fields.name;
@@ -300,6 +315,9 @@ export class SharedFile {
       this.media = fields.media;
       this.comment = fields.comment;
       this.rating = fields.rating;
+      this.verifyDate = fields.verifyDate;
+      this.verifyCorruptMd4 = fields.verifyCorruptMd4;
+      this.verifyCorruptAich = fields.verifyCorruptAich;
    }
 
    /**
@@ -340,6 +358,9 @@ export class SharedFile {
          media: parseMediaMetadata(tag),
          comment: tag.childString(ECTagNames.EC_TAG_KNOWNFILE_COMMENT),
          rating: ratingOrUndefined(tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_RATING)),
+         verifyDate: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_VERIFY_DATE),
+         verifyCorruptMd4: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_VERIFY_CORRUPT_MD4),
+         verifyCorruptAich: tag.childInt(ECTagNames.EC_TAG_KNOWNFILE_VERIFY_CORRUPT_AICH),
       });
    }
 
@@ -368,6 +389,9 @@ export class SharedFile {
          media: update.media ?? this.media,
          comment: update.comment ?? this.comment,
          rating: update.rating ?? this.rating,
+         verifyDate: update.verifyDate ?? this.verifyDate,
+         verifyCorruptMd4: update.verifyCorruptMd4 ?? this.verifyCorruptMd4,
+         verifyCorruptAich: update.verifyCorruptAich ?? this.verifyCorruptAich,
       });
    }
 }
@@ -742,6 +766,39 @@ export class SharedFiles implements ECFetchable {
          });
       debug("setSharedDirs: %d dir(s), %d rejected", dirs.length, rejections.length);
       return rejections;
+   }
+
+   /**
+    * Deletes a completed shared file from disk - EC_OP_KNOWNFILE_DELETE.
+    *
+    * Added in aMule 3.3.0 (#1950). Requires server capability `EC_TAG_CAN_DELETE_COMPLETE`
+    * (advertised in `remoteCapabilities.deleteComplete`).
+    * The target requires its MD4 hash, ECID, containing directory path, and filename.
+    */
+   public async deleteCompletedFile(file: {
+      hash: string;
+      ecid: bigint | number;
+      path: string;
+      name: string;
+   }): Promise<void> {
+      if (!this.connection.remoteCapabilities.deleteComplete) {
+         throw new Error("Server does not support EC_OP_KNOWNFILE_DELETE (EC_TAG_CAN_DELETE_COMPLETE not advertised).");
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_KNOWNFILE_DELETE);
+      request.add(new ECHash16Tag(ECTagNames.EC_TAG_KNOWNFILE, new Uint8Array(Buffer.from(file.hash, "hex"))));
+      request.add(new ECUInt32Tag(ECTagNames.EC_TAG_ECID, Number(file.ecid)));
+      request.add(new ECStringTag(ECTagNames.EC_TAG_KNOWNFILE_PATH, file.path));
+      request.add(new ECStringTag(ECTagNames.EC_TAG_PARTFILE_NAME, file.name));
+      const reply = await this.connection.request(request);
+      if (reply.opcode === ECOpcode.EC_OP_FAILED) {
+         const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
+         const reason = reasonTag instanceof ECStringTag ? reasonTag.value : `Failed to delete file ${file.name} from disk.`;
+         throw new Error(reason);
+      }
+      if (reply.opcode !== ECOpcode.EC_OP_NOOP) {
+         throw new Error(`Expected EC_OP_NOOP, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      debug("deleteCompletedFile: deleted %s (ecid=%s)", file.name, file.ecid);
    }
 }
 

@@ -181,6 +181,11 @@ export class DownloadFile {
    public readonly sizeDone: bigint | undefined;
    public readonly speed: bigint | undefined;
    /**
+    * Smoothed transfer rate in KiB/s for time-remaining calculations -
+    * EC_TAG_PARTFILE_SPEED_SMOOTHED (double). Added in aMule 3.3.0 (#2007).
+    */
+   public readonly speedSmoothed: number | undefined;
+   /**
     * `EC_TAG_PARTFILE_SOURCE_COUNT` - added unconditionally in `CEC_PartFile_Tag`, before its
     * `EC_DETAIL_UPDATE` early-return - defaults to `0n`, not "unknown", on the rare tag actually
     * built at that bare level.
@@ -288,6 +293,7 @@ export class DownloadFile {
       sizeFull: bigint | undefined;
       sizeDone: bigint | undefined;
       speed: bigint | undefined;
+      speedSmoothed?: number;
       sources: bigint;
       status: bigint;
       prio: bigint;
@@ -312,6 +318,7 @@ export class DownloadFile {
       this.sizeFull = fields.sizeFull;
       this.sizeDone = fields.sizeDone;
       this.speed = fields.speed;
+      this.speedSmoothed = fields.speedSmoothed;
       this.sources = fields.sources;
       this.status = fields.status;
       this.prio = fields.prio;
@@ -356,6 +363,7 @@ export class DownloadFile {
          sizeFull: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_FULL),
          sizeDone: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SIZE_DONE),
          speed: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SPEED),
+         speedSmoothed: tag.childDouble(ECTagNames.EC_TAG_PARTFILE_SPEED_SMOOTHED),
          sources: tag.childInt(ECTagNames.EC_TAG_PARTFILE_SOURCE_COUNT) ?? 0n,
          status: tag.childInt(ECTagNames.EC_TAG_PARTFILE_STATUS) ?? 0n,
          prio: tag.childInt(ECTagNames.EC_TAG_PARTFILE_PRIO) ?? 0n,
@@ -388,6 +396,7 @@ export class DownloadFile {
          sizeFull: update.sizeFull ?? this.sizeFull,
          sizeDone: update.sizeDone ?? this.sizeDone,
          speed: update.speed ?? this.speed,
+         speedSmoothed: update.speedSmoothed ?? this.speedSmoothed,
          sources: update.sources,
          status: update.status,
          prio: update.prio,
