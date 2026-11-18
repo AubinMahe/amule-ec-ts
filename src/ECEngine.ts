@@ -225,7 +225,17 @@ export const ECEngine = {
       if (altNamesCacheInstance) {
          await altNamesCacheInstance.init(ALT_NAMES_CACHE_MAX_AGE_MS);
       }
-      armReconnect(connection, host, options.port, options.passwordHash, notify, multiSearch, chatSessions, undefined, chatPeerHash);
+      armReconnect(
+         connection,
+         host,
+         options.port,
+         options.passwordHash,
+         notify,
+         multiSearch,
+         chatSessions,
+         undefined,
+         chatPeerHash,
+      );
    },
 
    get connection(): ECConnection {

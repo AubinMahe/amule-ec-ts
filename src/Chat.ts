@@ -343,11 +343,7 @@ export class Chat implements ECFetchable {
     * @throws RangeError if `ip` is not a dotted-quad IPv4 address or `port` is not in 1-65535.
     */
    public async sendToAddress(ip: string, port: number, text: string, captchaId?: number): Promise<bigint> {
-      const resolved = await this.sendTo(
-         { clientId: chatClientId(ip, port), captchaId },
-         text,
-         `Failed to send to ${ip}:${port}.`,
-      );
+      const resolved = await this.sendTo({ clientId: chatClientId(ip, port), captchaId }, text, `Failed to send to ${ip}:${port}.`);
       debug("sendToAddress: %s:%d", ip, port);
       return resolved;
    }

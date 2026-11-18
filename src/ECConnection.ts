@@ -44,18 +44,20 @@ function md5Hex(input: string): string {
 
 /**
  * The daemon answered EC_OP_AUTH_FAIL: it refused the credentials (or the protocol version), and
- * asking again with the same ones cannot succeed. `message` is the reason it gave, if any. Any
- * other failure of the handshake (a timeout, a dropped connection) is a plain Error, and may well
- * be transient.
+ * asking again with the same ones cannot succeed. `message` is the textual reason it gave, if any.
+ * `reason` is the typed failure code (`ECAuthFailReason`: `CLIENT_TOO_OLD`, `NO_PASSWORD`,
+ * `RATE_LIMITED`, `INCOMPATIBLE`, `REJECTED`), and `retryAfterSeconds` reports any anti-brute-force
+ * lockout duration (in seconds) sent by the daemon when rate-limited. Any other failure of the
+ * handshake (a timeout, a dropped connection) is a plain Error, and may well be transient.
  */
 export class ECAuthenticationError extends Error {
-   public readonly reasonCode?: ECAuthFailReason;
+   public readonly reason?: ECAuthFailReason;
    public readonly retryAfterSeconds?: number;
 
-   public constructor(message: string, reasonCode?: ECAuthFailReason, retryAfterSeconds?: number) {
+   public constructor(message: string, reason?: ECAuthFailReason, retryAfterSeconds?: number) {
       super(message);
       this.name = "ECAuthenticationError";
-      this.reasonCode = reasonCode;
+      this.reason = reason;
       this.retryAfterSeconds = retryAfterSeconds;
    }
 }
@@ -745,13 +747,13 @@ export class ECConnection extends events.EventEmitter {
    }
 
    private static parseAuthFailure(packet: ECPacket): ECAuthenticationError {
-      const reasonTag = packet.find(ECTagNames.EC_TAG_STRING);
-      const reason = reasonTag instanceof ECStringTag ? reasonTag.value : "EC authentication failed.";
-      const reasonCodeTag = packet.find(ECTagNames.EC_TAG_AUTH_FAIL_REASON);
-      const reasonCode = reasonCodeTag?.intValue !== undefined ? Number(reasonCodeTag.intValue) : undefined;
+      const messageTag = packet.find(ECTagNames.EC_TAG_STRING);
+      const message = messageTag instanceof ECStringTag ? messageTag.value : "EC authentication failed.";
+      const reasonTag = packet.find(ECTagNames.EC_TAG_AUTH_FAIL_REASON);
+      const reason = reasonTag?.intValue !== undefined ? Number(reasonTag.intValue) : undefined;
       const retryTag = packet.find(ECTagNames.EC_TAG_AUTH_RETRY_AFTER);
       const retryAfterSeconds = retryTag?.intValue !== undefined ? Number(retryTag.intValue) : undefined;
-      return new ECAuthenticationError(reason, reasonCode, retryAfterSeconds);
+      return new ECAuthenticationError(message, reason, retryAfterSeconds);
    }
 
    public async send(packet: ECPacket): Promise<void> {

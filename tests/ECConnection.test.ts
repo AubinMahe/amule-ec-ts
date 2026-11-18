@@ -310,7 +310,7 @@ describe("ECConnection.authenticateWithHash", () => {
       expect(caught).to.be.instanceOf(ec.ECAuthenticationError);
       const authErr = caught as ec.ECAuthenticationError;
       expect(authErr.message).to.equal("Too many failed attempts.");
-      expect(authErr.reasonCode).to.equal(ec.ECAuthFailReason.RATE_LIMITED);
+      expect(authErr.reason).to.equal(ec.ECAuthFailReason.RATE_LIMITED);
       expect(authErr.retryAfterSeconds).to.equal(300);
    });
 
