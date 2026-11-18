@@ -4,7 +4,7 @@ import { ECFetchable } from "./ECFetchable.js";
 import { ECPacket } from "./ECPacket.js";
 import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
-import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag, packIPv4ToUint32 } from "./ECTags.js";
+import { ECTag, ECUInt32Tag, ECUInt64Tag, ECStringTag, ECHash16Tag, packIPv4ToUint32 } from "./ECTags.js";
 
 const debug = debuglog("amule-ec:chat");
 
@@ -14,6 +14,16 @@ const debug = debuglog("amule-ec:chat");
 export enum ChatDirection {
    IN = 0,
    OUT = 1,
+}
+
+/**
+ * Message kind within a chat conversation - `EC_TAG_CHAT_MESSAGE_KIND`.
+ * Added in aMule 3.3.0 (#1829, #2089).
+ */
+export enum ChatMessageKind {
+   TEXT = 0,
+   CAPTCHA_CHALLENGE = 1,
+   CAPTCHA_RESULT = 2,
 }
 
 /**
@@ -33,15 +43,25 @@ export class ChatMessage {
        */
       public readonly timestamp: bigint,
       public readonly text: string,
+      public readonly kind: ChatMessageKind = ChatMessageKind.TEXT,
+      public readonly captchaImage?: string,
+      public readonly captchaStatus?: number,
    ) {}
 
    public static fromTag(tag: ECTag): ChatMessage {
       const direction: ChatDirection = Number(tag.childInt(ECTagNames.EC_TAG_CHAT_DIRECTION) ?? 0n);
+      const kind: ChatMessageKind = Number(tag.childInt(ECTagNames.EC_TAG_CHAT_MESSAGE_KIND) ?? 0n);
+      const captchaImage = tag.childString(ECTagNames.EC_TAG_CHAT_CAPTCHA_IMAGE);
+      const captchaStatusTag = tag.childInt(ECTagNames.EC_TAG_CHAT_CAPTCHA_STATUS);
+      const captchaStatus = captchaStatusTag !== undefined ? Number(captchaStatusTag) : undefined;
       return new ChatMessage(
          tag.childInt(ECTagNames.EC_TAG_CHAT_MSG_ID) ?? 0n,
          direction,
          tag.childInt(ECTagNames.EC_TAG_CHAT_TIMESTAMP) ?? 0n,
          tag.stringValue ?? "",
+         kind,
+         captchaImage,
+         captchaStatus,
       );
    }
 }
@@ -63,9 +83,18 @@ export class ChatSession {
       public readonly clientEcid: bigint | undefined,
       public readonly friendEcid: bigint | undefined,
       public readonly messages: readonly ChatMessage[],
+      public readonly peerHash?: string,
+      public readonly pendingCaptchaId?: number,
+      public readonly pendingCaptchaImage?: string,
    ) {}
 
    public static fromTag(tag: ECTag): ChatSession {
+      const hashTag = tag.findChild(ECTagNames.EC_TAG_CHAT_PEER_HASH);
+      const peerHash = hashTag instanceof ECHash16Tag ? Buffer.from(hashTag.value).toString("hex") : undefined;
+      const pendingCaptchaIdTag = tag.findChild(ECTagNames.EC_TAG_CHAT_CAPTCHA_ID);
+      const pendingCaptchaId = pendingCaptchaIdTag ? Number(pendingCaptchaIdTag.intValue ?? 0n) : undefined;
+      const pendingCaptchaImage = tag.childString(ECTagNames.EC_TAG_CHAT_CAPTCHA_IMAGE);
+
       return new ChatSession(
          tag.intValue ?? 0n,
          tag.childString(ECTagNames.EC_TAG_CHAT_PEER_NAME) ?? "",
@@ -77,6 +106,9 @@ export class ChatSession {
                return name === ECTagNames.EC_TAG_CHAT_MESSAGE;
             })
             .map((child) => ChatMessage.fromTag(child)),
+         peerHash,
+         pendingCaptchaId,
+         pendingCaptchaImage,
       );
    }
 }
@@ -240,24 +272,41 @@ export class Chat implements ECFetchable {
       const update = ChatSession.fromTag(sessionTag);
       const previous = this.sessions.find((session) => session.clientId === clientId);
       const messages = previous ? mergeMessages(previous.messages, update.messages) : update.messages;
-      const merged = new ChatSession(update.clientId, update.peerName, update.clientEcid, update.friendEcid, messages);
+      const merged = new ChatSession(
+         update.clientId,
+         update.peerName,
+         update.clientEcid,
+         update.friendEcid,
+         messages,
+         update.peerHash ?? previous?.peerHash,
+         update.pendingCaptchaId,
+         update.pendingCaptchaImage,
+      );
       this.sessions = [...this.sessions.filter((session) => session.clientId !== clientId), merged];
       debug("fetchHistory: clientId=%s, %d message(s)", clientId, merged.messages.length);
    }
 
    /**
-    * Sends `EC_OP_CHAT_SEND` to `clientId` (the GUI_ID `sendToSession()`/`closeSession()` address a
-    * session by), returning the id the daemon resolved - shared by `sendToSession()`/
-    * `sendToAddress()`, which differ only in how they obtain that id. A `false`-ish send result at
-    * the daemon (message queued while a connection to the peer is still being established) is not
-    * surfaced as failure here either, matching upstream's own reasoning: it is not an error, the
-    * message still arrives once connected.
+    * Sends `EC_OP_CHAT_SEND` to a target (by `clientId` or `peerHash`),
+    * returning the id the daemon resolved.
     */
-   private async sendTo(clientId: bigint, text: string, failureMessage: string): Promise<bigint> {
+   private async sendTo(
+      target: { clientId?: bigint; peerHash?: string; captchaId?: number },
+      text: string,
+      failureMessage: string,
+   ): Promise<bigint> {
       this.requireCapability();
       const request = new ECPacket(ECOpcode.EC_OP_CHAT_SEND);
       request.add(new ECStringTag(ECTagNames.EC_TAG_CHAT, text));
-      request.add(new ECUInt64Tag(ECTagNames.EC_TAG_CHAT_CLIENT_ID, clientId));
+      if (target.clientId !== undefined) {
+         request.add(new ECUInt64Tag(ECTagNames.EC_TAG_CHAT_CLIENT_ID, target.clientId));
+      }
+      if (target.peerHash !== undefined) {
+         request.add(new ECHash16Tag(ECTagNames.EC_TAG_CHAT_PEER_HASH, new Uint8Array(Buffer.from(target.peerHash, "hex"))));
+      }
+      if (target.captchaId !== undefined) {
+         request.add(new ECUInt32Tag(ECTagNames.EC_TAG_CHAT_CAPTCHA_ID, target.captchaId));
+      }
       const reply = await this.connection.request(request);
       if (reply.opcode === ECOpcode.EC_OP_FAILED) {
          const reasonTag = reply.find(ECTagNames.EC_TAG_STRING);
@@ -275,8 +324,8 @@ export class Chat implements ECFetchable {
     * own chat tabs do, since a tab already knows its peer's `clientId` from when the session was
     * opened.
     */
-   public async sendToSession(clientId: bigint, text: string): Promise<bigint> {
-      const resolved = await this.sendTo(clientId, text, `Failed to send to chat session ${clientId}.`);
+   public async sendToSession(clientId: bigint, text: string, captchaId?: number): Promise<bigint> {
+      const resolved = await this.sendTo({ clientId, captchaId }, text, `Failed to send to chat session ${clientId}.`);
       debug("sendToSession: clientId=%s", clientId);
       return resolved;
    }
@@ -293,9 +342,23 @@ export class Chat implements ECFetchable {
     *
     * @throws RangeError if `ip` is not a dotted-quad IPv4 address or `port` is not in 1-65535.
     */
-   public async sendToAddress(ip: string, port: number, text: string): Promise<bigint> {
-      const resolved = await this.sendTo(chatClientId(ip, port), text, `Failed to send to ${ip}:${port}.`);
+   public async sendToAddress(ip: string, port: number, text: string, captchaId?: number): Promise<bigint> {
+      const resolved = await this.sendTo(
+         { clientId: chatClientId(ip, port), captchaId },
+         text,
+         `Failed to send to ${ip}:${port}.`,
+      );
       debug("sendToAddress: %s:%d", ip, port);
+      return resolved;
+   }
+
+   /**
+    * Starts or continues a conversation with a peer by its stable MD4 hash -
+    * enabled when `remoteCapabilities.chatPeerHash` is active.
+    */
+   public async sendToPeerHash(peerHash: string, text: string, captchaId?: number): Promise<bigint> {
+      const resolved = await this.sendTo({ peerHash, captchaId }, text, `Failed to send to peer ${peerHash}.`);
+      debug("sendToPeerHash: %s", peerHash);
       return resolved;
    }
 

@@ -43,6 +43,7 @@ export * from "./ECVersion.js";
 export * from "./Friends.js";
 export * from "./IPFilter.js";
 export * from "./Kad.js";
+export * from "./KadLookups.js";
 export * from "./Log.js";
 export * from "./Preferences.js";
 export * from "./Search.js";

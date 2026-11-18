@@ -5,6 +5,7 @@ import { ECOpcode } from "./ECOpcode.js";
 import { ECTagNames } from "./ECTagNames.js";
 import { ECStringTag, ECUInt16Tag, ECUInt32Tag, packIPv4ToUint32 } from "./ECTags.js";
 import { assertEmptyOrHttpUrl } from "./ECValidation.js";
+import { KadLookupReport, decodeKadLookupReport } from "./KadLookups.js";
 
 const debug = debuglog("amule-ec:kad");
 
@@ -185,5 +186,31 @@ export class Kad {
       const messages = stringTagValues(reply);
       debug("disconnect: %s", messages.join(" | "));
       return messages;
+   }
+
+   /**
+    * Fetches a diagnostic snapshot of running and recent Kad lookups -
+    * EC_OP_GET_KAD_LOOKUPS.
+    *
+    * Added in aMule 3.3.0 (#1741). Requires server capability `EC_TAG_CAN_KAD_LOOKUPS`
+    * (advertised in `remoteCapabilities.kadLookups`).
+    */
+   public async getLookups(): Promise<readonly KadLookupReport[]> {
+      if (!this.connection.remoteCapabilities.kadLookups) {
+         throw new Error("Server does not support EC_OP_GET_KAD_LOOKUPS (EC_TAG_CAN_KAD_LOOKUPS not advertised).");
+      }
+      const request = new ECPacket(ECOpcode.EC_OP_GET_KAD_LOOKUPS);
+      const reply = await this.connection.request(request);
+      if (reply.opcode !== ECOpcode.EC_OP_GET_KAD_LOOKUPS) {
+         throw new Error(`Expected EC_OP_GET_KAD_LOOKUPS, received opcode 0x${reply.opcode.toString(16)}.`);
+      }
+      const reports = reply.tags
+         .filter((tag) => {
+            const name: ECTagNames = tag.name;
+            return name === ECTagNames.EC_TAG_KAD_LOOKUP;
+         })
+         .map((tag) => decodeKadLookupReport(tag));
+      debug("getLookups: %d lookup report(s)", reports.length);
+      return reports;
    }
 }

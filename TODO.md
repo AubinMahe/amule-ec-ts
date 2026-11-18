@@ -56,34 +56,29 @@ retired, replaced by `EC_TAG_SRP_A`, `EC_TAG_SRP_B`, `EC_TAG_SRP_PROFILE` (scryp
 
 - **Status**: Completed
 
-### Opcodes and capabilities added upstream since 2026-09-20 sync
+### Opcodes and capabilities added upstream since 2026-09-20 sync (Implemented)
 
 - `EC_OP_GET_KAD_LOOKUPS` (`0x69`, #1741): user-triggered bounded Kad lookup diagnostics snapshot. Gated on server capability
-  `EC_TAG_CAN_KAD_LOOKUPS` (`0x002A`). Reply returns container `EC_TAG_KAD_LOOKUP` (`0x2100`) and its 20 children
-  (`EC_TAG_KAD_LOOKUP_*`, `0x2101`–`0x2127`) describing active lookups, peer records, and referrals.
+  `EC_TAG_CAN_KAD_LOOKUPS` (`0x002A`). Implemented in `src/KadLookups.ts` and `Kad.getLookups()`.
 - `EC_OP_KNOWNFILE_DELETE` (`0x6A`, #1950): deletes a completed shared file or completed transfer from disk. Requires
-  `EC_TAG_KNOWNFILE` (MD4), `EC_TAG_ECID`, `EC_TAG_KNOWNFILE_PATH`, and `EC_TAG_PARTFILE_NAME`. Returns `EC_OP_NOOP` on success,
-  `EC_OP_FAILED` + `EC_TAG_STRING` on failure. Gated on capability `EC_TAG_CAN_DELETE_COMPLETE` (`0x002B`) advertised in `AUTH_OK`.
+  `EC_TAG_KNOWNFILE` (MD4), `EC_TAG_ECID`, `EC_TAG_KNOWNFILE_PATH`, and `EC_TAG_PARTFILE_NAME`. Implemented in
+  `SharedFiles.deleteCompletedFile()`, gated on `remoteCapabilities.deleteComplete` (`0x002B`).
 - `EC_SEARCH_ALL` (`0x05`, #1670): combined simultaneous eD2k+Kad search. Gated on server capability `EC_TAG_CAN_SEARCH_ALL`
   (`0x0029`). Returns split network source counts via `EC_TAG_SEARCHFILE_ED2K_SOURCES` (`0x0718`) and `_KAD_SOURCES` (`0x0719`),
   with per-network active status via `EC_TAG_SEARCH_KAD_ACTIVE` (`0x0717`) and `EC_TAG_SEARCH_ED2K_ACTIVE` (`0x071A`).
 - `EC_TAG_CAN_CHAT_PEER_HASH` (`0x0028`) / `EC_TAG_CHAT_PEER_HASH` (`0x0908`, #1551): chat session addressing by stable peer MD4
-  hash for peers that cannot be addressed by `GUI_ID(ip, port)` (such as IPv6 endpoints).
+  hash for peers that cannot be addressed by `GUI_ID(ip, port)`. Implemented in `Chat.sendToPeerHash()`.
 - Chat CAPTCHA challenges (#1829, #2089): `EC_TAG_CHAT_MESSAGE_KIND` (`0x0909`), `EC_TAG_CHAT_CAPTCHA_IMAGE` (`0x090A`),
-  `EC_TAG_CHAT_CAPTCHA_STATUS` (`0x090B`), `EC_TAG_CHAT_CAPTCHA_ID` (`0x090C`), and spam filter preferences
-  `EC_TAG_MSGFILTER_ADVANCED` (`0x140A`) / `EC_TAG_MSGFILTER_CAPTCHA` (`0x140B`).
+  `EC_TAG_CHAT_CAPTCHA_STATUS` (`0x090B`), `EC_TAG_CHAT_CAPTCHA_ID` (`0x090C`). Implemented in `ChatMessage` and `ChatSession`.
 - Shared file verification results (#1691, #1948): `EC_TAG_KNOWNFILE_VERIFY_DATE` (`0x041D`), `_VERIFY_CORRUPT_MD4` (`0x041E`),
-  `_VERIFY_CORRUPT_AICH` (`0x041F`), and preferences tag `EC_TAG_FILES_SHARED_REVERIFY_DAYS` (`0x1816`).
-- Preferences additions: read-only EC listener settings `EC_TAG_EXTERNALCONN_*` (`0x150C`–`0x1513`, #1614), IPv6 preferences
-  `EC_TAG_CONN_ADDRESS_FAMILIES` / `_ADVERTISE_IPV6` (`0x131A`/`_B`, #1957), server publication acceleration
-  `EC_TAG_SERVERS_ED2K_ACCELERATED_PUBLICATION` (`0x170D`, #1715), allowed directories roots `EC_TAG_DIRECTORIES_ALLOWED_ROOTS`
-  (`0x1A09`, #2172), Kad protocol 10 / strict AICH publisher options (`0x1E02`/`_03`).
-- Live metrics and stats: `EC_TAG_NETWORKS_ENABLED` (`0x002C`), `EC_TAG_STATS_KAD_DISTRIBUTION` (`0x021E`),
-  `EC_TAG_STATS_SESSION_SENT_BYTES` (`0x021F`), `_SESSION_RECEIVED_BYTES` (`0x0220`), `_ACTIVE_CONNECTIONS` (`0x0221`),
-  `_UPTIME_SECONDS` (`0x0222`), and `EC_TAG_PARTFILE_SPEED_SMOOTHED` (`0x0324`).
+  `_VERIFY_CORRUPT_AICH` (`0x041F`). Decoded in `SharedFile`.
+- Live metrics and stats: `EC_TAG_NETWORKS_ENABLED` (`0x002C`), `EC_TAG_STATS_SESSION_SENT_BYTES` (`0x021F`),
+  `_SESSION_RECEIVED_BYTES` (`0x0220`), `_ACTIVE_CONNECTIONS` (`0x0221`), `_UPTIME_SECONDS` (`0x0222`), `_UP_OVERHEAD`,
+  `_DOWN_OVERHEAD`, `_BANNED_COUNT`, `_TOTAL_SENT_BYTES`, `_TOTAL_RECEIVED_BYTES`, `_SHARED_FILE_COUNT` in `Status.ts`,
+  and `EC_TAG_PARTFILE_SPEED_SMOOTHED` (`0x0324`) in `Downloads.ts`.
+- Complete enum parity in `ECTagNames.ts`: all 55 missing tags ported from `ECCodes.abstract`.
 
-- **Priority**: Medium
-- **Effort**: Medium
+- **Status**: Completed
 
 ### `Status.ts` - undecoded `EC_OP_STATS`/`EC_OP_GET_CONNSTATE` fields
 

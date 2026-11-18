@@ -541,6 +541,9 @@ export class ECConnection extends events.EventEmitter {
       }
       if (this.localCapabilities.chatSessions) {
          authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS, new Uint8Array()));
+         if (this.localCapabilities.chatPeerHash) {
+            authRequest.add(new ECCustomTag(ECTagNames.EC_TAG_CAN_CHAT_PEER_HASH, new Uint8Array()));
+         }
       }
    }
 
@@ -623,6 +626,10 @@ export class ECConnection extends events.EventEmitter {
          this.localCapabilities.largeTagCount && reply.has(ECTagNames.EC_TAG_CAN_LARGE_TAG_COUNT);
       this.remoteCapabilities.multiSearch = this.localCapabilities.multiSearch && reply.has(ECTagNames.EC_TAG_CAN_MULTI_SEARCH);
       this.remoteCapabilities.chatSessions = this.localCapabilities.chatSessions && reply.has(ECTagNames.EC_TAG_CAN_CHAT_SESSIONS);
+      this.remoteCapabilities.chatPeerHash =
+         this.remoteCapabilities.chatSessions &&
+         this.localCapabilities.chatPeerHash &&
+         reply.has(ECTagNames.EC_TAG_CAN_CHAT_PEER_HASH);
       // Unconditional request above, so no ANDing with a local flag here -
       // see ECCapabilities.sharedDirsConfig's doc.
       this.remoteCapabilities.sharedDirsConfig = reply.has(ECTagNames.EC_TAG_CAN_SHAREDDIRS_CONFIG);
@@ -632,6 +639,10 @@ export class ECConnection extends events.EventEmitter {
       this.remoteCapabilities.partialUpdate = reply.has(ECTagNames.EC_TAG_CAN_PARTIAL_UPDATE);
       // Unconditional request above too - see ECCapabilities.clientHistory's doc.
       this.remoteCapabilities.clientHistory = reply.has(ECTagNames.EC_TAG_CAN_CLIENT_HISTORY);
+      this.remoteCapabilities.searchAll = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_ALL);
+      this.remoteCapabilities.searchMetadata = reply.has(ECTagNames.EC_TAG_CAN_SEARCH_METADATA);
+      this.remoteCapabilities.kadLookups = reply.has(ECTagNames.EC_TAG_CAN_KAD_LOOKUPS);
+      this.remoteCapabilities.deleteComplete = reply.has(ECTagNames.EC_TAG_CAN_DELETE_COMPLETE);
       this.sessionId = reply.find(ECTagNames.EC_TAG_SESSION_ID)?.intValue;
    }
 

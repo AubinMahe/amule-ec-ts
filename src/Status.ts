@@ -122,6 +122,43 @@ export class Status implements ECFetchable {
     * Daemon uptime in seconds - EC_TAG_STATS_UPTIME_SECONDS.
     */
    public uptimeSeconds: bigint | undefined;
+   /**
+    * Session upload total in bytes - EC_TAG_STATS_SESSION_SENT_BYTES.
+    */
+   public sessionSentBytes: bigint | undefined;
+   /**
+    * Session download total in bytes - EC_TAG_STATS_SESSION_RECEIVED_BYTES.
+    */
+   public sessionReceivedBytes: bigint | undefined;
+   /**
+    * Lifetime upload total in bytes - EC_TAG_STATS_TOTAL_SENT_BYTES.
+    */
+   public totalSentBytes: bigint | undefined;
+   /**
+    * Lifetime download total in bytes - EC_TAG_STATS_TOTAL_RECEIVED_BYTES.
+    */
+   public totalReceivedBytes: bigint | undefined;
+   /**
+    * Upload protocol overhead rate in bytes/s - EC_TAG_STATS_UP_OVERHEAD.
+    */
+   public upOverhead: bigint | undefined;
+   /**
+    * Download protocol overhead rate in bytes/s - EC_TAG_STATS_DOWN_OVERHEAD.
+    */
+   public downOverhead: bigint | undefined;
+   /**
+    * Currently banned peer count - EC_TAG_STATS_BANNED_COUNT.
+    */
+   public bannedCount: bigint | undefined;
+   /**
+    * Number of locally shared files - EC_TAG_STATS_SHARED_FILE_COUNT.
+    */
+   public sharedFileCount: bigint | undefined;
+   /**
+    * Configured network enablement in preferences (bit 0 = ED2K, bit 1 = Kad) -
+    * EC_TAG_NETWORKS_ENABLED.
+    */
+   public networksEnabled: { ed2k: boolean; kad: boolean } | undefined;
 
    public constructor(public readonly connection: ECConnection) {}
 
@@ -198,6 +235,14 @@ export class Status implements ECFetchable {
          this.residentMemoryBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_RESIDENT_MEMORY_BYTES)?.intValue;
          this.activeConnections = statsPacket.find(ECTagNames.EC_TAG_STATS_ACTIVE_CONNECTIONS)?.intValue;
          this.uptimeSeconds = statsPacket.find(ECTagNames.EC_TAG_STATS_UPTIME_SECONDS)?.intValue;
+         this.sessionSentBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_SESSION_SENT_BYTES)?.intValue;
+         this.sessionReceivedBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_SESSION_RECEIVED_BYTES)?.intValue;
+         this.totalSentBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_TOTAL_SENT_BYTES)?.intValue;
+         this.totalReceivedBytes = statsPacket.find(ECTagNames.EC_TAG_STATS_TOTAL_RECEIVED_BYTES)?.intValue;
+         this.upOverhead = statsPacket.find(ECTagNames.EC_TAG_STATS_UP_OVERHEAD)?.intValue;
+         this.downOverhead = statsPacket.find(ECTagNames.EC_TAG_STATS_DOWN_OVERHEAD)?.intValue;
+         this.bannedCount = statsPacket.find(ECTagNames.EC_TAG_STATS_BANNED_COUNT)?.intValue;
+         this.sharedFileCount = statsPacket.find(ECTagNames.EC_TAG_STATS_SHARED_FILE_COUNT)?.intValue;
       }
       if (!connStateTag) {
          return;
@@ -208,6 +253,14 @@ export class Status implements ECFetchable {
       this.kadConnected = (bitmask & 0x04n) !== 0n;
       this.kadFirewalled = (bitmask & 0x08n) !== 0n;
       this.kadRunning = (bitmask & 0x10n) !== 0n;
+      const networksTag = connStateTag.findChild(ECTagNames.EC_TAG_NETWORKS_ENABLED);
+      if (networksTag?.intValue !== undefined) {
+         const nMask = networksTag.intValue;
+         this.networksEnabled = {
+            ed2k: (nMask & 0x01n) !== 0n,
+            kad: (nMask & 0x02n) !== 0n,
+         };
+      }
       this.ed2kId = connStateTag.findChild(ECTagNames.EC_TAG_ED2K_ID)?.intValue;
       this.hasLowId = this.ed2kId !== undefined ? this.ed2kId < HIGHEST_LOWID_ED2K_KAD : undefined;
       this.ed2kConnectedSince = connStateTag.findChild(ECTagNames.EC_TAG_ED2K_CONNECTED_SINCE)?.intValue;
