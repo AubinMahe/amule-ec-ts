@@ -217,3 +217,40 @@ accepts with `npm view typescript-eslint peerDependencies.typescript`; once the 
 
 - **Priority**: Low
 - **Effort**: Low
+
+## How to publish on npm
+
+Publishing to npm uses GitHub Actions with OIDC and Sigstore provenance (no long-lived secrets in repository), combined with npm
+_staged publishing_ requiring two-factor authentication (2FA) to approve:
+
+1. **Prerequisites**: Ensure the release is tagged, pushed to origin, and matches `package.json`:
+
+   ```bash
+   npm run check-versions -- vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+1. **Trigger the publish workflow** on the tag (`vX.Y.Z`, branches are refused):
+
+   ```bash
+   gh workflow run publish.yml --ref vX.Y.Z
+   ```
+
+   Or on GitHub: Actions -> "Publish to npm" -> "Run workflow" -> select tag
+
+1. **Monitor the workflow**:
+
+   ```bash
+   gh run list --workflow=publish.yml --limit 1
+   gh run watch
+   ```
+
+1. **Approve the staged release** (requires 2FA / WebAuthn key):
+
+   ```bash
+   npm stage list
+   npm stage approve <stage-id>
+   ```
+
+   **Or via Web**: Navigate to [npmjs.com Staged Packages](https://www.npmjs.com/settings/aubin_mahe/staged-packages) and click
+   **Approve**.

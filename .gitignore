@@ -4,3 +4,4 @@ commit-message.md
 coverage/
 dist/
 node_modules/
+statsgraphs-dump.txt

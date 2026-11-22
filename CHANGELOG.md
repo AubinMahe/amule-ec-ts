@@ -7,6 +7,14 @@ Beyond bug fixes, future changes are driven by the upstream [amule-org/amule](ht
 EC opcodes/tags or protocol behavior changes there are what this client tracks - see CONTRIBUTING.md for how such changes are
 verified against that source before being reflected here.
 
+## [4.3.2] - 2026-11-22
+
+### Added
+
+- REPL: added `--delay=ms` option to `scripts/repl-run.mjs` for delayed sequential command feeding.
+- REPL: enhanced `printStatsGraphs` in `tests/repl/views/statsGraphs.ts` with point indices, raw byte rates, `last` and `depth`
+  metadata.
+
 ## [4.3.1] - 2026-11-18
 
 ### Fixed
