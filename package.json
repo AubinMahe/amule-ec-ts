@@ -10,7 +10,7 @@
    "name"           : "amule-ec",
    "type"           : "module",
    "types"          : "./dist/index.d.ts",
-   "version"        : "4.3.1",
+   "version"        : "4.3.2",
    "allowScripts"   : {
       "esbuild@0.28.1": true
    },
