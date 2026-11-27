@@ -218,6 +218,50 @@ accepts with `npm view typescript-eslint peerDependencies.typescript`; once the 
 - **Priority**: Low
 - **Effort**: Low
 
+## How to create a PR for a new release
+
+1. **Create and switch to a dedicated working branch**:
+
+   ```bash
+   git switch -c <branch-name>
+   ```
+
+1. **Bump version, document changes, and lint**:
+
+   ```bash
+   npm version patch --no-git-tag-version    # or minor / major
+   code CHANGELOG.md                         # document changes under the new version header
+   npm run lint:fix                          # auto-fix linting and formatting across markdown and code
+   ```
+
+1. **Commit and push branch to origin**:
+
+   ```bash
+   git add --all
+   git commit -m "<commit message>"
+   git push -u origin HEAD
+   ```
+
+1. **Create PR and monitor CI checks**:
+
+   ```bash
+   gh pr create --fill
+   gh pr checks --watch
+   ```
+
+1. **Merge the PR** (squash commits, delete local/remote branch, and return to synced `master`):
+
+   ```bash
+   gh pr merge --squash --delete-branch
+   ```
+
+1. **Tag the release on master**:
+
+   ```bash
+   git tag v<new-version>
+   git push origin v<new-version>
+   ```
+
 ## How to publish on npm
 
 Publishing to npm uses GitHub Actions with OIDC and Sigstore provenance (no long-lived secrets in repository), combined with npm
